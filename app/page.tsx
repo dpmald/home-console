@@ -29,9 +29,9 @@ export default async function HomePage() {
         <div
           style={{
             padding: '8px 20px',
-            background: 'rgba(56, 189, 248, 0.14)',
-            borderBottom: '1px solid rgba(56, 189, 248, 0.35)',
-            color: '#bae6fd',
+            background: 'var(--card-2)',
+            borderBottom: '1px solid var(--line)',
+            color: 'var(--muted)',
             fontSize: '0.88rem',
             display: 'flex',
             justifyContent: 'space-between',

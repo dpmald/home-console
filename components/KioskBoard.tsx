@@ -7,6 +7,7 @@ import { isFullyKiosk, speakOnCozyla, useCozylaKiosk, wakeCozylaScreen } from '@
 import type { BacklogLocation, KioskAction, KitchenState } from '@/lib/types';
 import type { Weather } from '@/lib/weather';
 import { VoiceOrb } from './VoiceOrb';
+import { ThemeToggle } from './ThemeToggle';
 
 interface Timer {
   id: string;
@@ -322,6 +323,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
             onStopNpr={stopNpr}
             onServerToolDone={refresh}
           />
+
+          <ThemeToggle defaultTheme="light" />
 
           <a href="/guide" className="btn sm ghost" title="Open Interactive User Guide">
             📖 Guide
