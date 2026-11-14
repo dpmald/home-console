@@ -3,7 +3,7 @@ import {
   addBacklogItem, addGrocery, assignLogistics, claimDinner, cookFromBacklog, getKitchenState,
   markDinnerCooked, setBacklogStatus, setGroceryStatus, setNotTonight, toggleChore, unclaimDinner,
 } from '@/lib/domain';
-import { demoKitchenState } from '@/lib/cozyla';
+import { demoKitchenState } from '@/lib/demo';
 import { refreshDinnerMessages } from '@/lib/slack/sync';
 import { todayISO } from '@/lib/time';
 import type { KioskAction } from '@/lib/types';

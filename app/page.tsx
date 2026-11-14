@@ -1,5 +1,5 @@
 import { KioskBoard } from '@/components/KioskBoard';
-import { demoKitchenState } from '@/lib/cozyla';
+import { demoKitchenState } from '@/lib/demo';
 import { getKitchenState } from '@/lib/domain';
 import { todayISO } from '@/lib/time';
 import { getWeather, type Weather } from '@/lib/weather';
