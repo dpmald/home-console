@@ -16,6 +16,93 @@ interface Timer {
 
 const NPR_URL = process.env.NEXT_PUBLIC_NPR_STREAM_URL || 'https://npr-ice.streamguys1.com/live.mp3';
 
+function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState {
+  switch (a.type) {
+    case 'claim_dinner':
+      return {
+        ...cur,
+        dinner: {
+          ...cur.dinner,
+          chef: a.chef,
+          status: 'planned',
+          recipe_name: a.chef === 'takeout' ? 'Takeout / fend for yourselves' : cur.dinner.chef === 'takeout' ? null : cur.dinner.recipe_name,
+          linked_backlog_id: a.chef === 'takeout' ? null : cur.dinner.linked_backlog_id,
+          unavailable: cur.dinner.unavailable.filter((p) => p !== a.chef),
+          claimed_via: 'kiosk',
+        },
+      };
+    case 'unclaim_dinner':
+      return {
+        ...cur,
+        dinner: { ...cur.dinner, chef: 'unclaimed', status: 'unclaimed', recipe_name: null, linked_backlog_id: null, claimed_via: 'kiosk' },
+      };
+    case 'not_tonight': {
+      const set = new Set(cur.dinner.unavailable);
+      if (a.unavailable) set.add(a.parent);
+      else set.delete(a.parent);
+      return { ...cur, dinner: { ...cur.dinner, unavailable: [...set], claimed_via: 'kiosk' } };
+    }
+    case 'cook_from_backlog': {
+      const item = cur.backlog.find((b) => b.id === a.backlogId);
+      return {
+        ...cur,
+        dinner: {
+          ...cur.dinner,
+          status: 'planned',
+          recipe_name: item?.recipe_or_item_name ?? cur.dinner.recipe_name,
+          linked_backlog_id: a.backlogId,
+          claimed_via: 'kiosk',
+        },
+      };
+    }
+    case 'dinner_cooked':
+      return {
+        ...cur,
+        dinner: { ...cur.dinner, status: 'cooked', claimed_via: 'kiosk' },
+        backlog: cur.backlog.filter((b) => b.id !== cur.dinner.linked_backlog_id),
+      };
+    case 'backlog_status':
+      return { ...cur, backlog: cur.backlog.filter((b) => b.id !== a.id) };
+    case 'add_backlog':
+      return {
+        ...cur,
+        backlog: [
+          ...cur.backlog,
+          {
+            id: `local-${Date.now()}`,
+            recipe_or_item_name: a.name,
+            key_perishables: [],
+            location: a.location,
+            delivery_date: cur.date,
+            status: 'in_fridge',
+            added_by: 'kiosk',
+          },
+        ],
+      };
+    case 'toggle_chore':
+      return {
+        ...cur,
+        chores: cur.chores.map((c) => (c.id === a.id ? { ...c, completed: a.completed } : c)),
+      };
+    case 'assign_logistics':
+      return {
+        ...cur,
+        events: cur.events.map((e) => (e.id === a.id ? { ...e, assigned_parent: a.parent } : e)),
+        conflicts: cur.conflicts.filter((c) => c.eventId !== a.id || a.parent === 'unassigned'),
+      };
+    case 'add_grocery':
+      return {
+        ...cur,
+        groceries: [
+          ...cur.groceries,
+          { id: `g-${Date.now()}`, name: a.name, quantity: null, status: 'needed', added_by: 'kiosk' },
+        ],
+      };
+    case 'grocery_status':
+      return { ...cur, groceries: cur.groceries.filter((g) => g.id !== a.id) };
+  }
+}
+
 function chime() {
   try {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
@@ -56,21 +143,53 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   useCozylaKiosk(refresh);
 
   const act = useCallback(async (action: KioskAction) => {
-    const r = await fetch('/api/kiosk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(action),
-    });
-    if (r.ok) setState(await r.json());
+    try {
+      const r = await fetch('/api/kiosk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(action),
+      });
+      if (r.ok) {
+        setState(await r.json());
+        return;
+      }
+    } catch {}
+    // Local preview fallback when Supabase is not connected yet
+    setState((cur) => applyOptimisticAction(cur, action));
   }, []);
 
   const decideOrder = useCallback(async (id: string, approve: boolean) => {
-    const r = await fetch('/api/kiosk/order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, approve }),
-    });
-    if (r.ok) setState(await r.json());
+    try {
+      const r = await fetch('/api/kiosk/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, approve }),
+      });
+      if (r.ok) {
+        setState(await r.json());
+        return;
+      }
+    } catch {}
+    setState((cur) => ({
+      ...cur,
+      orders: cur.orders.map((o) => (o.id === id ? { ...o, status: approve ? 'approved' : 'rejected' } : o)),
+      backlog: approve
+        ? [
+            ...cur.backlog,
+            ...(cur.orders
+              .find((o) => o.id === id)
+              ?.kept_recipes.map((r, idx) => ({
+                id: `approved-${idx}-${Date.now()}`,
+                recipe_or_item_name: r.name,
+                key_perishables: r.perishables ?? [],
+                location: 'fridge' as const,
+                delivery_date: cur.date,
+                status: 'in_fridge' as const,
+                added_by: "Warren's Sat cart",
+              })) ?? []),
+          ]
+        : cur.backlog,
+    }));
   }, []);
 
   // Clock + timer chime loop (1 Hz)
@@ -203,6 +322,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
             onStopNpr={stopNpr}
             onServerToolDone={refresh}
           />
+
+          <a href="/guide" className="btn sm ghost" title="Open Interactive User Guide">
+            📖 Guide
+          </a>
         </div>
       </header>
 

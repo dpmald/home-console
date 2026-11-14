@@ -3,6 +3,7 @@ import {
   addBacklogItem, addGrocery, assignLogistics, claimDinner, cookFromBacklog, getKitchenState,
   markDinnerCooked, setBacklogStatus, setGroceryStatus, setNotTonight, toggleChore, unclaimDinner,
 } from '@/lib/domain';
+import { demoKitchenState } from '@/lib/cozyla';
 import { refreshDinnerMessages } from '@/lib/slack/sync';
 import { todayISO } from '@/lib/time';
 import type { KioskAction } from '@/lib/types';
@@ -10,7 +11,12 @@ import type { KioskAction } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json(await getKitchenState(todayISO()));
+  const date = todayISO();
+  try {
+    return NextResponse.json(await getKitchenState(date));
+  } catch {
+    return NextResponse.json(demoKitchenState(date));
+  }
 }
 
 export async function POST(req: NextRequest) {
