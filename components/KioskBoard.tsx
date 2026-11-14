@@ -3,19 +3,42 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserSupabase } from '@/lib/supabase/browser';
 import { NAMES, PARENTS, SOURCE_LABEL, isParent } from '@/lib/family';
 import { daysBetween, fmtDay, fmtShortDate, fmtTime, isAllDay } from '@/lib/time';
-import { isFullyKiosk, speakOnCozyla, useCozylaKiosk, wakeCozylaScreen } from '@/lib/cozyla';
+import { isFullyKiosk, speakOnCozyla, useCozylaKiosk, wakeCozylaScreen, wakeSpotifyOnCozyla } from '@/lib/cozyla';
 import type { BacklogLocation, KioskAction, KitchenState } from '@/lib/types';
 import type { Weather } from '@/lib/weather';
+import type { SpotifyNowPlaying } from '@/lib/spotify';
 import { VoiceOrb } from './VoiceOrb';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Timer {
   id: string;
   label: string;
+  initialSecs: number;
   endsAt: number;
+  pausedRemaining?: number;
 }
 
+type ViewMode = 'ambient' | 'bento' | 'timeline';
+type MemberFilter = 'all' | 'daniela' | 'warren' | 'wesley';
+
 const NPR_URL = process.env.NEXT_PUBLIC_NPR_STREAM_URL || 'https://npr-ice.streamguys1.com/live.mp3';
+
+function chime() {
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new Ctx();
+    [0, 0.25, 0.5, 0.85, 1.1, 1.35].forEach((offset, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = i % 2 === 0 ? 880 : 660;
+      gain.gain.setValueAtTime(0.22, ctx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.2);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.22);
+    });
+  } catch {}
+}
 
 function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState {
   switch (a.type) {
@@ -26,7 +49,12 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
           ...cur.dinner,
           chef: a.chef,
           status: 'planned',
-          recipe_name: a.chef === 'takeout' ? 'Takeout / fend for yourselves' : cur.dinner.chef === 'takeout' ? null : cur.dinner.recipe_name,
+          recipe_name:
+            a.chef === 'takeout'
+              ? 'Takeout / Order In'
+              : cur.dinner.chef === 'takeout'
+                ? null
+                : cur.dinner.recipe_name,
           linked_backlog_id: a.chef === 'takeout' ? null : cur.dinner.linked_backlog_id,
           unavailable: cur.dinner.unavailable.filter((p) => p !== a.chef),
           claimed_via: 'kiosk',
@@ -35,7 +63,14 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
     case 'unclaim_dinner':
       return {
         ...cur,
-        dinner: { ...cur.dinner, chef: 'unclaimed', status: 'unclaimed', recipe_name: null, linked_backlog_id: null, claimed_via: 'kiosk' },
+        dinner: {
+          ...cur.dinner,
+          chef: 'unclaimed',
+          status: 'unclaimed',
+          recipe_name: null,
+          linked_backlog_id: null,
+          claimed_via: 'kiosk',
+        },
       };
     case 'not_tonight': {
       const set = new Set(cur.dinner.unavailable);
@@ -49,6 +84,7 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
         ...cur,
         dinner: {
           ...cur.dinner,
+          chef: isParent(cur.dinner.chef) ? cur.dinner.chef : 'daniela',
           status: 'planned',
           recipe_name: item?.recipe_or_item_name ?? cur.dinner.recipe_name,
           linked_backlog_id: a.backlogId,
@@ -104,29 +140,23 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
   }
 }
 
-function chime() {
-  try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = new Ctx();
-    [0, 0.25, 0.5, 0.85, 1.1, 1.35].forEach((offset, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = i % 2 === 0 ? 880 : 660;
-      gain.gain.setValueAtTime(0.22, ctx.currentTime + offset);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.2);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(ctx.currentTime + offset);
-      osc.stop(ctx.currentTime + offset + 0.22);
-    });
-  } catch {}
-}
-
 export function KioskBoard({ initial, initialWeather }: { initial: KitchenState; initialWeather: Weather | null }) {
   const [state, setState] = useState<KitchenState>(initial);
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
+  const [mode, setMode] = useState<ViewMode>('bento');
+  const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
   const [now, setNow] = useState<Date>(() => new Date());
-  const [timers, setTimers] = useState<Timer[]>([]);
+  const [timers, setTimers] = useState<Timer[]>([
+    {
+      id: 'default-simmer',
+      label: 'Kitchen Timer',
+      initialSecs: 600,
+      endsAt: Date.now() + 522 * 1000,
+      pausedRemaining: 522,
+    },
+  ]);
   const [nprPlaying, setNprPlaying] = useState(false);
+  const [spotify, setSpotify] = useState<SpotifyNowPlaying>({ configured: false, playing: false });
   const [newBacklog, setNewBacklog] = useState('');
   const [newBacklogLoc, setNewBacklogLoc] = useState<BacklogLocation>('fridge');
   const [newGrocery, setNewGrocery] = useState('');
@@ -138,9 +168,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
       const r = await fetch('/api/kiosk', { cache: 'no-store' });
       if (r.ok) setState(await r.json());
     } catch {}
+    try {
+      const sr = await fetch('/api/spotify', { cache: 'no-store' });
+      if (sr.ok) setSpotify(await sr.json());
+    } catch {}
   }, []);
 
-  // Cozyla 24" + Fully Kiosk Browser integration (wake lock, camera motion wake, night dimming)
   useCozylaKiosk(refresh);
 
   const act = useCallback(async (action: KioskAction) => {
@@ -155,7 +188,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
         return;
       }
     } catch {}
-    // Local preview fallback when Supabase is not connected yet
     setState((cur) => applyOptimisticAction(cur, action));
   }, []);
 
@@ -193,18 +225,42 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     }));
   }, []);
 
-  // Clock + timer chime loop (1 Hz)
+  const actSpotify = useCallback(async (op: 'play' | 'pause' | 'next', query?: string) => {
+    try {
+      const r = await fetch('/api/spotify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op, query }),
+      });
+      const j = await r.json();
+      if (j.needsWake && wakeSpotifyOnCozyla()) {
+        setTimeout(async () => {
+          const r2 = await fetch('/api/spotify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op, query }),
+          });
+          const j2 = await r2.json();
+          if (j2.state) setSpotify(j2.state);
+        }, 1800);
+        return;
+      }
+      if (j.state) setSpotify(j.state);
+    } catch {}
+  }, []);
+
+  // 1 Hz Clock + Rotary Timer tick
   useEffect(() => {
     const id = setInterval(() => {
       const t = new Date();
       setNow(t);
       setTimers((cur) => {
         for (const tm of cur) {
-          if (tm.endsAt <= t.getTime() && !firedTimers.current.has(tm.id)) {
+          if (tm.pausedRemaining === undefined && tm.endsAt <= t.getTime() && !firedTimers.current.has(tm.id)) {
             firedTimers.current.add(tm.id);
             wakeCozylaScreen();
             chime();
-            if (isFullyKiosk()) speakOnCozyla(`${tm.label} timer is done`);
+            if (isFullyKiosk()) speakOnCozyla(`${tm.label} is done`);
           }
         }
         return cur;
@@ -213,7 +269,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     return () => clearInterval(id);
   }, []);
 
-  // Supabase Realtime broadcast subscription + 45s fallback poll + weather refresh
+  // Supabase Realtime broadcast subscription + fallback poll
   useEffect(() => {
     const sb = browserSupabase();
     const channel = sb
@@ -232,7 +288,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     };
   }, [refresh]);
 
-  // NPR controls
   const playNpr = useCallback(() => {
     if (!nprRef.current) nprRef.current = new Audio(NPR_URL);
     nprRef.current.src = NPR_URL;
@@ -247,420 +302,1570 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     setNprPlaying(false);
   }, []);
 
-  const startTimer = useCallback((seconds: number, label = 'Timer') => {
-    setTimers((cur) => [...cur, { id: `${Date.now()}-${Math.random()}`, label, endsAt: Date.now() + seconds * 1000 }]);
+  const startTimer = useCallback((seconds: number, label = 'Kitchen Timer') => {
+    const id = `${Date.now()}`;
+    firedTimers.current.delete(id);
+    setTimers([
+      {
+        id,
+        label,
+        initialSecs: seconds,
+        endsAt: Date.now() + seconds * 1000,
+      },
+    ]);
   }, []);
 
+  const activeTimer = timers[0];
+  const timerRemainingSecs = activeTimer
+    ? activeTimer.pausedRemaining !== undefined
+      ? activeTimer.pausedRemaining
+      : Math.max(0, Math.ceil((activeTimer.endsAt - now.getTime()) / 1000))
+    : 0;
+  const timerRunning = Boolean(activeTimer && activeTimer.pausedRemaining === undefined && timerRemainingSecs > 0);
+  const timerMM = String(Math.floor(timerRemainingSecs / 60)).padStart(2, '0');
+  const timerSS = String(timerRemainingSecs % 60).padStart(2, '0');
+  const circumference = 2 * Math.PI * 41; // 257.6
+  const timerRatio = activeTimer ? Math.min(1, Math.max(0, timerRemainingSecs / Math.max(1, activeTimer.initialSecs))) : 0;
+  const timerDashOffset = circumference * (1 - timerRatio);
+
+  const toggleActiveTimer = () => {
+    if (!activeTimer) {
+      startTimer(600, 'Kitchen Timer');
+      return;
+    }
+    setTimers((cur) =>
+      cur.map((tm, i) => {
+        if (i !== 0) return tm;
+        if (tm.pausedRemaining !== undefined) {
+          return { ...tm, endsAt: Date.now() + tm.pausedRemaining * 1000, pausedRemaining: undefined };
+        }
+        const rem = Math.max(0, Math.ceil((tm.endsAt - Date.now()) / 1000));
+        return { ...tm, pausedRemaining: rem };
+      }),
+    );
+  };
+
+  const bumpTimerMinute = () => {
+    if (!activeTimer) {
+      startTimer(60, '1 Min Timer');
+      return;
+    }
+    setTimers((cur) =>
+      cur.map((tm, i) => {
+        if (i !== 0) return tm;
+        if (tm.pausedRemaining !== undefined) {
+          return { ...tm, pausedRemaining: tm.pausedRemaining + 60, initialSecs: tm.initialSecs + 60 };
+        }
+        return { ...tm, endsAt: tm.endsAt + 60_000, initialSecs: tm.initialSecs + 60 };
+      }),
+    );
+  };
+
+  const resetActiveTimer = () => {
+    if (!activeTimer) return;
+    setTimers((cur) =>
+      cur.map((tm, i) => (i === 0 ? { ...tm, pausedRemaining: tm.initialSecs, endsAt: Date.now() + tm.initialSecs * 1000 } : tm)),
+    );
+  };
+
+  // Time formatting
+  const rawTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const [clockDigits, clockAmPm] = rawTime.split(' ');
   const d = state.dinner;
   const doneChores = state.chores.filter((c) => c.completed).length;
+  const totalChores = state.chores.length || 1;
+  const chorePct = Math.round((doneChores / totalChores) * 100);
+  const allowanceEarned = (doneChores * 5).toFixed(2);
+  const allowanceTotal = (state.chores.length * 5).toFixed(2);
   const pendingOrders = state.orders.filter((o) => o.status === 'pending');
+  const nextUnassigned = state.events.find(
+    (e) => (e.logistics_type === 'pickup' || e.logistics_type === 'appointment') && e.assigned_parent === 'unassigned',
+  );
+  const filteredEvents = state.events.filter((ev) => {
+    if (memberFilter === 'all') return true;
+    if (memberFilter === 'wesley') return ev.logistics_type === 'pickup' || ev.logistics_type === 'appointment' || ev.title.toLowerCase().includes('wesley');
+    return ev.assigned_parent === memberFilter || ev.source_calendar.startsWith(memberFilter);
+  });
 
-  const dinnerHeadline =
-    d.chef === 'takeout'
-      ? '🥡 Takeout / fend for yourselves'
-      : d.status === 'unclaimed'
-        ? '❓ Nobody has claimed dinner yet'
-        : `${d.status === 'cooked' ? '✅' : '👩‍🍳'} ${ isParent(d.chef) ? NAMES[d.chef] : 'Planned'}${
-            d.recipe_name ? ` — ${d.recipe_name}` : ' is cooking tonight'
-          }`;
+  const audioStatusLabel = nprPlaying
+    ? 'NPR LIVE STREAM (PLAYING)'
+    : spotify.playing
+      ? `SPOTIFY: ${(spotify.track || 'PLAYING').toUpperCase()}`
+      : 'AUDIO STANDBY • NPR / SPOTIFY';
 
   return (
-    <main className="kiosk">
-      {/* ── Top Bar: Clock · Weather · Timers · NPR · Voice ── */}
-      <header className="topbar">
-        <div className="clock-wrap">
-          <div className="clock">
-            {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-          </div>
-          <div className="date-sub">{fmtDay(state.date)}</div>
-        </div>
+    <div className="hearth-canvas">
+      {/* Ambient dot-pattern & warm terracotta/cobalt glow */}
+      <div className="hearth-bg-dots" />
+      <div className="hearth-glow-top" />
+      <div className="hearth-glow-bottom" />
 
-        {weather && (
-          <div className="weather-pill">
-            <span className="weather-now">
-              {weather.current.emoji} {weather.current.temp}°
-            </span>
-            <div className="weather-meta">
-              <div>
-                {weather.current.label} · H {weather.today.hi}° / L {weather.today.lo}°
-                {weather.today.precip ? ` · ${weather.today.precip}% rain` : ''}
+      <main className="hearth-shell">
+        {/* ── 1. Top Navigation & Family Presence Bar (Shown in Bento & Timeline Modes; slim in Ambient) ── */}
+        <header className="hearth-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              className={`hw-btn ${mode === 'ambient' ? 'terracotta' : ''}`}
+              onClick={() => setMode(mode === 'ambient' ? 'bento' : 'ambient')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>
+                {mode === 'ambient' ? 'grid_view' : 'arrow_back'}
+              </span>
+              <span>{mode === 'ambient' ? 'OPEN COMMAND BENTO' : 'RETURN TO AMBIENT'}</span>
+            </button>
+
+            <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
+
+            <button
+              className="hw-btn"
+              onClick={() => setMode(mode === 'timeline' ? 'bento' : 'timeline')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--emerald)' }}>
+                {mode === 'timeline' ? 'close_fullscreen' : 'grid_view'}
+              </span>
+              <span>{mode === 'timeline' ? 'TIMELINE EXPANDED' : 'BENTO OVERVIEW'}</span>
+            </button>
+          </div>
+
+          {/* Center Glance Clock + Weather */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontSize: '2.55rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {clockDigits}
+              </span>
+              <span className="font-mono" style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--muted)' }}>
+                {clockAmPm}
+              </span>
+            </div>
+            <div style={{ textAlign: 'right', lineHeight: 1.25 }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>{fmtDay(state.date)}</div>
+              <div className="font-mono" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>
+                {weather
+                  ? `OUTDOOR ${weather.current.temp}°F (${weather.current.label.toUpperCase()}) • H ${weather.today.hi}° L ${weather.today.lo}°`
+                  : 'KITCHEN HEARTH • ONLINE'}
               </div>
-              <div>
-                Tomorrow: {weather.tomorrow.emoji} {weather.tomorrow.hi}°/{weather.tomorrow.lo}° {weather.tomorrow.label}
+            </div>
+          </div>
+
+          {/* Right Family Presence Pods + Voice */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div className="presence-pod">
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--terracotta)' }} />
+              <span>
+                <strong style={{ color: 'var(--text)' }}>Daniela:</strong>{' '}
+                {d.chef === 'daniela' ? 'Chef Tonight' : d.unavailable.includes('daniela') ? 'Out Tonight' : 'Home'}
+              </span>
+            </div>
+            <div className="presence-pod">
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cobalt)' }} />
+              <span>
+                <strong style={{ color: 'var(--text)' }}>Wesley:</strong> {doneChores}/{state.chores.length} Done
+              </span>
+            </div>
+            <div className="presence-pod">
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: state.lateTonight.length ? 'var(--amber)' : 'var(--sage)',
+                }}
+              />
+              <span>
+                <strong style={{ color: 'var(--text)' }}>Warren:</strong>{' '}
+                {d.chef === 'warren'
+                  ? 'Chef Tonight'
+                  : state.lateTonight[0]
+                    ? `Late until ${fmtTime(state.lateTonight[0].until)}`
+                    : 'Home'}
+              </span>
+            </div>
+
+            <VoiceOrb
+              onStartTimer={startTimer}
+              onCancelTimers={() => setTimers([])}
+              onPlayNpr={playNpr}
+              onStopNpr={stopNpr}
+              onServerToolDone={refresh}
+            />
+          </div>
+        </header>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            VIEW 1: 10-FOOT AMBIENT STANDBY HEARTH VIEW (Stitch Screen 1 & 2)
+            ════════════════════════════════════════════════════════════════════ */}
+        {mode === 'ambient' && (
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateColumns: '7fr 5fr',
+              gap: 20,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Left Primary Glanceable Column: Giant 116px Hero Clock + Next Logistics Callout + Presence */}
+            <div
+              className="ceramic-card"
+              style={{
+                padding: '26px 32px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                className="font-mono"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '0.75rem',
+                  color: 'var(--muted)',
+                  paddingBottom: 12,
+                  borderBottom: '1px solid var(--border-subtle)',
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--terracotta)' }} />
+                  HEARTH // COZYLA 24&quot; AMBIENT DISPLAY
+                </span>
+                <span>SLACK + SUPABASE REALTIME SYNC</span>
+              </div>
+
+              {/* Giant 10-Foot Glanceable Clock */}
+              <div style={{ margin: 'auto 0', padding: '12px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+                  <span
+                    style={{
+                      fontSize: 'clamp(76px, 7.6vw, 118px)',
+                      fontWeight: 800,
+                      letterSpacing: '-0.04em',
+                      lineHeight: 0.95,
+                    }}
+                  >
+                    {clockDigits}
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
+                    >
+                      {clockAmPm}
+                    </span>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.1em' }}
+                    >
+                      LOCAL • HOME
+                    </span>
+                  </div>
+                </div>
+
+                {/* Date & Weather Glances */}
+                <div
+                  style={{
+                    marginTop: 18,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 14,
+                    fontSize: '1.2rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{fmtDay(state.date)}</span>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--amber)', fontSize: 22 }}>
+                      sunny
+                    </span>
+                    {weather ? `Outdoor ${weather.current.temp}°F (${weather.current.label})` : 'Weather Ready'}
+                  </span>
+                  {weather && (
+                    <>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '1.02rem' }}>
+                        Tomorrow {weather.tomorrow.hi}°/{weather.tomorrow.lo}° {weather.tomorrow.label}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Clickable Next Schedule / Pickup Banner */}
+                <div
+                  onClick={() => setMode('timeline')}
+                  className="ceramic-well"
+                  style={{
+                    marginTop: 22,
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 12,
+                        background: 'rgba(43, 89, 255, 0.1)',
+                        border: '1px solid rgba(43, 89, 255, 0.25)',
+                        color: 'var(--cobalt)',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      <span className="material-symbols-outlined">calendar_clock</span>
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          className="font-mono"
+                          style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--cobalt)', letterSpacing: '0.06em' }}
+                        >
+                          SCHEDULE &amp; LOGISTICS
+                        </span>
+                        {nextUnassigned && (
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: '0.66rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              background: '#fef3c7',
+                              color: '#b45309',
+                            }}
+                          >
+                            DRIVER NEEDED
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 700, marginTop: 2 }}>
+                        {nextUnassigned
+                          ? `${fmtTime(nextUnassigned.start_time)} • ${nextUnassigned.title}`
+                          : state.events[0]
+                            ? `${fmtTime(state.events[0].start_time)} • ${state.events[0].title}`
+                            : 'All pickups and appointments covered today'}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className="font-mono"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', fontWeight: 700, color: 'var(--cobalt)' }}
+                  >
+                    <span>View Family Schedule</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      arrow_forward
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lower Presence & Audio Status Shelf */}
+              <div
+                style={{
+                  paddingTop: 14,
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                    At Hearth:
+                  </span>
+                  <span className="presence-pod">
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--sage)' }} />
+                    <strong style={{ color: 'var(--text)' }}>Daniela</strong>
+                    <span>{d.chef === 'daniela' ? 'Chef' : 'Home'}</span>
+                  </span>
+                  <span className="presence-pod">
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cobalt)' }} />
+                    <strong style={{ color: 'var(--text)' }}>Wesley</strong>
+                    <span style={{ color: 'var(--cobalt)' }}>Chores {doneChores}/{state.chores.length}</span>
+                  </span>
+                  <span className="presence-pod">
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)' }} />
+                    <strong style={{ color: 'var(--text)' }}>Warren</strong>
+                    <span>{d.chef === 'warren' ? 'Chef' : 'Synced'}</span>
+                  </span>
+                </div>
+
+                <button
+                  className="hw-btn pill"
+                  onClick={nprPlaying ? stopNpr : playNpr}
+                  style={{ fontSize: '0.72rem' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
+                    graphic_eq
+                  </span>
+                  <span>{audioStatusLabel}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right Bento Stack: Tonight's Dinner Decision Card + Physical Rotary Timer Widget */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0 }}>
+              {/* Card 1: Tonight's Dinner Decision Hub (Matches Stitch Screen 1 & 2) */}
+              <div
+                className="ceramic-card"
+                style={{
+                  padding: '22px 24px',
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 0,
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
+                        className="font-mono"
+                        style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
+                      >
+                        {d.status === 'unclaimed' ? '[ DINNER // ACTION NEEDED ]' : '[ MENU // TONIGHT ]'}
+                      </span>
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          padding: '2px 10px',
+                          borderRadius: 999,
+                          background: d.status === 'unclaimed' ? '#fef3c7' : '#fdeee9',
+                          color: d.status === 'unclaimed' ? '#b45309' : 'var(--terracotta)',
+                        }}
+                      >
+                        {d.status === 'unclaimed'
+                          ? 'NEEDS COOK CLAIM'
+                          : d.chef === 'takeout'
+                            ? 'TAKEOUT / FEND'
+                            : isParent(d.chef)
+                              ? `${NAMES[d.chef].toUpperCase()} LEAD`
+                              : 'PLANNED'}
+                      </span>
+                    </div>
+                    {d.status !== 'unclaimed' && (
+                      <button className="hw-btn" style={{ padding: '4px 10px', fontSize: '0.68rem' }} onClick={() => act({ type: 'unclaim_dinner' })}>
+                        RESET
+                      </button>
+                    )}
+                  </div>
+
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                    {d.status === 'unclaimed'
+                      ? "Tonight's Dinner Decision"
+                      : d.recipe_name || `${isParent(d.chef) ? NAMES[d.chef] : 'Family'} is cooking tonight`}
+                  </h2>
+                  <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                    {d.status === 'unclaimed'
+                      ? `No cook selected yet. ${state.backlog.length} fridge backlog kits ready to cook.`
+                      : d.unavailable.length
+                        ? `Not cooking tonight: ${d.unavailable.map((p) => NAMES[p]).join(', ')}`
+                        : 'Synced with Slack #food and the kitchen board.'}
+                  </p>
+
+                  {/* Quick Meal Kit Options from Fridge Backlog */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 12 }}>
+                    {state.backlog.slice(0, 2).map((b) => (
+                      <div
+                        key={b.id}
+                        className="ceramic-well"
+                        style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sage)' }}>
+                            eco
+                          </span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {b.recipe_or_item_name}
+                            </div>
+                            <div className="font-mono" style={{ fontSize: '0.66rem', color: 'var(--muted)' }}>
+                              {b.key_perishables.join(' • ') || 'In fridge backlog'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          className="hw-btn emerald"
+                          style={{ padding: '5px 10px', fontSize: '0.68rem' }}
+                          onClick={() => act({ type: 'cook_from_backlog', backlogId: b.id })}
+                        >
+                          SELECT
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2x2 Chef Assignment Hardware Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+                  <button
+                    className={`hw-btn ${d.chef === 'daniela' ? 'terracotta' : ''}`}
+                    onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      skillet
+                    </span>
+                    <span>Daniela cooks</span>
+                  </button>
+                  <button
+                    className={`hw-btn ${d.chef === 'warren' ? 'terracotta' : ''}`}
+                    onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      soup_kitchen
+                    </span>
+                    <span>Warren cooks</span>
+                  </button>
+                  <button
+                    className={`hw-btn ${d.chef === 'takeout' ? 'terracotta' : ''}`}
+                    onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      takeout_dining
+                    </span>
+                    <span>Takeout / Order In</span>
+                  </button>
+                  <button
+                    className="hw-btn"
+                    onClick={() =>
+                      d.status === 'planned'
+                        ? act({ type: 'dinner_cooked' })
+                        : act({ type: 'not_tonight', parent: 'daniela', unavailable: !d.unavailable.includes('daniela') })
+                    }
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      {d.status === 'planned' ? 'check_circle' : 'block'}
+                    </span>
+                    <span>{d.status === 'planned' ? 'Mark Cooked ✓' : 'Daniela: Not Tonight'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Physical Rotary Kitchen Timer Widget (From Stitch Screen 1) */}
+              <div
+                className="ceramic-card"
+                style={{
+                  padding: '20px 24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 18,
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        width: 9,
+                        height: 9,
+                        borderRadius: '50%',
+                        background: timerRunning ? 'var(--terracotta)' : 'var(--muted)',
+                      }}
+                    />
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
+                    >
+                      TIMER 01 // {timerRunning ? 'ACTIVE' : 'STANDBY'}
+                    </span>
+                  </div>
+                  <div style={{ margin: '6px 0 12px' }}>
+                    <div style={{ fontSize: '1.18rem', fontWeight: 800 }}>
+                      {activeTimer?.label || 'Kitchen Simmer Timer'}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                      Tap PAUSE / RESUME or +1 MIN • Voice: &ldquo;Set a 10m timer&rdquo;
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="hw-btn terracotta" onClick={toggleActiveTimer}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                        {timerRunning ? 'pause' : 'play_arrow'}
+                      </span>
+                      <span>{timerRunning ? 'PAUSE' : 'START'}</span>
+                    </button>
+                    <button className="hw-btn" onClick={bumpTimerMinute}>
+                      +1 MIN
+                    </button>
+                    <button className="hw-btn" onClick={() => startTimer(300, '5 Min Timer')}>
+                      5M
+                    </button>
+                    <button className="hw-btn" onClick={resetActiveTimer}>
+                      RESET
+                    </button>
+                  </div>
+                </div>
+
+                {/* Circular SVG Rotary Gauge Dial */}
+                <div
+                  style={{
+                    position: 'relative',
+                    width: 132,
+                    height: 132,
+                    borderRadius: '50%',
+                    background: 'var(--surface-tint)',
+                    border: '1px solid var(--border)',
+                    boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg style={{ width: 118, height: 118, transform: 'rotate(-90deg)' }} viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="41" fill="none" stroke="var(--border)" strokeWidth="7" />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="41"
+                      fill="none"
+                      stroke="var(--terracotta)"
+                      strokeWidth="7"
+                      strokeLinecap="round"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={timerDashOffset}
+                      style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                    />
+                  </svg>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <span style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
+                      {timerMM}:{timerSS}
+                    </span>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.1em' }}
+                    >
+                      REMAINING
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="media-cluster">
-          {timers.map((tm) => {
-            const rem = Math.max(0, Math.ceil((tm.endsAt - now.getTime()) / 1000));
-            const mm = String(Math.floor(rem / 60)).padStart(2, '0');
-            const ss = String(rem % 60).padStart(2, '0');
-            return (
-              <button
-                key={tm.id}
-                className={`btn sm ${rem === 0 ? 'red' : 'active'}`}
-                onClick={() => setTimers((cur) => cur.filter((x) => x.id !== tm.id))}
-                title="Tap to dismiss"
+        {/* ════════════════════════════════════════════════════════════════════
+            VIEW 2: BENTO OVERVIEW & EXPANDED TIMELINE (Stitch Screens 3 & 4)
+            ════════════════════════════════════════════════════════════════════ */}
+        {mode !== 'ambient' && (
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateColumns: mode === 'timeline' ? '78fr 22fr' : '7fr 5fr',
+              gap: 18,
+              overflow: 'hidden',
+              transition: 'grid-template-columns 0.3s ease',
+            }}
+          >
+            {/* LEFT COLUMN: Schedule/Logistics + Tonight's Hearth Dinner + Fridge Backlog */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
+              {/* Card 1: Master Family Timeline / Today's Logistics */}
+              <section
+                className="ceramic-card"
+                style={{
+                  padding: '18px 22px',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  overflow: 'hidden',
+                }}
               >
-                ⏱️ {tm.label}: {rem === 0 ? 'DONE!' : `${mm}:${ss}`} ✕
-              </button>
-            );
-          })}
-          <button className="btn sm" onClick={() => startTimer(5 * 60, '5m')}>+5m</button>
-          <button className="btn sm" onClick={() => startTimer(10 * 60, '10m')}>+10m</button>
-          <button className="btn sm" onClick={() => startTimer(15 * 60, '15m')}>+15m</button>
-
-          <button className={`btn ${nprPlaying ? 'active' : ''}`} onClick={nprPlaying ? stopNpr : playNpr}>
-            📻 {nprPlaying ? 'Stop NPR' : 'Play NPR'}
-          </button>
-
-          <VoiceOrb
-            onStartTimer={startTimer}
-            onCancelTimers={() => setTimers([])}
-            onPlayNpr={playNpr}
-            onStopNpr={stopNpr}
-            onServerToolDone={refresh}
-          />
-
-          <ThemeToggle defaultTheme="light" />
-
-          <a href="/guide" className="btn sm ghost" title="Open Interactive User Guide">
-            📖 Guide
-          </a>
-        </div>
-      </header>
-
-      {/* ── Alert Strip: Conflicts · Working Late · Pending Saturday Cart ── */}
-      {(state.conflicts.length > 0 || state.lateTonight.length > 0 || pendingOrders.length > 0) && (
-        <section className="alert-strip">
-          {state.conflicts.map((c, i) => (
-            <span key={i} className="alert-chip">⚠️ {c.message}</span>
-          ))}
-          {state.lateTonight.map((l, i) => (
-            <span key={`l-${i}`} className="alert-chip late">
-              🏢 {l.parent ? `${NAMES[l.parent]}: ` : ''}{l.title} until {fmtTime(l.until)}
-            </span>
-          ))}
-          {pendingOrders.map((o) => (
-            <span key={o.id} className="alert-chip order">
-              🛒 Saturday order waiting for approval ({o.kept_recipes.length} recipes, {o.items.length} items)
-            </span>
-          ))}
-        </section>
-      )}
-
-      {/* ── Main 3-Column Board ── */}
-      <section className="board">
-        {/* ═══ Column 1: Tonight's Dinner + Fridge/Pantry Backlog + Saturday Cart Gate ═══ */}
-        <div className="col">
-          <div className="card">
-            <div className="card-head">
-              <span className="card-title">🍽️ Tonight&apos;s Dinner</span>
-              {d.claimed_via && <span className="badge">via {d.claimed_via}</span>}
-            </div>
-
-            <div className={`dinner-hero ${d.status}`}>
-              <div>
-                <div className="dinner-who">{dinnerHeadline}</div>
-                {d.unavailable.length > 0 && (
-                  <div className="dinner-sub">
-                    🙅 Not cooking tonight: {d.unavailable.map((p) => NAMES[p]).join(', ')}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingBottom: 11,
+                    borderBottom: '1px solid var(--border-subtle)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--clay)', letterSpacing: '0.06em' }}
+                    >
+                      [ 01 // MASTER FAMILY TIMELINE — {filteredEvents.length} SCHEDULED ITEMS ]
+                    </span>
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '2px 10px',
+                        borderRadius: 999,
+                        background: state.conflicts.length ? '#fef3c7' : '#edf7f2',
+                        border: `1px solid ${state.conflicts.length ? '#fde68a' : '#bbf7d0'}`,
+                        color: state.conflicts.length ? '#b45309' : 'var(--emerald)',
+                      }}
+                    >
+                      ● {state.conflicts.length ? `${state.conflicts.length} Needs Owner` : 'On Track'}
+                    </span>
                   </div>
-                )}
-              </div>
-              {d.status === 'planned' && (
-                <button className="btn green" onClick={() => act({ type: 'dinner_cooked' })}>
-                  ✅ Cooked
-                </button>
-              )}
-              {d.status !== 'unclaimed' && (
-                <button className="btn sm ghost" onClick={() => act({ type: 'unclaim_dinner' })}>
-                  Reset
-                </button>
-              )}
-            </div>
 
-            <div className="btn-row">
-              <button
-                className={`btn ${d.chef === 'daniela' ? 'active' : ''}`}
-                onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
-              >
-                🙋‍♀️ Daniela&apos;s cooking
-              </button>
-              <button
-                className={`btn ${d.chef === 'warren' ? 'active' : ''}`}
-                onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
-              >
-                🧑‍🍳 Warren&apos;s cooking
-              </button>
-              <button
-                className={`btn ${d.chef === 'takeout' ? 'active' : ''}`}
-                onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
-              >
-                🥡 Takeout / Fend
-              </button>
-              {PARENTS.map((p) => {
-                const off = d.unavailable.includes(p);
-                return (
-                  <button
-                    key={p}
-                    className={`btn sm ${off ? 'red' : 'ghost'}`}
-                    onClick={() => act({ type: 'not_tonight', parent: p, unavailable: !off })}
+                  {/* Member Filter Pills (All / Daniela / Warren / Wesley) */}
+                  <div
+                    className="ceramic-well font-mono"
+                    style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 12, fontSize: '0.72rem' }}
                   >
-                    🙅 {NAMES[p]}: {off ? 'out tonight' : 'not tonight'}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                    {(['all', 'daniela', 'warren', 'wesley'] as MemberFilter[]).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setMemberFilter(f)}
+                        style={{
+                          padding: '4px 11px',
+                          borderRadius: 9,
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: memberFilter === f ? 'var(--surface)' : 'transparent',
+                          color: memberFilter === f ? 'var(--text)' : 'var(--muted)',
+                          fontWeight: memberFilter === f ? 700 : 500,
+                        }}
+                      >
+                        {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-          {/* Fridge & Pantry Backlog */}
-          <div className="card grow">
-            <div className="card-head">
-              <span className="card-title">🧊 Fridge &amp; Pantry Backlog</span>
-              <span className={`badge ${state.backlog.length >= 3 ? 'warn' : ''}`}>
-                {state.backlog.length} waiting
-              </span>
-            </div>
+                {/* Event Rows */}
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    padding: '10px 0',
+                  }}
+                >
+                  {filteredEvents.map((ev) => {
+                    const needsOwner =
+                      (ev.logistics_type === 'pickup' || ev.logistics_type === 'appointment') &&
+                      ev.assigned_parent === 'unassigned';
+                    const isLate = ev.logistics_type === 'late_office';
+                    const timeStr = isAllDay(ev.start_time, ev.end_time) ? 'ALL DAY' : fmtTime(ev.start_time);
+                    return (
+                      <div
+                        key={ev.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 14,
+                          padding: '11px 14px',
+                          borderRadius: 16,
+                          background: needsOwner ? '#fffaf5' : isLate ? '#fff5f2' : 'var(--surface-tint)',
+                          border: `1.5px solid ${needsOwner ? '#fed7aa' : isLate ? 'var(--terracotta)' : 'var(--border)'}`,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                          <div style={{ width: 82, flexShrink: 0 }}>
+                            <div
+                              className="font-mono"
+                              style={{
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                color: needsOwner ? '#b45309' : isLate ? 'var(--clay)' : 'var(--text)',
+                              }}
+                            >
+                              {timeStr}
+                            </div>
+                            <div
+                              className="font-mono"
+                              style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}
+                            >
+                              {ev.logistics_type.replace('_', ' ')}
+                            </div>
+                          </div>
 
-            <div className="scroll">
-              {state.backlog.length === 0 && (
-                <div className="row-meta">All caught up — nothing backed up in the fridge.</div>
-              )}
-              {state.backlog.map((b) => {
-                const age = daysBetween(b.delivery_date, state.date);
-                const ageText =
-                  age < 0 ? `Arrives ${fmtShortDate(b.delivery_date)}` : age === 0 ? 'Arrived today' : `${age}d in ${b.location}`;
-                const linked = d.linked_backlog_id === b.id;
-                return (
-                  <div key={b.id} className={`row ${age >= 6 ? 'old' : age >= 4 ? 'aging' : ''}`}>
-                    <div className="row-main">
-                      <div className="row-title">
-                        {b.recipe_or_item_name} {linked ? '· 🎯 tonight' : ''}
+                          <div
+                            style={{
+                              width: 3,
+                              height: 30,
+                              borderRadius: 99,
+                              background: needsOwner ? 'var(--amber)' : isLate ? 'var(--terracotta)' : 'var(--sage)',
+                              flexShrink: 0,
+                            }}
+                          />
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.92rem', fontWeight: 700 }}>{ev.title}</span>
+                              {needsOwner ? (
+                                <span
+                                  className="font-mono"
+                                  style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
+                                    borderRadius: 999,
+                                    background: '#fef3c7',
+                                    border: '1px solid #fde68a',
+                                    color: '#b45309',
+                                  }}
+                                >
+                                  DRIVER UNASSIGNED
+                                </span>
+                              ) : (
+                                <span
+                                  className="font-mono"
+                                  style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
+                                    borderRadius: 999,
+                                    background: '#edf7f2',
+                                    border: '1px solid #bbf7d0',
+                                    color: 'var(--emerald)',
+                                  }}
+                                >
+                                  {ev.assigned_parent !== 'unassigned' ? `✓ ${NAMES[ev.assigned_parent]}` : 'SCHEDULED'}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                              {SOURCE_LABEL[ev.source_calendar]} • {fmtTime(ev.start_time)}–{fmtTime(ev.end_time)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Claim / Assign Pickup Buttons */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {PARENTS.map((p) => (
+                            <button
+                              key={p}
+                              className={`hw-btn ${ev.assigned_parent === p ? 'terracotta' : ''}`}
+                              style={{ padding: '6px 11px', fontSize: '0.7rem' }}
+                              onClick={() =>
+                                act({
+                                  type: 'assign_logistics',
+                                  id: ev.id,
+                                  parent: ev.assigned_parent === p ? 'unassigned' : p,
+                                })
+                              }
+                            >
+                              {ev.assigned_parent === p ? `✓ ${NAMES[p]}` : `Claim: ${NAMES[p]}`}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="row-meta">
-                        {ageText}
-                        {b.key_perishables.length ? ` · ${b.key_perishables.join(', ')}` : ''}
-                        {b.added_by ? ` · ${b.added_by}` : ''}
+                    );
+                  })}
+                </div>
+
+                {/* Expand / Collapse Timeline Footer */}
+                <div
+                  style={{
+                    paddingTop: 10,
+                    borderTop: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    flexShrink: 0,
+                  }}
+                >
+                  <button
+                    className="hw-btn"
+                    onClick={() => setMode(mode === 'timeline' ? 'bento' : 'timeline')}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      {mode === 'timeline' ? 'expand_less' : 'schedule'}
+                    </span>
+                    <span>
+                      {mode === 'timeline' ? 'COLLAPSE TO BENTO OVERVIEW' : `EXPAND FULL TIMELINE (${state.events.length} EVENTS)`}
+                    </span>
+                  </button>
+
+                  <div
+                    className="font-mono"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', color: 'var(--muted)' }}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--emerald)' }} />
+                    <span>Outlook + Google Calendar Synced</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* Card 2: Tonight's Hearth Dinner + Fridge Backlog Bar (In Bento Mode) */}
+              {mode === 'bento' && (
+                <section
+                  className="ceramic-card"
+                  style={{
+                    padding: '16px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 11,
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 12,
+                          background: '#faf7f2',
+                          border: '1px solid #edd5c3',
+                          color: 'var(--terracotta)',
+                          display: 'grid',
+                          placeItems: 'center',
+                        }}
+                      >
+                        <span className="material-symbols-outlined">soup_kitchen</span>
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            className="font-mono"
+                            style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--clay)', letterSpacing: '0.06em' }}
+                          >
+                            [ TONIGHT&apos;S HEARTH DINNER ]
+                          </span>
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: '0.66rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              background: d.status === 'unclaimed' ? '#fef3c7' : '#edf7f2',
+                              color: d.status === 'unclaimed' ? '#b45309' : 'var(--emerald)',
+                            }}
+                          >
+                            {d.status === 'unclaimed'
+                              ? 'UNCLAIMED'
+                              : d.chef === 'takeout'
+                                ? 'TAKEOUT'
+                                : isParent(d.chef)
+                                  ? `${NAMES[d.chef].toUpperCase()} COOKING`
+                                  : 'PLANNED'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, marginTop: 2 }}>
+                          {d.recipe_name || (d.status === 'unclaimed' ? 'Who is cooking tonight?' : `${isParent(d.chef) ? NAMES[d.chef] : 'Dinner'} tonight`)}
+                        </div>
                       </div>
                     </div>
-                    <div className="btn-row">
-                      {!linked && d.status !== 'cooked' && (
-                        <button
-                          className="btn sm primary"
-                          onClick={() => act({ type: 'cook_from_backlog', backlogId: b.id })}
-                        >
-                          Cook tonight
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        className={`hw-btn ${d.chef === 'daniela' ? 'terracotta' : ''}`}
+                        onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
+                      >
+                        Daniela
+                      </button>
+                      <button
+                        className={`hw-btn ${d.chef === 'warren' ? 'terracotta' : ''}`}
+                        onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
+                      >
+                        Warren
+                      </button>
+                      <button
+                        className={`hw-btn ${d.chef === 'takeout' ? 'terracotta' : ''}`}
+                        onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
+                      >
+                        Takeout
+                      </button>
+                      {d.status === 'planned' && (
+                        <button className="hw-btn emerald" onClick={() => act({ type: 'dinner_cooked' })}>
+                          ✓ Cooked
                         </button>
                       )}
-                      <button
-                        className="btn sm green"
-                        onClick={() => act({ type: 'backlog_status', id: b.id, status: 'cooked' })}
-                      >
-                        ✅ Cooked
-                      </button>
-                      <button
-                        className="btn sm ghost"
-                        onClick={() => act({ type: 'backlog_status', id: b.id, status: 'discarded' })}
-                      >
-                        🗑️ Toss
-                      </button>
                     </div>
                   </div>
-                );
-              })}
 
-              {/* Pending Saturday Cart Proposal from Warren's Agent */}
-              {pendingOrders.map((p) => (
-                <div key={p.id} className="row aging">
-                  <div className="row-main">
-                    <div className="row-title">
-                      🛒 Warren&apos;s Saturday order ({fmtShortDate(p.delivery_date)})
-                    </div>
-                    <div className="row-meta">
-                      {p.kept_recipes.map((r) => r.name).join(', ') || 'Household items only'} · {p.items.length} items
-                      {p.dropped_recipes.length ? ` (scaled back ${p.dropped_recipes.length} bc of backlog)` : ''}
-                    </div>
-                  </div>
-                  <div className="btn-row">
-                    <button className="btn sm green" onClick={() => decideOrder(p.id, true)}>
-                      👍 Approve
-                    </button>
-                    <button className="btn sm red" onClick={() => decideOrder(p.id, false)}>
-                      ✋ Hold
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <form
-              className="add-row"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!newBacklog.trim()) return;
-                act({ type: 'add_backlog', name: newBacklog, location: newBacklogLoc });
-                setNewBacklog('');
-              }}
-            >
-              <input
-                className="input"
-                placeholder="Add meal kit, leftovers, or pantry item…"
-                value={newBacklog}
-                onChange={(e) => setNewBacklog(e.target.value)}
-              />
-              <select
-                className="input"
-                style={{ flex: '0 0 110px' }}
-                value={newBacklogLoc}
-                onChange={(e) => setNewBacklogLoc(e.target.value as BacklogLocation)}
-              >
-                <option value="fridge">Fridge</option>
-                <option value="pantry">Pantry</option>
-                <option value="freezer">Freezer</option>
-              </select>
-              <button className="btn sm" type="submit">+ Add</button>
-            </form>
-          </div>
-        </div>
-
-        {/* ═══ Column 2: Today's Unified Schedule & Pickup Ownership ═══ */}
-        <div className="col">
-          <div className="card grow">
-            <div className="card-head">
-              <span className="card-title">🚗 Today&apos;s Logistics &amp; Calendars</span>
-              <span className="badge">{state.events.length} events</span>
-            </div>
-
-            <div className="scroll">
-              {state.events.length === 0 && (
-                <div className="row-meta">
-                  Nothing on Warren&apos;s Outlook or Daniela&apos;s Google Calendar today.
-                </div>
-              )}
-              {state.events.map((ev) => {
-                const needsOwner =
-                  (ev.logistics_type === 'pickup' || ev.logistics_type === 'appointment') &&
-                  ev.assigned_parent === 'unassigned';
-                const timeStr = isAllDay(ev.start_time, ev.end_time)
-                  ? 'All day'
-                  : `${fmtTime(ev.start_time)}–${fmtTime(ev.end_time)}`;
-                return (
-                  <div key={ev.id} className={`row ${needsOwner ? 'aging' : ''}`}>
-                    <div className="row-main">
-                      <div className="row-title">
-                        {ev.logistics_type === 'pickup' && '🚗 '}
-                        {ev.logistics_type === 'appointment' && '🩺 '}
-                        {ev.logistics_type === 'late_office' && '🏢 '}
-                        {ev.title}
-                      </div>
-                      <div className="row-meta" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>{timeStr}</span>
-                        <span className={`cal-tag ${ev.source_calendar}`}>{SOURCE_LABEL[ev.source_calendar]}</span>
-                      </div>
+                  {/* Fridge Backlog Pills + Saturday Order Gate */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      paddingTop: 9,
+                      borderTop: '1px solid var(--border-subtle)',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="font-mono" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--muted)' }}>
+                        FRIDGE BACKLOG ({state.backlog.length}):
+                      </span>
+                      {state.backlog.map((b) => {
+                        const age = daysBetween(b.delivery_date, state.date);
+                        return (
+                          <div
+                            key={b.id}
+                            className="ceramic-well"
+                            style={{
+                              padding: '4px 10px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              fontSize: '0.76rem',
+                            }}
+                          >
+                            <span style={{ fontWeight: 700 }}>{b.recipe_or_item_name}</span>
+                            <span className="font-mono" style={{ fontSize: '0.66rem', color: 'var(--muted)' }}>
+                              {age <= 0 ? 'today' : `${age}d`}
+                            </span>
+                            <button
+                              onClick={() => act({ type: 'cook_from_backlog', backlogId: b.id })}
+                              style={{
+                                border: 'none',
+                                background: 'var(--terracotta)',
+                                color: '#fff',
+                                borderRadius: 6,
+                                padding: '2px 7px',
+                                fontSize: '0.64rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Cook
+                            </button>
+                            <button
+                              onClick={() => act({ type: 'backlog_status', id: b.id, status: 'cooked' })}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--emerald)',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                              }}
+                              title="Mark cooked"
+                            >
+                              ✓
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
 
-                    <div className="btn-row">
-                      {PARENTS.map((p) => (
+                    {pendingOrders[0] && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="font-mono" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--clay)' }}>
+                          SAT CART ({pendingOrders[0].kept_recipes.length} meals):
+                        </span>
                         <button
-                          key={p}
-                          className={`btn sm ${ev.assigned_parent === p ? 'active' : ''}`}
-                          onClick={() =>
-                            act({
-                              type: 'assign_logistics',
-                              id: ev.id,
-                              parent: ev.assigned_parent === p ? 'unassigned' : p,
-                            })
-                          }
+                          className="hw-btn emerald"
+                          style={{ padding: '4px 10px', fontSize: '0.68rem' }}
+                          onClick={() => decideOrder(pendingOrders[0].id, true)}
                         >
-                          {NAMES[p]}
+                          👍 Approve
+                        </button>
+                        <button
+                          className="hw-btn"
+                          style={{ padding: '4px 10px', fontSize: '0.68rem' }}
+                          onClick={() => decideOrder(pendingOrders[0].id, false)}
+                        >
+                          ✋ Hold
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            {/* RIGHT COLUMN: Full Wesley's Chores + Pantry Staging (or Slim Right Rail when Timeline is Expanded) */}
+            {mode === 'bento' ? (
+              <div
+                className="ceramic-card"
+                style={{
+                  padding: '18px 22px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 0,
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  {/* Wesley's Chores Header */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingBottom: 10,
+                      borderBottom: '1px solid var(--border-subtle)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        className="ceramic-well"
+                        style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', color: 'var(--cobalt)' }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                          task_alt
+                        </span>
+                      </div>
+                      <div>
+                        <h2 style={{ fontSize: '1.08rem', fontWeight: 800 }}>Wesley&apos;s Chores</h2>
+                        <span className="font-mono" style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                          Daily Contributions &amp; Greenlight Audit
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className="ceramic-well font-mono"
+                      style={{
+                        padding: '4px 11px',
+                        borderRadius: 999,
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--cobalt)' }}>
+                        credit_card
+                      </span>
+                      Greenlight
+                    </span>
+                  </div>
+
+                  {/* Weekly Allowance Progress Card */}
+                  <div
+                    className="ceramic-well"
+                    style={{ margin: '10px 0', padding: '12px 14px', borderRadius: 18 }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <div>
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: '0.64rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.07em',
+                            color: 'var(--muted)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--amber)' }}>
+                            account_balance_wallet
+                          </span>
+                          Today&apos;s Allowance Progress
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+                          <span style={{ fontSize: '1.75rem', fontWeight: 800 }}>${allowanceEarned}</span>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--muted)' }}>
+                            of ${allowanceTotal} Today
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className="font-mono"
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {chorePct}% COMPLETE
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        width: '100%',
+                        height: 9,
+                        borderRadius: 999,
+                        background: 'var(--border)',
+                        overflow: 'hidden',
+                        marginTop: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${chorePct}%`,
+                          height: '100%',
+                          borderRadius: 999,
+                          background: 'linear-gradient(90deg, var(--amber), var(--sage))',
+                          transition: 'width 0.35s ease',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Chore Checklist Rows */}
+                  <div
+                    style={{
+                      flex: 1,
+                      minHeight: 0,
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 7,
+                    }}
+                  >
+                    {state.chores.map((c) => (
+                      <div
+                        key={c.id}
+                        onClick={() => act({ type: 'toggle_chore', id: c.id, completed: !c.completed })}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          borderRadius: 16,
+                          background: c.completed ? 'var(--surface-tint)' : 'var(--surface)',
+                          border: `1.5px solid ${c.completed ? 'var(--border)' : '#d2dbe8'}`,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 10,
+                              background: c.completed ? '#edf7f2' : '#f4f7ff',
+                              border: `1px solid ${c.completed ? '#bbf7d0' : 'rgba(43,89,255,0.35)'}`,
+                              color: c.completed ? 'var(--emerald)' : 'var(--cobalt)',
+                              display: 'grid',
+                              placeItems: 'center',
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                              {c.completed ? 'check' : 'check_box_outline_blank'}
+                            </span>
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: '0.86rem',
+                                fontWeight: 700,
+                                textDecoration: c.completed ? 'line-through' : 'none',
+                                color: c.completed ? 'var(--text-secondary)' : 'var(--text)',
+                              }}
+                            >
+                              {c.emoji ? `${c.emoji} ` : ''}
+                              {c.chore_title}
+                            </div>
+                            <div className="font-mono" style={{ fontSize: '0.64rem', color: 'var(--muted)' }}>
+                              {c.completed ? 'Completed on Kitchen Board' : 'Tap to complete'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span
+                          className="font-mono"
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: c.completed ? '#edf7f2' : '#f4f7ff',
+                            color: c.completed ? 'var(--emerald)' : 'var(--cobalt)',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          +$5.00
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pantry & Grocery Cart Staging Footer */}
+                <div style={{ paddingTop: 10, marginTop: 10, borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--muted)' }}>
+                        local_shipping
+                      </span>
+                      Pantry Cart Staging ({state.groceries.length})
+                    </span>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      {['Oat Milk', 'Paper Towels'].map((item) => (
+                        <button
+                          key={item}
+                          className="hw-btn"
+                          style={{ padding: '3px 8px', fontSize: '0.66rem' }}
+                          onClick={() => act({ type: 'add_grocery', name: item })}
+                        >
+                          + {item}
                         </button>
                       ))}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
 
-        {/* ═══ Column 3: Wesley's Greenlight Chores + Household Shopping List ═══ */}
-        <div className="col">
-          <div className="card grow">
-            <div className="card-head">
-              <span className="card-title">⭐ Wesley&apos;s Chores</span>
-              <span className={`badge ${doneChores === state.chores.length && state.chores.length > 0 ? 'ok' : ''}`}>
-                {doneChores}/{state.chores.length} done
-              </span>
-            </div>
-
-            <div className="scroll">
-              {state.chores.map((c) => (
-                <button
-                  key={c.id}
-                  className={`chore-tile ${c.completed ? 'done' : ''}`}
-                  onClick={() => act({ type: 'toggle_chore', id: c.id, completed: !c.completed })}
+                  <form
+                    style={{ display: 'flex', gap: 6 }}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newGrocery.trim()) return;
+                      act({ type: 'add_grocery', name: newGrocery });
+                      setNewGrocery('');
+                    }}
+                  >
+                    <input
+                      className="ceramic-well"
+                      style={{ flex: 1, padding: '7px 12px', fontSize: '0.8rem' }}
+                      placeholder={
+                        state.groceries.length
+                          ? `In cart: ${state.groceries.map((g) => g.name).join(', ')} — add more…`
+                          : 'Add item to Saturday grocery cart…'
+                      }
+                      value={newGrocery}
+                      onChange={(e) => setNewGrocery(e.target.value)}
+                    />
+                    <button className="hw-btn" type="submit">
+                      + ADD
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              /* SLIM GLANCEABLE RIGHT RAIL (Stitch Screen 3 — when Timeline is Expanded) */
+              <aside style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+                {/* Bento 1: Tonight's Dinner */}
+                <div
+                  className="ceramic-card"
+                  style={{
+                    padding: 14,
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    background: '#fffcf5',
+                    borderColor: '#edd5c3',
+                  }}
                 >
-                  <span className="chore-check">{c.completed ? '✓' : ''}</span>
-                  <span>
-                    {c.emoji ? `${c.emoji} ` : ''}
-                    {c.chore_title}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-head">
-              <span className="card-title">🧻 Next Grocery Order</span>
-              <span className="badge">{state.groceries.length}</span>
-            </div>
-
-            <div className="scroll" style={{ maxHeight: 165 }}>
-              {state.groceries.length === 0 && (
-                <div className="row-meta">Say &ldquo;add paper towels to the cart&rdquo; or type below.</div>
-              )}
-              {state.groceries.map((g) => (
-                <div key={g.id} className="row">
-                  <div className="row-main">
-                    <div className="row-title">
-                      {g.name}
-                      {g.quantity ? ` (${g.quantity})` : ''}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="font-mono" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#9a3412' }}>
+                      🍲 TONIGHT&apos;S DINNER
+                    </span>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.64rem', fontWeight: 700, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: 6 }}
+                    >
+                      6:30 PM
+                    </span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 800 }}>
+                      {d.recipe_name || (d.status === 'unclaimed' ? 'Unclaimed' : `${isParent(d.chef) ? NAMES[d.chef] : 'Planned'} Cooking`)}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      {state.backlog.length} kits in fridge backlog
                     </div>
                   </div>
-                  <button
-                    className="btn sm ghost"
-                    onClick={() => act({ type: 'grocery_status', id: g.id, status: 'got' })}
-                  >
-                    ✓ Got it
+                  <button className="hw-btn" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setMode('ambient')}>
+                    <span>EXPAND DINNER</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                      chevron_left
+                    </span>
                   </button>
                 </div>
-              ))}
-            </div>
 
-            <form
-              className="add-row"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!newGrocery.trim()) return;
-                act({ type: 'add_grocery', name: newGrocery });
-                setNewGrocery('');
-              }}
-            >
-              <input
-                className="input"
-                placeholder="Add to shopping list…"
-                value={newGrocery}
-                onChange={(e) => setNewGrocery(e.target.value)}
-              />
-              <button className="btn sm" type="submit">+ Add</button>
-            </form>
+                {/* Bento 2: Wesley's Chores */}
+                <div
+                  className="ceramic-card"
+                  style={{
+                    padding: 14,
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="font-mono" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--cobalt)' }}>
+                      ✓ WESLEY&apos;S CHORES
+                    </span>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.64rem', fontWeight: 700, background: '#edf7f2', color: 'var(--emerald)', padding: '2px 6px', borderRadius: 6 }}
+                    >
+                      {chorePct}% Done
+                    </span>
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <span className="font-mono" style={{ fontSize: '0.64rem', color: 'var(--muted)' }}>
+                        EARNED / ALLOWANCE
+                      </span>
+                      <span className="font-mono" style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                        ${allowanceEarned}
+                      </span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden', margin: '6px 0' }}>
+                      <div style={{ width: `${chorePct}%`, height: '100%', background: 'var(--cobalt)' }} />
+                    </div>
+                    <div className="font-mono" style={{ fontSize: '0.66rem', color: 'var(--emerald)', fontWeight: 700 }}>
+                      {doneChores} of {state.chores.length} Completed
+                    </div>
+                  </div>
+                  <button className="hw-btn" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setMode('bento')}>
+                    <span>EXPAND CHORES</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                      chevron_left
+                    </span>
+                  </button>
+                </div>
+
+                {/* Bento 3: Pantry & Groceries */}
+                <div
+                  className="ceramic-card"
+                  style={{
+                    padding: 14,
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="font-mono" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--emerald)' }}>
+                      🛍️ PANTRY &amp; GROCERIES
+                    </span>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: '0.62rem', fontWeight: 700, background: '#fdf2f2', color: '#b91c1c', padding: '2px 6px', borderRadius: 6 }}
+                    >
+                      SAT GATE
+                    </span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 800 }}>
+                      {state.groceries.length} household items + {state.backlog.length} kits
+                    </div>
+                    <div className="font-mono" style={{ fontSize: '0.66rem', color: 'var(--clay)', marginTop: 3 }}>
+                      {pendingOrders.length ? 'Saturday proposal awaiting approval' : 'Fridge backlog synced'}
+                    </div>
+                  </div>
+                  <button className="hw-btn" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setMode('bento')}>
+                    <span>EXPAND PANTRY</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                      chevron_left
+                    </span>
+                  </button>
+                </div>
+              </aside>
+            )}
           </div>
-        </div>
-      </section>
-    </main>
+        )}
+
+        {/* ── Bottom Hardware Navigation Dock (Matches Stitch Screens 1–4) ── */}
+        <footer className="hearth-dock">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              className={`dock-tab ${mode === 'ambient' ? 'active' : ''}`}
+              onClick={() => setMode('ambient')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'ambient' ? '#fff' : 'var(--terracotta)' }}>
+                restaurant
+              </span>
+              <span>Dinner &amp; Timer Hub</span>
+            </button>
+
+            <button
+              className={`dock-tab ${mode === 'bento' ? 'active' : ''}`}
+              onClick={() => setMode('bento')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'bento' ? '#fff' : 'var(--cobalt)' }}>
+                checklist
+              </span>
+              <span>Chores &amp; Schedule ({doneChores}/{state.chores.length})</span>
+            </button>
+
+            <button
+              className={`dock-tab ${mode === 'timeline' ? 'active' : ''}`}
+              onClick={() => setMode('timeline')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'timeline' ? '#fff' : 'var(--emerald)' }}>
+                calendar_month
+              </span>
+              <span>Master Timeline ({state.events.length})</span>
+            </button>
+
+            <button
+              className="dock-tab"
+              onClick={nprPlaying ? stopNpr : playNpr}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
+                radio
+              </span>
+              <span>{nprPlaying ? 'Stop NPR Live' : 'NPR Live Radio'}</span>
+            </button>
+
+            <button
+              className="dock-tab"
+              onClick={() => actSpotify(spotify.playing ? 'pause' : 'play')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--cobalt)' }}>
+                graphic_eq
+              </span>
+              <span>
+                {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify Connect'}
+              </span>
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <ThemeToggle defaultTheme="light" />
+            <a href="/guide" className="hw-btn">
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
+                menu_book
+              </span>
+              <span>MANUAL</span>
+            </a>
+            <button
+              className="hw-btn"
+              onClick={() => setMode(mode === 'ambient' ? 'bento' : 'ambient')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                power_settings_new
+              </span>
+              <span>{mode === 'ambient' ? 'WAKE' : 'STANDBY'}</span>
+            </button>
+          </div>
+        </footer>
+      </main>
+    </div>
   );
 }

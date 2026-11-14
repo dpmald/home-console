@@ -59,5 +59,14 @@ export const VOICE_TOOLS = [
   fn('cancel_timers', 'Cancel all kitchen timers.'),
   fn('play_npr', 'Play the NPR live stream on the kitchen speakers.'),
   fn('stop_npr', 'Stop the NPR stream.'),
+  fn(
+    'control_spotify',
+    'Control Spotify music playback on the kitchen console (play a song/artist/playlist, resume, pause, or skip).',
+    {
+      op: { type: 'string', enum: ['play', 'pause', 'next', 'previous'] },
+      query: { type: 'string', description: 'Optional artist, album, playlist, or song to search and play.' },
+    },
+    ['op'],
+  ),
   fn('end_session', 'End the conversation when the user is done ("thanks", "that\'s all", "never mind").'),
 ];

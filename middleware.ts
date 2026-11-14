@@ -39,5 +39,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/guide', '/api/kiosk/:path*', '/api/voice/:path*', '/api/weather'],
+  matcher: ['/', '/guide', '/api/kiosk/:path*', '/api/voice/:path*', '/api/weather', '/api/spotify/:path*'],
 };

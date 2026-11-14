@@ -1,0 +1,322 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<meta content="web_blank" name="shell-type">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        overscroll-behavior: none;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    .dot-pattern {
+      background-image: radial-gradient(#d5cfc4 1.25px, transparent 1.25px);
+      background-size: 24px 24px;
+    }
+    .font-mono-tag {
+      font-family: 'Space Grotesk', monospace, sans-serif;
+    }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "hearth-terracotta": "#e85a36",
+            "hearth-cobalt": "#2b59ff",
+            "hearth-emerald": "#3aa677",
+            "hearth-linen": "#faf9f5",
+            "hearth-warm-bg": "#f5f3ee",
+            "hearth-border": "#eae7e0",
+            "hearth-card": "#ffffff",
+            "hearth-card-tint": "#fcfbf9",
+            "hearth-dark": "#1b1c1a",
+            "hearth-muted": "#6a655e",
+            "hearth-pill": "#f0ede6"
+          },
+          borderRadius: {
+            "3xl": "1.5rem",
+            "4xl": "2rem"
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"Space Grotesk"', 'monospace', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-[#edeae3] text-hearth-dark antialiased select-none min-h-screen relative overflow-x-hidden flex flex-col justify-between">
+<!-- Ambient lighting gradients & Subtle dot pattern background -->
+<div class="fixed inset-0 pointer-events-none z-0">
+<!-- Dot pattern across canvas -->
+<div class="absolute inset-0 dot-pattern opacity-60"></div>
+<!-- Warm hearth terracotta diffuse atmospheric ambient glow -->
+<div class="absolute -top-32 right-10 w-[700px] h-[550px] bg-gradient-to-br from-[#e85a36]/15 via-[#f59e0b]/10 to-transparent rounded-full blur-3xl opacity-75"></div>
+<div class="absolute -bottom-24 left-10 w-[600px] h-[500px] bg-gradient-to-tr from-[#2b59ff]/08 via-[#3aa677]/08 to-transparent rounded-full blur-3xl opacity-50"></div>
+</div>
+<div class="relative z-10 min-h-screen w-full p-4 lg:p-7 flex flex-col justify-between box-border max-w-[1720px] mx-auto">
+<!-- Top System Telemetry Bar -->
+
+<!-- Main 10-foot Glanceable Domestic Hearth Display -->
+<main class="w-full flex-1 my-5 flex flex-col justify-center items-center bg-[#faf9f5]/90 backdrop-blur-lg rounded-3xl p-6 lg:p-10 border border-hearth-border shadow-[0_12px_40px_rgba(40,25,15,0.04),0_1px_3px_rgba(0,0,0,0.03)]">
+<div class="flex flex-col w-full text-hearth-dark">
+<div class="grid grid-cols-12 gap-6 lg:gap-8 items-stretch w-full">
+<!-- Primary Glanceable Column (Left: Big Bold Clock & Family Presence) -->
+<div class="col-span-12 lg:col-span-7 flex flex-col justify-between p-7 lg:p-9 bg-gradient-to-b from-white to-[#faf9f5] border border-hearth-border rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.9)] relative overflow-hidden group">
+<!-- Atmospheric Warm Corner Accent inside card -->
+<div class="absolute -top-16 -right-16 w-48 h-48 bg-[#e85a36]/10 rounded-full blur-2xl pointer-events-none"></div>
+<!-- Hardware & Environmental Micro-Telemetry -->
+<div class="flex items-center justify-between font-mono text-xs text-hearth-muted pb-4 border-b border-hearth-border/50">
+<div class="flex items-center gap-2 tracking-widest uppercase font-semibold">
+<span class="inline-block w-2 h-2 rounded-full bg-hearth-terracotta"></span>
+<span>HEARTH // ZONE A-01</span>
+</div>
+<div class="opacity-75 tracking-wider">
+                SENSOR.AIR.VOC: 0.02 ppm (OPTIMAL)
+              </div>
+</div>
+<!-- Hero Clock (Crisp 10-Foot Glanceable Plus Jakarta Sans) -->
+<div class="my-auto py-8">
+<div class="flex items-baseline gap-4">
+<span class="font-extrabold text-[108px] lg:text-[124px] leading-none tracking-tight text-hearth-dark select-none drop-shadow-sm font-sans">
+                  07:18
+                </span>
+<div class="flex flex-col">
+<span class="font-mono text-2xl font-bold uppercase text-hearth-terracotta tracking-wider">PM</span>
+<span class="font-mono text-xs font-semibold text-hearth-muted tracking-widest">EDT • NYC</span>
+</div>
+</div>
+<!-- Date & Weather Glances -->
+<div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xl font-medium text-hearth-muted">
+<span class="text-hearth-dark font-semibold">Tuesday, October 24</span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#d2ccc0]"></span>
+<span class="flex items-center gap-1.5 text-hearth-dark font-medium">
+<span class="material-symbols-outlined text-[22px] text-amber-500">sunny</span>
+                  Outdoor 68°F
+                </span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#d2ccc0]"></span>
+<span class="flex items-center gap-1.5 text-hearth-dark font-medium">
+<span class="material-symbols-outlined text-[22px] text-hearth-terracotta">thermostat</span>
+                  Kitchen 71.4°F
+                </span>
+</div>
+</div>
+<!-- Lower Presence & Ambient Sound Shelf -->
+<div class="pt-4 border-t border-hearth-border/70 flex flex-wrap items-center justify-between gap-4">
+<div class="flex flex-wrap items-center gap-2.5">
+<span class="font-mono text-xs uppercase tracking-wider font-semibold text-hearth-muted mr-1">At Hearth:</span>
+<!-- Family Token: Daniela -->
+<div class="flex items-center gap-2 bg-[#f4f2ec] border border-hearth-border/70 px-3.5 py-1.5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+<span class="w-2.5 h-2.5 rounded-full bg-hearth-emerald"></span>
+<span class="text-sm font-bold text-hearth-dark">Daniela</span>
+<span class="font-mono text-xs font-medium text-hearth-muted">Chef</span>
+</div>
+<!-- Family Token: Wesley -->
+<div class="flex items-center gap-2 bg-[#f4f2ec] border border-hearth-border/70 px-3.5 py-1.5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+<span class="w-2.5 h-2.5 rounded-full bg-hearth-cobalt"></span>
+<span class="text-sm font-bold text-hearth-dark">Wesley</span>
+<span class="font-mono text-xs font-semibold text-hearth-cobalt">Chores 3/4</span>
+</div>
+<!-- Family Token: Warren -->
+<div class="flex items-center gap-2 bg-[#f4f2ec] border border-hearth-border/70 px-3.5 py-1.5 rounded-full opacity-80">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+<span class="text-sm font-bold text-hearth-dark">Warren</span>
+<span class="font-mono text-xs font-medium text-amber-700">ETA 12m</span>
+</div>
+</div>
+<!-- Audio Status Pill -->
+<div class="flex items-center gap-2 font-mono text-xs font-semibold text-hearth-muted bg-[#f4f2ec]/80 px-3 py-1.5 rounded-full border border-hearth-border/60">
+<span class="material-symbols-outlined text-[16px] text-hearth-terracotta">graphic_eq</span>
+<span>AUDIO: KITCHEN HOP FM (32%)</span>
+</div>
+</div>
+</div>
+<!-- Secondary Column (Right Bento Stack: Dinner & Physical Rotary Timer) -->
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-6">
+<!-- Card 1: Tonight's Dinner Schedule (Warm Ceramic Texture) -->
+<div class="p-6 bg-gradient-to-b from-white to-[#faf9f5] border border-hearth-border rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col justify-between relative overflow-hidden group hover:border-hearth-terracotta/40 transition-colors">
+<div>
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<span class="font-mono text-xs uppercase font-bold text-hearth-terracotta tracking-wider">[MENU // TONIGHT]</span>
+<span class="px-2.5 py-0.5 rounded-full bg-[#fdeee9] text-hearth-terracotta font-mono text-xs font-bold tracking-wide">
+                      DANIELA LEAD
+                    </span>
+</div>
+<span class="font-mono text-xs text-hearth-muted flex items-center gap-1.5 font-medium">
+<span class="material-symbols-outlined text-[15px] text-hearth-terracotta">skillet</span>
+                    6:30 PM PREP
+                  </span>
+</div>
+<h2 class="text-2xl font-bold text-hearth-dark tracking-tight">
+                  Crispy Miso Salmon Rice Bowls
+                </h2>
+<p class="text-sm text-hearth-muted mt-2 leading-relaxed font-normal">
+                  Avocado, charred scallions, ginger glaze, jasmine rice. All fresh ingredients prepped on station.
+                </p>
+</div>
+<div class="mt-6 pt-4 border-t border-hearth-border/60 flex items-center justify-between">
+<div class="flex items-center gap-3 font-mono text-xs text-hearth-muted font-medium">
+<span class="flex items-center gap-1 text-hearth-emerald font-semibold">
+<span class="material-symbols-outlined text-[16px]">nutrition</span>
+                    4 Servings
+                  </span>
+<span class="w-1 h-1 rounded-full bg-hearth-border"></span>
+<span>Prep: 20 min</span>
+</div>
+<button class="px-4 py-2 bg-[#f4f2ec] hover:bg-hearth-terracotta hover:text-white text-hearth-dark rounded-xl font-mono text-xs font-bold tracking-wider border border-hearth-border/80 shadow-[0_2px_0_#d5cfc4] active:translate-y-0.5 active:shadow-none transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">menu_book</span>
+                  VIEW RECIPE
+                </button>
+</div>
+</div>
+<!-- Card 2: Rotary Kitchen Timer Widget -->
+<div class="p-6 bg-gradient-to-b from-white to-[#faf9f5] border border-hearth-border rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-5 relative overflow-hidden">
+<div class="flex flex-col justify-between flex-1">
+<div>
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-hearth-terracotta animate-pulse"></span>
+<span class="font-mono text-xs uppercase font-bold text-hearth-terracotta tracking-wider">TIMER 01 // ACTIVE</span>
+</div>
+<div class="my-2">
+<span class="text-xl font-bold text-hearth-dark block">Jasmine Rice Simmer</span>
+<span class="text-xs text-hearth-muted">Stove Back Left • Low Flame</span>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-3 font-mono">
+<button class="px-4 py-2 bg-hearth-terracotta hover:bg-[#d44d2b] text-white rounded-xl text-xs font-bold shadow-[0_3px_0_#b53e20] active:translate-y-0.5 active:shadow-none transition-all flex items-center gap-1.5" id="timerToggle">
+<span class="material-symbols-outlined text-[16px]">pause</span>
+                    PAUSE
+                  </button>
+<button class="px-3 py-2 bg-[#f4f2ec] hover:bg-[#eae6dc] text-hearth-dark rounded-xl text-xs font-bold border border-hearth-border shadow-[0_2px_0_#d5cfc4] active:translate-y-0.5 active:shadow-none transition-all" id="timerAddMin">
+                    +1 MIN
+                  </button>
+<button class="px-3 py-2 bg-[#f4f2ec] hover:bg-[#eae6dc] text-hearth-dark rounded-xl text-xs font-bold border border-hearth-border shadow-[0_2px_0_#d5cfc4] active:translate-y-0.5 active:shadow-none transition-all" id="timerReset">
+                    RESET
+                  </button>
+</div>
+</div>
+<!-- Physical Circular Gauge Dial -->
+<div class="relative w-36 h-36 flex-shrink-0 flex items-center justify-center bg-[#faf9f5] rounded-full border border-hearth-border shadow-[inset_0_4px_10px_rgba(0,0,0,0.05),0_4px_12px_rgba(0,0,0,0.03)]">
+<svg class="w-32 h-32 -rotate-90" viewBox="0 0 100 100">
+<circle class="text-[#edeae3] fill-none" cx="50" cy="50" r="41" stroke="currentColor" stroke-width="7"></circle>
+<circle class="text-hearth-terracotta fill-none transition-all duration-1000" cx="50" cy="50" id="timerProgress" r="41" stroke="currentColor" stroke-dasharray="257.6" stroke-dashoffset="68" stroke-linecap="round" stroke-width="7" style="stroke-dashoffset: 257.611;"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+<span class="text-2xl font-extrabold tracking-tight text-hearth-dark font-sans" id="timerText">00:00</span>
+<span class="font-mono text-[9px] uppercase font-bold tracking-widest text-hearth-muted">REMAINING</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Hardware Fast-Action Bar / Touch Wake Bezel -->
+<div class="w-full mt-7 pt-5 border-t border-hearth-border/80 flex flex-wrap items-center justify-between gap-4 font-mono">
+<!-- Ambient Guidance Trigger -->
+<div class="flex items-center gap-2.5 text-hearth-muted text-xs font-medium">
+
+
+</div>
+<!-- Physical Mode Buttons -->
+<div class="flex flex-wrap items-center gap-2.5">
+<button class="px-4 py-2 rounded-full bg-[#f4f2ec] hover:bg-hearth-card text-hearth-dark text-xs font-bold border border-hearth-border shadow-[0_2px_0_#d5cfc4] active:translate-y-0.5 active:shadow-none transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-hearth-terracotta">restaurant</span>
+              [ DINNER HUB ]
+            </button>
+<button class="px-4 py-2 rounded-full bg-[#f4f2ec] hover:bg-hearth-card text-hearth-dark text-xs font-bold border border-hearth-border shadow-[0_2px_0_#d5cfc4] active:translate-y-0.5 active:shadow-none transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-hearth-cobalt">checklist</span>
+              [ CHORE BOARD ]
+            </button>
+<button class="px-4 py-2 rounded-full bg-[#f4f2ec] hover:bg-hearth-card text-hearth-dark text-xs font-bold border border-hearth-border shadow-[0_2px_0_#d5cfc4] active:translate-y-0.5 active:shadow-none transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-hearth-emerald">lightbulb</span>
+              [ LIGHTS &amp; HVAC ]
+            </button>
+<button class="px-4 py-2 rounded-full bg-[#e8e4db] hover:bg-[#ded9cf] text-hearth-dark text-xs font-bold border border-hearth-border/80 shadow-[0_2px_0_#c8c2b5] active:translate-y-0.5 active:shadow-none transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">power_settings_new</span>
+              SLEEP DISP
+            </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Chassis Information Bar -->
+
+</div>
+<script>
+    // Live countdown timer simulation
+    (function() {
+      let secondsLeft = 522; // 8 min 42 sec
+      const initialSeconds = 600; // 10 min
+      let isRunning = true;
+      const timerText = document.getElementById('timerText');
+      const timerProgress = document.getElementById('timerProgress');
+      const timerToggle = document.getElementById('timerToggle');
+      const timerAddMin = document.getElementById('timerAddMin');
+      const timerReset = document.getElementById('timerReset');
+
+      const circumference = 2 * Math.PI * 41; // ~257.6
+
+      function updateDisplay() {
+        const m = Math.floor(secondsLeft / 60);
+        const s = secondsLeft % 60;
+        if (timerText) {
+          timerText.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+        if (timerProgress) {
+          const ratio = Math.max(0, secondsLeft / initialSeconds);
+          const offset = circumference * (1 - ratio);
+          timerProgress.style.strokeDashoffset = offset;
+        }
+      }
+
+      setInterval(() => {
+        if (isRunning && secondsLeft > 0) {
+          secondsLeft--;
+          updateDisplay();
+        }
+      }, 1000);
+
+      if (timerToggle) {
+        timerToggle.addEventListener('click', () => {
+          isRunning = !isRunning;
+          timerToggle.innerHTML = isRunning 
+            ? '<span class="material-symbols-outlined text-[16px]">pause</span> PAUSE'
+            : '<span class="material-symbols-outlined text-[16px]">play_arrow</span> RESUME';
+        });
+      }
+
+      if (timerAddMin) {
+        timerAddMin.addEventListener('click', () => {
+          secondsLeft += 60;
+          updateDisplay();
+        });
+      }
+
+      if (timerReset) {
+        timerReset.addEventListener('click', () => {
+          secondsLeft = initialSeconds;
+          updateDisplay();
+        });
+      }
+
+      updateDisplay();
+    })();
+  </script>
+
+
+</body></html>

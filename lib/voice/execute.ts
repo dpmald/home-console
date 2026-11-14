@@ -7,6 +7,7 @@ import {
 import { isParent, NAMES } from '../family';
 import { fmtTime, fmtDay, todayISO } from '../time';
 import { getWeather } from '../weather';
+import { controlSpotify } from '../spotify';
 import { postMessage, CHANNELS } from '../slack/api';
 import { refreshDinnerMessages } from '../slack/sync';
 import { dinnerLine } from '../slack/blocks';
@@ -101,6 +102,12 @@ export async function executeVoiceTool(name: string, args: Record<string, any>):
 
     case 'get_weather':
       return ok(await getWeather());
+
+    case 'control_spotify': {
+      const op = ['play', 'pause', 'next', 'previous'].includes(args.op) ? args.op : 'play';
+      const res = await controlSpotify({ op, query: args.query ? String(args.query) : undefined });
+      return ok(res);
+    }
 
     case 'post_to_slack': {
       const channel = args.channel === 'food' ? CHANNELS.food() : CHANNELS.logistics();

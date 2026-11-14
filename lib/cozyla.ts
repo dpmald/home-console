@@ -17,7 +17,8 @@ declare global {
       playSound?: (url: string, loop?: boolean) => void;
       stopSound?: () => void;
       vibrate?: (millis: number) => void;
-      bringToForeground?: () => void;
+      startApplication?: (packageName: string, action?: string, url?: string) => void;
+      bringToForeground?: (millis?: number) => void;
       clearCache?: () => void;
       loadStartUrl?: () => void;
       getDeviceName?: () => string;
@@ -47,6 +48,23 @@ export function speakOnCozyla(text: string) {
     }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+/**
+ * Silently wakes the native Android Spotify app in the background on the Cozyla
+ * so it registers with Spotify Connect, then immediately brings Fully Kiosk
+ * Browser back to the foreground so the user never leaves the dashboard.
+ */
+export function wakeSpotifyOnCozyla() {
+  try {
+    if (window.fully?.startApplication) {
+      window.fully.startApplication('com.spotify.music');
+      window.fully.bringToForeground?.(650);
+      setTimeout(() => window.fully?.bringToForeground?.(), 700);
       return true;
     }
   } catch {}

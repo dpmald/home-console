@@ -1,0 +1,474 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<meta content="web_blank" name="shell-type">
+<title>Hearth — Cozyla 24" Family Logistics &amp; Chore Hub</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+  @layer base {
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    body {
+      overscroll-behavior: none;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+  }
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  .dot-pattern {
+    background-image: radial-gradient(#d5d0c5 1.25px, transparent 1.25px);
+    background-size: 24px 24px;
+  }
+  .ceramic-card {
+    background: #ffffff;
+    border: 1px solid #e7e3da;
+    box-shadow: 0 4px 20px -2px rgba(40, 25, 15, 0.03), 0 1px 3px 0 rgba(40, 25, 15, 0.02);
+  }
+  .ceramic-inset {
+    background: #f7f6f2;
+    border: 1px solid #eae6de;
+  }
+  .font-mono-tag {
+    font-family: 'Space Grotesk', monospace, sans-serif;
+  }
+  @keyframes pop-check {
+    0% { transform: scale(0.94); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .pop-anim {
+    animation: pop-check 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+</style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "primary": "#ab2f0d",
+          "primary-fixed": "#ffdad2",
+          "on-primary-fixed-variant": "#891d00",
+          "tertiary": "#006a46",
+          "tertiary-fixed": "#8ef7c2",
+          "tertiary-fixed-dim": "#72daa7",
+          "on-tertiary-fixed-variant": "#005235",
+          "secondary": "#2b59ff",
+          "on-surface": "#1b1c1a",
+          "on-surface-variant": "#59413b",
+          "outline": "#8d716a",
+          "outline-variant": "#e1bfb7",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-low": "#f7f6f2",
+          "surface-container": "#efeeea",
+          "surface-container-high": "#e8e6e0",
+          "surface-dim": "#dedcd5",
+          "hearth-terracotta": "#e85a36",
+          "hearth-clay": "#ab2f0d",
+          "hearth-sage": "#3aa677",
+          "hearth-amber": "#d97706",
+          "hearth-sand": "#fbfaf7",
+          "hearth-bone": "#f4f2ec"
+        },
+        fontFamily: {
+          sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          mono: ['"Space Grotesk"', 'monospace', 'sans-serif']
+        }
+      }
+    }
+  };
+</script>
+</head>
+<body class="bg-[#edeae3] text-[#1b1c1a] antialiased select-none h-screen w-screen relative overflow-hidden flex flex-col justify-between">
+<!-- Ambient lighting gradients & Subtle dot pattern background -->
+<div class="fixed inset-0 pointer-events-none z-0">
+<div class="absolute inset-0 dot-pattern opacity-60"></div>
+<div class="absolute -top-32 right-10 w-[700px] h-[550px] bg-gradient-to-br from-[#e85a36]/10 via-[#d97706]/08 to-transparent rounded-full blur-3xl opacity-70"></div>
+<div class="absolute -bottom-24 left-10 w-[600px] h-[500px] bg-gradient-to-tr from-[#2b59ff]/08 via-[#3aa677]/08 to-transparent rounded-full blur-3xl opacity-60"></div>
+</div>
+<div class="relative z-10 h-screen w-screen p-3.5 2xl:p-5 flex flex-col justify-between box-border max-w-[1920px] mx-auto overflow-hidden">
+<!-- Main Domestic Hearth Display (Native full display on dot-grid warm background) -->
+<main class="w-full flex-1 flex flex-col justify-between bg-[#faf9f5]/95 backdrop-blur-lg rounded-3xl p-5 2xl:p-6 border border-[#e5e1d8] shadow-[0_12px_40px_rgba(40,25,15,0.04)] overflow-hidden min-h-0">
+<!-- 1. Top Navigation Bar -->
+<div class="w-full flex items-center justify-between pb-3.5 border-b border-[#e5e1d8] shrink-0">
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#f2efe9] transition-all text-[#1b1c1a] shadow-xs border border-[#e5e1d8] active:translate-y-0.5" id="returnAmbientBtn">
+<span class="material-symbols-outlined text-[18px] text-[#e85a36]">arrow_back</span>
+<span class="font-mono text-xs uppercase tracking-wider font-bold">Return to Ambient</span>
+</button>
+<div class="h-6 w-px bg-[#e5e1d8]"></div>
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#f4f2ec] border border-[#e2ded5] hover:bg-[#ece8df] transition-colors" id="bentoOverviewBtn">
+<span class="material-symbols-outlined text-[16px] text-[#006a46]">grid_view</span>
+<span class="font-mono text-xs text-[#1b1c1a] font-bold tracking-wide uppercase" id="overviewModeTag">TIMELINE EXPANDED</span>
+</button>
+</div>
+<!-- Glance Clock + Kitchen Ambient Sensors -->
+<div class="flex items-center gap-6">
+<div class="flex items-baseline gap-2">
+<span class="text-4xl 2xl:text-5xl font-extrabold tracking-tight text-[#1b1c1a]">07:22</span>
+<span class="font-mono text-sm uppercase text-[#8d716a] font-bold">PM</span>
+</div>
+<div class="hidden sm:flex flex-col text-right text-xs font-semibold leading-tight text-[#59413b]">
+<span class="font-bold text-[#1b1c1a] text-sm">Tuesday, Oct 24</span>
+<span class="font-mono text-[11px] text-[#8d716a] tracking-wider uppercase">KITCHEN 71.4°F • OTR 68°F</span>
+</div>
+</div>
+<!-- Family Member Presence Pods -->
+<div class="flex items-center gap-2.5">
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#e5e1d8] shadow-xs">
+<span class="h-2 w-2 rounded-full bg-[#e85a36]"></span>
+<span class="font-mono text-xs text-[#59413b] font-semibold"><span class="font-bold text-[#1b1c1a]">Daniela:</span> Kitchen</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#e5e1d8] shadow-xs">
+<span class="h-2 w-2 rounded-full bg-[#2b59ff]"></span>
+<span class="font-mono text-xs text-[#59413b] font-semibold"><span class="font-bold text-[#1b1c1a]">Wesley:</span> <span id="memberWesleyStatus">3/4 Done</span></span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#fed7aa] shadow-xs">
+<span class="h-2 w-2 rounded-full bg-[#ea580c] animate-pulse"></span>
+<span class="font-mono text-xs text-[#9a3412] font-semibold"><span class="font-bold text-[#1b1c1a]">Warren:</span> ETA ~12m</span>
+</div>
+</div>
+</div>
+<!-- 2. Main Body Grid (Two columns: Left ~79% Expanded Timeline, Right ~21% Slim Bentos Rail) -->
+<div class="w-full flex-1 flex gap-4 pt-3.5 min-h-0 overflow-hidden" id="bentoMainGrid">
+<!-- LEFT MAIN CANVAS: Master Family Timeline (~79% width) -->
+<section class="flex-[79] min-w-0 min-h-0 flex flex-col justify-between ceramic-card rounded-2xl p-4 2xl:p-5 border border-[#e7e3da] bg-white overflow-hidden shadow-sm">
+<!-- Header -->
+<div class="flex items-center justify-between pb-3 border-b border-[#e5e1d8] shrink-0">
+<div class="flex items-center gap-3">
+<span class="font-mono text-xs 2xl:text-sm font-bold text-[#ab2f0d] tracking-wider uppercase">[ 01 // MASTER FAMILY TIMELINE — 5 SCHEDULED ITEMS ]</span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#edf7f2] border border-[#bbf7d0] text-[#006a46] font-mono text-[11px] font-bold">
+<span class="h-1.5 w-1.5 rounded-full bg-[#006a46] animate-pulse"></span>
+              On Track
+            </span>
+</div>
+<!-- Filter Tabs -->
+<div class="flex items-center gap-1.5 p-1 rounded-xl bg-[#f4f2ec] border border-[#eae6de]">
+<button class="filter-btn px-3 py-1 rounded-lg bg-white font-bold text-[#1b1c1a] shadow-xs font-mono text-xs transition-all" data-filter="all">All</button>
+<button class="filter-btn px-3 py-1 rounded-lg text-[#8d716a] font-medium hover:text-[#1b1c1a] font-mono text-xs transition-all" data-filter="Daniela">Daniela</button>
+<button class="filter-btn px-3 py-1 rounded-lg text-[#8d716a] font-medium hover:text-[#1b1c1a] font-mono text-xs transition-all" data-filter="Warren">Warren</button>
+<button class="filter-btn px-3 py-1 rounded-lg text-[#8d716a] font-medium hover:text-[#1b1c1a] font-mono text-xs transition-all" data-filter="Wesley">Wesley</button>
+</div>
+</div>
+<!-- 5 Scheduled Timeline Items Cleanly Listed -->
+<div class="flex-1 flex flex-col justify-between py-2 min-h-0 gap-2 overflow-y-auto" id="timelineItemsContainer">
+<!-- Item 1: 08:00 AM TOMORROW -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-xl border border-[#fed7aa] bg-[#fffaf5] hover:bg-[#fff7ee] transition-all" data-member="Wesley">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-24 shrink-0 flex flex-col">
+<span class="font-mono text-xs font-extrabold text-[#b45309]">08:00 AM</span>
+<span class="font-mono text-[10px] uppercase font-bold text-[#d97706] tracking-wider">TOMORROW</span>
+</div>
+<div class="h-8 w-px bg-[#fed7aa] shrink-0"></div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-sm text-[#1b1c1a] truncate">Wesley Dentist Checkup</h3>
+<span class="font-mono text-[10px] font-bold text-[#b45309] bg-[#fef3c7] border border-[#fde68a] px-2 py-0.5 rounded-full uppercase">DRIVER UNASSIGNED</span>
+</div>
+<p class="text-xs text-[#59413b] mt-0.5 truncate">Midtown Pediatric Dental • 420 University Ave</p>
+</div>
+</div>
+<div class="flex items-center gap-3 shrink-0">
+<button class="px-3 py-1.5 rounded-xl bg-white hover:bg-[#fef3c7] border border-[#fde68a] text-[#b45309] font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-xs flex items-center gap-1 active:scale-95" onclick="claimPickupAction(this)">
+<span class="material-symbols-outlined text-[15px]">person_add</span>
+                CLAIM PICKUP
+              </button>
+</div>
+</div>
+<!-- Item 2: 03:30 PM -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-xl border border-[#bbf7d0] bg-[#f7fcf9] hover:bg-[#f0fdf4] transition-all" data-member="Daniela">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-24 shrink-0 flex flex-col">
+<span class="font-mono text-xs font-extrabold text-[#006a46]">03:30 PM</span>
+<span class="font-mono text-[10px] uppercase font-bold text-[#059669] tracking-wider">AFTERNOON</span>
+</div>
+<div class="h-8 w-px bg-[#bbf7d0] shrink-0"></div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-sm text-[#1b1c1a] truncate">Wesley Soccer Practice</h3>
+<span class="font-mono text-[10px] font-bold text-[#006a46] bg-[#dcfce7] border border-[#bbf7d0] px-2 py-0.5 rounded-full uppercase">✓ COMPLETED</span>
+<span class="font-mono text-[10px] font-bold text-[#59413b] bg-white border border-[#e5e1d8] px-2 py-0.5 rounded-full">Daniela</span>
+</div>
+<p class="text-xs text-[#59413b] mt-0.5 truncate">Lincoln Field 2 • Daniela picked up • Shin guards rinsed</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="font-mono text-xs text-[#006a46] font-bold flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-[#bbf7d0]">
+<span class="material-symbols-outlined text-[15px]">done_all</span> All Logged
+              </span>
+</div>
+</div>
+<!-- Item 3: 05:15 PM NOW -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-xl border-2 border-[#e85a36] bg-[#fff5f2] shadow-xs" data-member="Warren">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-24 shrink-0 flex flex-col">
+<span class="font-mono text-xs font-black text-[#ab2f0d]">05:15 PM</span>
+<span class="font-mono text-[10px] uppercase font-bold text-[#e85a36] tracking-wider flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-[#e85a36] animate-ping"></span> NOW
+                </span>
+</div>
+<div class="h-8 w-px bg-[#fca5a5] shrink-0"></div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-sm text-[#1b1c1a] truncate">Warren Commuting Home</h3>
+<span class="font-mono text-[10px] font-bold text-white bg-[#e85a36] px-2 py-0.5 rounded-full uppercase shadow-xs">ETA ~12 MIN</span>
+<span class="font-mono text-[10px] font-bold text-[#ab2f0d] bg-white border border-[#fca5a5] px-2 py-0.5 rounded-full">Warren</span>
+</div>
+<p class="text-xs text-[#59413b] mt-0.5 truncate">Via I-280 North • Audi e-tron • 3.2 mi left</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="font-mono text-xs font-bold text-[#ab2f0d] bg-white border border-[#fca5a5] px-3 py-1.5 rounded-xl shadow-xs">
+                5:27 ETA
+              </span>
+</div>
+</div>
+<!-- Item 4: 06:30 PM UP NEXT -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-xl border border-[#fed7aa] bg-[#fffbf7] hover:bg-[#fff8f0] transition-all" data-member="all">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-24 shrink-0 flex flex-col">
+<span class="font-mono text-xs font-extrabold text-[#c2410c]">06:30 PM</span>
+<span class="font-mono text-[10px] uppercase font-bold text-[#ea580c] tracking-wider">UP NEXT</span>
+</div>
+<div class="h-8 w-px bg-[#fed7aa] shrink-0"></div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-sm text-[#1b1c1a] truncate">Family Dinner @ Kitchen Island</h3>
+<span class="font-mono text-[10px] font-bold text-[#c2410c] bg-[#ffedd5] border border-[#fed7aa] px-2 py-0.5 rounded-full uppercase">ALL 3 ATTENDING</span>
+</div>
+<p class="text-xs text-[#59413b] mt-0.5 truncate">Crispy Miso Salmon Rice Bowls • Rice cooker warm resting</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="font-mono text-xs font-semibold text-[#8d716a] bg-white px-2.5 py-1 rounded-lg border border-[#e5e1d8]">
+                In 1h 08m
+              </span>
+</div>
+</div>
+<!-- Item 5: 07:45 PM -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-xl border border-[#e5e1d8] bg-[#fcfbf9] hover:bg-white transition-all" data-member="Warren">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-24 shrink-0 flex flex-col">
+<span class="font-mono text-xs font-extrabold text-[#59413b]">07:45 PM</span>
+<span class="font-mono text-[10px] uppercase font-bold text-[#8d716a] tracking-wider">EVENING</span>
+</div>
+<div class="h-8 w-px bg-[#e5e1d8] shrink-0"></div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-sm text-[#1b1c1a] truncate">Bedtime Reading &amp; Wind Down</h3>
+<span class="font-mono text-[10px] font-bold text-[#59413b] bg-white border border-[#d2dbe8] px-2 py-0.5 rounded-full">Warren &amp; Wesley</span>
+</div>
+<p class="text-xs text-[#59413b] mt-0.5 truncate">Percy Jackson Ch. 7 • Warm chamomile tea</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="font-mono text-xs font-medium text-[#8d716a] bg-white px-2.5 py-1 rounded-lg border border-[#e5e1d8]">
+                Assigned: Warren
+              </span>
+</div>
+</div>
+</div>
+<!-- Bottom of Timeline Footer -->
+<div class="w-full pt-3 border-t border-[#e5e1d8] flex items-center justify-between shrink-0">
+<div class="flex items-center gap-2.5">
+<button class="px-3.5 py-1.5 rounded-xl bg-[#f4f2ec] hover:bg-[#eae7df] border border-[#e2ded5] text-[#1b1c1a] font-mono text-xs font-bold tracking-wide transition-all shadow-xs flex items-center gap-1.5 active:scale-95" onclick="quickActionFeedback(this, 'Opened Sync Dialog')">
+<span class="material-symbols-outlined text-[16px] text-[#ab2f0d]">add_circle</span>
+              + Sync New Event
+            </button>
+<button class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#f4f2ec] border border-[#e2ded5] text-[#59413b] font-mono text-xs font-bold tracking-wide transition-all shadow-xs flex items-center gap-1.5 active:scale-95" onclick="quickActionFeedback(this, 'Reassign Open')">
+<span class="material-symbols-outlined text-[16px] text-[#2b59ff]">swap_horiz</span>
+              ⇄ Reassign Pickup
+            </button>
+</div>
+<div class="flex items-center gap-2 text-[#8d716a] font-mono text-[11px]">
+<span class="h-2 w-2 rounded-full bg-[#006a46]"></span>
+<span>Auto-synced 2m ago • CalDAV Connected</span>
+</div>
+</div>
+</section>
+<!-- RIGHT RAIL: Compressed Bento Rail (~21% width) -->
+<aside class="flex-[21] flex flex-col gap-3 shrink-0 select-none min-h-0 overflow-y-auto" id="ultraSlimRightRail">
+<!-- Bento 1: Tonight's Dinner Bento -->
+<div class="ceramic-card rounded-2xl p-3.5 flex flex-col justify-between flex-1 border border-[#edd5c3] bg-[#fffcf5] shadow-xs hover:border-[#e85a36] transition-all cursor-pointer group">
+<div class="flex items-center justify-between pb-2 border-b border-[#f5e6c8]">
+<div class="flex items-center gap-1.5">
+<div class="h-6 w-6 rounded-lg bg-[#fdfaf7] border border-[#edd5c3] text-[#e85a36] flex items-center justify-center">
+<span class="material-symbols-outlined text-[15px]">soup_kitchen</span>
+</div>
+<span class="font-mono text-[10px] font-bold text-[#9a3412] tracking-wider uppercase">🍲 TONIGHT'S DINNER</span>
+</div>
+<span class="font-mono text-[10px] font-bold text-[#d97706] bg-[#fef3c7] px-1.5 py-0.5 rounded-md">6:30 PM</span>
+</div>
+<div class="my-auto py-1.5">
+<h4 class="font-bold text-xs 2xl:text-sm text-[#1b1c1a] leading-tight line-clamp-2">Crispy Miso Salmon Rice Bowls</h4>
+<p class="text-[11px] text-[#59413b] mt-0.5">with avocado &amp; scallions</p>
+<p class="font-mono text-[10px] text-[#006a46] font-semibold mt-1.5 flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-[#006a46]"></span>
+              Warm Resting in Rice Cooker
+            </p>
+</div>
+<button class="w-full py-1.5 px-2 rounded-xl bg-white hover:bg-[#fbf7ee] border border-[#edd5c3] text-[#ab2f0d] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-between shadow-xs transition-all">
+<span class="leading-none">EXPAND DINNER</span>
+<span class="material-symbols-outlined text-[14px] text-[#ab2f0d]">chevron_left</span>
+</button>
+</div>
+<!-- Bento 2: Wesley's Chores Bento -->
+<div class="ceramic-card rounded-2xl p-3.5 flex flex-col justify-between flex-1 border border-[#d2dbe8] bg-[#f4f7ff]/40 shadow-xs hover:border-[#2b59ff] transition-all cursor-pointer group">
+<div class="flex items-center justify-between pb-2 border-b border-[#ede9e1]">
+<div class="flex items-center gap-1.5">
+<div class="h-6 w-6 rounded-lg bg-white border border-[#d2dbe8] text-[#2b59ff] flex items-center justify-center">
+<span class="material-symbols-outlined text-[15px]">checklist</span>
+</div>
+<span class="font-mono text-[10px] font-bold text-[#2b59ff] tracking-wider uppercase">✓ WESLEY'S CHORES</span>
+</div>
+<span class="font-mono text-[10px] font-bold text-[#006a46] bg-[#edf7f2] px-1.5 py-0.5 rounded-md">74% Done</span>
+</div>
+<div class="my-auto py-1.5">
+<div class="flex items-baseline justify-between">
+<span class="font-mono text-[10px] text-[#8d716a] font-semibold uppercase">EARNED / ALLOWANCE</span>
+<span class="font-mono text-base font-extrabold text-[#1b1c1a]">$18.50</span>
+</div>
+<div class="w-full bg-[#e2e8f0] h-1.5 rounded-full overflow-hidden my-1.5">
+<div class="bg-[#2b59ff] h-full rounded-full" style="width: 74%"></div>
+</div>
+<div class="flex items-center justify-between text-[10px] text-[#59413b] font-medium">
+<span class="font-mono text-[#006a46] font-semibold">3 of 4 Completed</span>
+<span class="font-mono text-[9px] text-[#ab2f0d] font-bold">1 LEFT: Tidy Bedroom</span>
+</div>
+</div>
+<button class="w-full py-1.5 px-2 rounded-xl bg-white hover:bg-[#ece8df] border border-[#d2dbe8] text-[#2b59ff] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-between shadow-xs transition-all">
+<span class="leading-none">EXPAND CHORES</span>
+<span class="material-symbols-outlined text-[14px] text-[#2b59ff]">chevron_left</span>
+</button>
+</div>
+<!-- Bento 3: Pantry & Grocery Order Bento -->
+<div class="ceramic-card rounded-2xl p-3.5 flex flex-col justify-between flex-1 border border-[#e2ded5] bg-white shadow-xs hover:border-[#3aa677] transition-all cursor-pointer group">
+<div class="flex items-center justify-between pb-2 border-b border-[#ede9e1]">
+<div class="flex items-center gap-1.5">
+<div class="h-6 w-6 rounded-lg bg-[#edf7f2] border border-[#bbf7d0] text-[#006a46] flex items-center justify-center">
+<span class="material-symbols-outlined text-[15px]">shopping_bag</span>
+</div>
+<span class="font-mono text-[10px] font-bold text-[#006a46] tracking-wider uppercase">🛍️ PANTRY &amp; GROCERIES</span>
+</div>
+<span class="font-mono text-[9px] font-bold text-[#b91c1c] bg-[#fdf2f2] border border-[#fbd5d5] px-1.5 py-0.5 rounded-md uppercase">10 PM CUTOFF</span>
+</div>
+<div class="my-auto py-1.5">
+<div class="flex items-baseline justify-between">
+<span class="font-bold text-xs 2xl:text-sm text-[#1b1c1a]">18 items staged in cart</span>
+<span class="font-mono text-xs font-bold text-[#1b1c1a]">$142.50</span>
+</div>
+<p class="font-mono text-[10px] text-[#ab2f0d] font-semibold mt-1">Next-day delivery cutoff in 2h 38m</p>
+</div>
+<button class="w-full py-1.5 px-2 rounded-xl bg-[#f4f2ec] hover:bg-[#eae7df] border border-[#e2ded5] text-[#1b1c1a] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-between shadow-xs transition-all">
+<span class="leading-none">EXPAND PANTRY</span>
+<span class="material-symbols-outlined text-[14px] text-[#8d716a]">chevron_left</span>
+</button>
+</div>
+</aside>
+</div>
+<!-- 4. Bottom Dock: Tactile Hardware Navigation Dock -->
+<div class="w-full pt-3 border-t border-[#e5e1d8] flex items-center justify-between shrink-0">
+<div class="flex items-center gap-2.5">
+<button class="px-4 py-2 rounded-2xl bg-white hover:bg-[#eae7df] font-mono text-xs text-[#1b1c1a] font-bold transition-all shadow-xs border border-[#e5e1d8] flex items-center gap-2 active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px] text-[#e85a36]">restaurant</span>
+          Dinner Hub
+        </button>
+<!-- Active Mode Button in warm terracotta #e85a36 -->
+<button class="px-5 py-2 rounded-2xl bg-[#e85a36] text-white font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(232,90,54,0.25)] flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">checklist</span>
+          Chores &amp; Schedule
+        </button>
+<button class="px-4 py-2 rounded-2xl bg-white hover:bg-[#eae7df] font-mono text-xs text-[#1b1c1a] font-bold transition-all shadow-xs border border-[#e5e1d8] flex items-center gap-2 active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px] text-[#d97706]">lightbulb</span>
+          Lights &amp; HVAC
+        </button>
+<button class="px-4 py-2 rounded-2xl bg-white hover:bg-[#eae7df] font-mono text-xs text-[#1b1c1a] font-bold transition-all shadow-xs border border-[#e5e1d8] flex items-center gap-2 active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px] text-[#2b59ff]">graphic_eq</span>
+          Sound: Kitchen Hop FM
+        </button>
+</div>
+<!-- Hardware Chassis Telemetry -->
+<div class="flex items-center gap-4 text-[#8d716a] font-mono text-xs">
+<div class="flex items-center gap-1.5">
+<span class="h-2 w-2 rounded-full bg-[#3aa677]"></span>
+
+</div>
+<button class="px-3.5 py-1.5 rounded-xl bg-[#f4f2ec] hover:bg-[#eae7df] border border-[#e2ded5] font-mono text-xs text-[#1b1c1a] font-bold transition-colors flex items-center gap-1.5 active:scale-95">
+<span class="material-symbols-outlined text-[16px] text-[#8d716a]">power_settings_new</span>
+          STANDBY
+        </button>
+</div>
+</div>
+</main>
+</div>
+<!-- Interactive Engine -->
+<script>
+  // Filter tabs for the master timeline
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => {
+        b.classList.remove('bg-white', 'font-bold', 'text-[#1b1c1a]', 'shadow-xs');
+        b.classList.add('text-[#8d716a]', 'font-medium');
+      });
+      btn.classList.add('bg-white', 'font-bold', 'text-[#1b1c1a]', 'shadow-xs');
+      btn.classList.remove('text-[#8d716a]', 'font-medium');
+
+      const filter = btn.getAttribute('data-filter');
+      const rows = document.querySelectorAll('.timeline-row');
+      rows.forEach(row => {
+        const member = row.getAttribute('data-member');
+        if (filter === 'all' || member === 'all' || member === filter) {
+          row.style.display = 'flex';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Claim pickup handler
+  function claimPickupAction(btn) {
+    btn.innerHTML = '<span class="material-symbols-outlined text-[15px]">check_circle</span> Daniela Claimed';
+    btn.classList.remove('bg-white', 'border-[#fde68a]', 'text-[#b45309]');
+    btn.classList.add('bg-[#edf7f2]', 'border-[#bbf7d0]', 'text-[#006a46]');
+    setTimeout(() => {
+      btn.innerHTML = '<span class="material-symbols-outlined text-[15px]">person_add</span> CLAIM PICKUP';
+      btn.classList.add('bg-white', 'border-[#fde68a]', 'text-[#b45309]');
+      btn.classList.remove('bg-[#edf7f2]', 'border-[#bbf7d0]', 'text-[#006a46]');
+    }, 3000);
+  }
+
+  // Quick action feedback
+  function quickActionFeedback(btn, message) {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<span class="material-symbols-outlined text-[15px]">check</span> ${message}`;
+    btn.classList.add('text-[#006a46]');
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.classList.remove('text-[#006a46]');
+    }, 1800);
+  }
+
+  // Button micro-interaction
+  const returnAmbientBtn = document.getElementById('returnAmbientBtn');
+  if (returnAmbientBtn) {
+    returnAmbientBtn.addEventListener('click', () => {
+      returnAmbientBtn.classList.add('scale-95');
+      setTimeout(() => returnAmbientBtn.classList.remove('scale-95'), 180);
+    });
+  }
+</script>
+
+
+</body></html>

@@ -1,0 +1,819 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<meta content="web_blank" name="shell-type">
+<title>Hearth — Cozyla 24" Family Logistics &amp; Chore Hub</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+  @layer base {
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    body {
+      overscroll-behavior: none;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+  }
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  .dot-pattern {
+    background-image: radial-gradient(#d5d0c5 1.25px, transparent 1.25px);
+    background-size: 24px 24px;
+  }
+  .ceramic-card {
+    background: #ffffff;
+    border: 1px solid #e7e3da;
+    box-shadow: 0 4px 20px -2px rgba(40, 25, 15, 0.03), 0 1px 3px 0 rgba(40, 25, 15, 0.02);
+  }
+  .ceramic-inset {
+    background: #f7f6f2;
+    border: 1px solid #eae6de;
+  }
+  .font-mono-tag {
+    font-family: 'Space Grotesk', monospace, sans-serif;
+  }
+  @keyframes pop-check {
+    0% { transform: scale(0.94); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .pop-anim {
+    animation: pop-check 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  /* Smooth layout transitions for Cozyla 1080p kiosk bento */
+  .bento-transition {
+    transition: all 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+</style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "primary": "#ab2f0d",
+          "primary-fixed": "#ffdad2",
+          "on-primary-fixed-variant": "#891d00",
+          "tertiary": "#006a46",
+          "tertiary-fixed": "#8ef7c2",
+          "tertiary-fixed-dim": "#72daa7",
+          "on-tertiary-fixed-variant": "#005235",
+          "secondary": "#2b59ff",
+          "on-surface": "#1b1c1a",
+          "on-surface-variant": "#59413b",
+          "outline": "#8d716a",
+          "outline-variant": "#e1bfb7",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-low": "#f7f6f2",
+          "surface-container": "#efeeea",
+          "surface-container-high": "#e8e6e0",
+          "surface-dim": "#dedcd5",
+          "hearth-terracotta": "#e85a36",
+          "hearth-clay": "#ab2f0d",
+          "hearth-sage": "#3aa677",
+          "hearth-amber": "#d97706",
+          "hearth-sand": "#fbfaf7",
+          "hearth-bone": "#f4f2ec"
+        },
+        fontFamily: {
+          sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          mono: ['"Space Grotesk"', 'monospace', 'sans-serif']
+        }
+      }
+    }
+  };
+</script>
+</head>
+<body class="bg-[#edeae3] text-[#1b1c1a] antialiased select-none h-screen w-screen relative overflow-hidden flex flex-col justify-between">
+<!-- Ambient lighting gradients & Subtle dot pattern background -->
+<div class="fixed inset-0 pointer-events-none z-0">
+<div class="absolute inset-0 dot-pattern opacity-60"></div>
+<div class="absolute -top-32 right-10 w-[700px] h-[550px] bg-gradient-to-br from-[#e85a36]/10 via-[#d97706]/08 to-transparent rounded-full blur-3xl opacity-70"></div>
+<div class="absolute -bottom-24 left-10 w-[600px] h-[500px] bg-gradient-to-tr from-[#2b59ff]/08 via-[#3aa677]/08 to-transparent rounded-full blur-3xl opacity-60"></div>
+</div>
+<div class="relative z-10 h-screen w-screen p-3.5 2xl:p-5 flex flex-col justify-between box-border max-w-[1920px] mx-auto overflow-hidden">
+<!-- Top System Telemetry Bar (Cozyla 24" Kiosk Frame Spec) -->
+
+<!-- Main Domestic Hearth Display (Fixed viewport container with zero vertical overflow) -->
+<main class="w-full flex-1 my-3 flex flex-col justify-between bg-[#faf9f5]/95 backdrop-blur-lg rounded-3xl p-5 2xl:p-6 border border-[#e5e1d8] shadow-[0_12px_40px_rgba(40,25,15,0.04)] overflow-hidden min-h-0">
+<!-- Domestic Hearth Sub-Header / Ambient Control Bar -->
+<div class="w-full flex items-center justify-between pb-3.5 border-b border-[#e5e1d8] shrink-0">
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#f2efe9] transition-all text-[#1b1c1a] shadow-xs border border-[#e5e1d8] active:translate-y-0.5" id="returnAmbientBtn">
+<span class="material-symbols-outlined text-[18px] text-[#e85a36]">arrow_back</span>
+<span class="font-mono text-xs uppercase tracking-wider font-bold">Return to Ambient</span>
+</button>
+<div class="h-6 w-px bg-[#e5e1d8]"></div>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#f4f2ec] border border-[#e2ded5] hover:bg-[#ece8df] transition-colors" id="bentoOverviewBtn">
+<span class="material-symbols-outlined text-[16px] text-[#006a46]">grid_view</span>
+<span class="font-mono text-xs text-[#1b1c1a] font-bold tracking-wide uppercase" id="overviewModeTag">BENTO OVERVIEW</span>
+</button>
+</div>
+<!-- Glance Clock + Kitchen Ambient Sensors -->
+<div class="flex items-center gap-6">
+<div class="flex items-baseline gap-2">
+<span class="text-4xl 2xl:text-5xl font-extrabold tracking-tight text-[#1b1c1a]">07:22</span>
+<span class="font-mono text-sm uppercase text-[#8d716a] font-bold">PM</span>
+</div>
+<div class="hidden sm:flex flex-col text-right text-xs font-semibold leading-tight text-[#59413b]">
+<span class="font-bold text-[#1b1c1a] text-sm">Tuesday, Oct 24</span>
+<span class="font-mono text-[11px] text-[#8d716a] tracking-wider">KITCHEN 71.4°F • OTR 68°F</span>
+</div>
+</div>
+<!-- Family Member Presence Pods -->
+<div class="flex items-center gap-2.5">
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#e5e1d8] shadow-xs">
+<span class="h-2 w-2 rounded-full bg-[#e85a36]"></span>
+<span class="font-mono text-xs text-[#59413b] font-semibold"><span class="font-bold text-[#1b1c1a]">Daniela:</span> Kitchen</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#e5e1d8] shadow-xs">
+<span class="h-2 w-2 rounded-full bg-[#2b59ff]"></span>
+<span class="font-mono text-xs text-[#59413b] font-semibold"><span class="font-bold text-[#1b1c1a]">Wesley:</span> <span id="memberWesleyStatus">3/4 Done</span></span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#fed7aa] shadow-xs">
+<span class="h-2 w-2 rounded-full bg-[#ea580c] animate-pulse"></span>
+<span class="font-mono text-xs text-[#9a3412] font-semibold"><span class="font-bold text-[#1b1c1a]">Warren:</span> ETA ~12m</span>
+</div>
+</div>
+</div>
+<!-- MAIN BENTO WORKSPACE (Grid dynamically animates between Bento Overview & Expanded Timeline) -->
+<div class="w-full flex-1 grid grid-cols-12 gap-5 pt-3.5 min-h-0 overflow-hidden bento-transition" id="bentoMainGrid">
+<!-- LEFT SIDE: SCHEDULE / TIMELINE & TONIGHT'S DINNER (Cols 1-7 expands to Col 1-10 or 1-11) -->
+<div class="col-span-7 flex flex-col justify-between gap-3.5 min-h-0 bento-transition" id="leftTimelineCol">
+<!-- 1. Schedule & Transit Ceramic Card -->
+<div class="ceramic-card rounded-3xl p-5 2xl:p-6 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden bento-transition" id="logisticsCard">
+<!-- Card Header & Status Badges -->
+<div class="flex items-center justify-between pb-3 border-b border-[#f0ede6] shrink-0">
+<div class="flex items-center gap-2.5">
+<span class="font-mono text-xs font-bold text-[#8d716a] tracking-wider uppercase" id="logisticsHeaderTitle">[ 01 // TODAY'S LOGISTICS ]</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-0.5 rounded-full bg-[#edf7f2] border border-[#bbf7d0] text-[#006a46] font-mono text-xs font-bold flex items-center gap-1.5">
+<span class="h-1.5 w-1.5 rounded-full bg-[#006a46]"></span> On Track
+              </span>
+<!-- Filter Source Badges -->
+<div class="flex items-center gap-1 p-0.5 bg-[#f4f2ec] rounded-xl text-xs font-mono" id="filterPillsContainer">
+<button class="filter-btn px-2.5 py-0.5 rounded-lg bg-white font-bold text-[#1b1c1a] shadow-xs cursor-pointer" data-filter="all">All</button>
+<button class="filter-btn px-2 py-0.5 text-[#8d716a] hover:text-[#1b1c1a] font-medium cursor-pointer" data-filter="daniela">Daniela</button>
+<button class="filter-btn px-2 py-0.5 text-[#8d716a] hover:text-[#1b1c1a] font-medium cursor-pointer" data-filter="warren">Warren</button>
+<button class="filter-btn px-2 py-0.5 text-[#8d716a] hover:text-[#1b1c1a] font-medium cursor-pointer" data-filter="wesley">Wesley</button>
+</div>
+</div>
+</div>
+<!-- DEFAULT COMPACT VIEW: Two glance pods + calm pickup banner (shown in Bento Mode) -->
+<div class="space-y-3 my-auto py-1 bento-transition" id="compactGlancePods">
+<div class="grid grid-cols-2 gap-3.5">
+<!-- Glance Pod: Warren Commute Active -->
+<div class="p-3.5 rounded-2xl bg-[#faf7f2] border border-[#f0e4d7] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="h-10 w-10 rounded-xl bg-white border border-[#edd5c3] text-[#e85a36] flex items-center justify-center shadow-xs shrink-0">
+<span class="material-symbols-outlined text-[22px]">directions_car</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-mono text-[10px] font-bold uppercase text-[#ab2f0d] tracking-wider">COMMUTE IN PROGRESS</span>
+<span class="h-1.5 w-1.5 rounded-full bg-[#e85a36] animate-ping"></span>
+</div>
+<div class="font-bold text-sm text-[#1b1c1a] leading-snug">Warren arriving ~12m</div>
+<div class="text-[11px] text-[#8d716a] font-mono">I-280 North • 3.2 mi left</div>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-lg bg-white font-mono text-xs font-bold text-[#ab2f0d] border border-[#edd5c3]">5:27 ETA</span>
+</div>
+<!-- Glance Pod: Next Up Dinner -->
+<div class="p-3.5 rounded-2xl bg-[#f7f8fa] border border-[#e2e7ef] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="h-10 w-10 rounded-xl bg-white border border-[#d2dbe8] text-[#2b59ff] flex items-center justify-center shadow-xs shrink-0">
+<span class="material-symbols-outlined text-[22px]">restaurant</span>
+</div>
+<div>
+<span class="font-mono text-[10px] font-bold uppercase text-[#2b59ff] tracking-wider">UP NEXT</span>
+<div class="font-bold text-sm text-[#1b1c1a] leading-snug">Family Dinner @ 6:30 PM</div>
+<div class="text-[11px] text-[#8d716a] font-mono">All 3 attending • Kitchen Island</div>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-lg bg-white font-mono text-xs font-bold text-[#2b59ff] border border-[#d2dbe8]">In 1h 08m</span>
+</div>
+</div>
+<!-- Calm Action Notice Banner -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-[#fffcf5] border border-[#f5e6c8]">
+<div class="flex items-center gap-3">
+<span class="h-8 w-8 rounded-xl bg-white border border-[#ebd8b0] text-[#b45309] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">calendar_month</span>
+</span>
+<div>
+<span class="font-mono text-[10px] font-bold text-[#b45309] uppercase tracking-wide">Tomorrow 8:00 AM • Logistics Needed</span>
+<p class="font-bold text-sm text-[#1b1c1a]">Wesley Dentist Checkup — Driver Unassigned</p>
+</div>
+</div>
+<button class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#fbf7ee] border border-[#d6be8c] text-[#854d0e] font-mono text-xs uppercase font-bold tracking-wider shadow-xs transition-all active:translate-y-0.5" onclick="claimPickupAction(this)">
+                Claim Pickup
+              </button>
+</div>
+</div>
+<!-- FULL TIMELINE EXPANDED VIEW (Generous, full 1080p kiosk schedule details) -->
+<div class="hidden flex-1 flex-col justify-between py-2 overflow-y-auto bento-transition" id="expandedTimelineView">
+<div class="grid grid-cols-1 gap-2.5">
+<!-- Event 1: Morning Checkup (High visibility logistics needed) -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-2xl bg-[#fffcf5] border border-[#f5e6c8]" data-member="wesley">
+<div class="flex items-center gap-3.5">
+<div class="flex flex-col items-center justify-center min-w-[70px]">
+<span class="font-mono text-xs font-bold text-[#b45309]">08:00 AM</span>
+<span class="font-mono text-[10px] text-[#8d716a]">TOMORROW</span>
+</div>
+<div class="h-7 w-1 bg-[#d97706] rounded-full"></div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-sm text-[#1b1c1a]">Wesley Dentist Checkup</span>
+<span class="px-2 py-0.5 rounded-md bg-[#fef3c7] text-[#92400e] font-mono text-[10px] font-bold">DRIVER UNASSIGNED</span>
+</div>
+<p class="text-xs text-[#8d716a] font-mono mt-0.5">Midtown Pediatric Dental • 420 University Ave</p>
+</div>
+</div>
+<button class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#fbf7ee] border border-[#d6be8c] text-[#854d0e] font-mono text-xs uppercase font-bold tracking-wider shadow-xs transition-all active:translate-y-0.5" onclick="claimPickupAction(this)">
+                  Claim Pickup
+                </button>
+</div>
+<!-- Event 2: Soccer Practice (Completed) -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-2xl bg-[#faf9f6] border border-[#ede9e1] opacity-80" data-member="wesley">
+<div class="flex items-center gap-3.5">
+<div class="flex flex-col items-center justify-center min-w-[70px]">
+<span class="font-mono text-xs font-bold text-[#1b1c1a]">03:30 PM</span>
+<span class="font-mono text-[10px] text-[#8d716a]">04:15 PM</span>
+</div>
+<div class="h-7 w-1 bg-[#3aa677] rounded-full"></div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-sm text-[#1b1c1a]">Wesley Soccer Practice</span>
+<span class="px-2 py-0.5 rounded-md bg-[#edf7f2] text-[#006a46] font-mono text-[10px] font-bold">✓ COMPLETED</span>
+</div>
+<p class="text-xs text-[#8d716a] mt-0.5">Lincoln Field 2 • Daniela picked up • Shin guards rinsed</p>
+</div>
+</div>
+<span class="font-mono text-xs text-[#8d716a] px-3">Daniela</span>
+</div>
+<!-- Event 3: Warren Commute -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-2xl bg-[#fdfaf7] border border-[#edd5c3]" data-member="warren">
+<div class="flex items-center gap-3.5">
+<div class="flex flex-col items-center justify-center min-w-[70px]">
+<span class="font-mono text-xs font-bold text-[#ab2f0d]">05:15 PM</span>
+<span class="font-mono text-[10px] text-[#e85a36] font-bold">NOW</span>
+</div>
+<div class="h-7 w-1 bg-[#e85a36] rounded-full"></div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-sm text-[#1b1c1a]">Warren Commuting Home</span>
+<span class="px-2 py-0.5 rounded-md bg-white border border-[#edd5c3] text-[#ab2f0d] font-mono text-[10px] font-bold">ETA ~12 MIN</span>
+</div>
+<p class="text-xs text-[#8d716a] mt-0.5">Via I-280 North • Audi e-tron • 3.2 mi left</p>
+</div>
+</div>
+<span class="font-mono text-xs text-[#ab2f0d] font-semibold px-3">5:27 ETA</span>
+</div>
+<!-- Event 4: Family Dinner -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-2xl bg-white border border-[#d2dbe8]" data-member="all">
+<div class="flex items-center gap-3.5">
+<div class="flex flex-col items-center justify-center min-w-[70px]">
+<span class="font-mono text-xs font-bold text-[#1b1c1a]">06:30 PM</span>
+<span class="font-mono text-[10px] text-[#2b59ff] font-bold">UP NEXT</span>
+</div>
+<div class="h-7 w-1 bg-[#2b59ff] rounded-full"></div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-sm text-[#1b1c1a]">Family Dinner @ Kitchen Island</span>
+<span class="px-2 py-0.5 rounded-md bg-[#f4f7ff] text-[#2b59ff] font-mono text-[10px] font-bold">All 3 Attending</span>
+</div>
+<p class="text-xs text-[#8d716a] mt-0.5">Crispy Miso Salmon Rice Bowls • Rice cooker warm resting</p>
+</div>
+</div>
+<span class="font-mono text-xs text-[#2b59ff] font-semibold px-3">In 1h 08m</span>
+</div>
+<!-- Event 5: Bedtime Reading -->
+<div class="timeline-row flex items-center justify-between p-3 rounded-2xl bg-[#faf9f6] border border-[#ede9e1]" data-member="warren">
+<div class="flex items-center gap-3.5">
+<div class="flex flex-col items-center justify-center min-w-[70px]">
+<span class="font-mono text-xs font-bold text-[#1b1c1a]">07:45 PM</span>
+<span class="font-mono text-[10px] text-[#8d716a]">08:15 PM</span>
+</div>
+<div class="h-7 w-1 bg-[#8d716a] rounded-full"></div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-sm text-[#1b1c1a]">Bedtime Reading &amp; Wind Down</span>
+<span class="text-xs font-mono text-[#8d716a]">Assigned: Warren</span>
+</div>
+<p class="text-xs text-[#8d716a] mt-0.5">Percy Jackson Ch. 7 • Warm chamomile tea</p>
+</div>
+</div>
+<span class="font-mono text-xs text-[#8d716a] px-3">Warren &amp; Wesley</span>
+</div>
+</div>
+</div>
+<!-- Interactive Expand / Collapse Toggle Bar -->
+<div class="pt-2.5 border-t border-[#f0ede6] shrink-0">
+<button class="w-full flex items-center justify-between px-4 py-2 rounded-xl bg-[#f7f6f2] hover:bg-[#eeebe3] text-[#1b1c1a] transition-all font-mono text-xs font-bold uppercase tracking-wider group" id="toggleTimelineBtn">
+<span class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-[#8d716a] group-hover:text-[#1b1c1a]" id="timelineBtnIcon">schedule</span>
+<span id="timelineToggleLabel">Show Full Timeline (4 events)</span>
+</span>
+<span class="material-symbols-outlined text-[20px] text-[#8d716a] transition-transform duration-200" id="timelineArrow">expand_more</span>
+</button>
+</div>
+<!-- Bottom Schedule Quick Controls -->
+<div class="pt-2 flex items-center justify-between text-xs text-[#8d716a] font-mono border-t border-[#f0ede6] mt-2 shrink-0">
+<div class="flex items-center gap-3">
+<button class="hover:text-[#1b1c1a] flex items-center gap-1 transition-colors font-semibold" onclick="quickActionFeedback(this, 'Event added')">
+<span class="material-symbols-outlined text-[16px]">add_circle</span> Sync New Event
+              </button>
+<button class="hover:text-[#1b1c1a] flex items-center gap-1 transition-colors font-semibold" onclick="quickActionFeedback(this, 'Pickups re-synced')">
+<span class="material-symbols-outlined text-[16px]">swap_horiz</span> Reassign Pickup
+              </button>
+</div>
+<span>Auto-synced 2m ago • CalDAV Connected</span>
+</div>
+</div>
+<!-- 2. Tonight's Hearth Dinner Card (Collapses down gracefully into a sleek single line when Timeline is expanded) -->
+<div class="ceramic-card rounded-3xl p-4 2xl:p-4.5 flex items-center justify-between shrink-0 bento-transition" id="dinnerCard">
+<div class="flex items-center gap-3.5">
+<div class="h-10 w-10 rounded-xl bg-[#faf7f2] border border-[#edd5c3] text-[#e85a36] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[22px]">soup_kitchen</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-mono text-[10px] font-bold uppercase text-[#ab2f0d] tracking-wider">[ TONIGHT'S HEARTH DINNER ]</span>
+<span class="px-2 py-0.5 rounded-full bg-[#f4f2ec] text-[#59413b] font-mono text-[10px] font-semibold">6:30 PM</span>
+</div>
+<h3 class="font-bold text-sm text-[#1b1c1a] mt-0.5 leading-tight" id="dinnerTitle">Crispy Miso Salmon Rice Bowls with Avocado</h3>
+<p class="text-xs text-[#8d716a]" id="dinnerSub">Rice cooker warm resting • Edamame steamed • Table set</p>
+</div>
+</div>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#f7f6f2] hover:bg-[#edeae2] text-[#1b1c1a] border border-[#e2ded5] font-mono text-xs font-bold active:translate-y-0.5 transition-all shrink-0">
+<span class="material-symbols-outlined text-[16px] text-[#e85a36]">menu_book</span>
+            Recipe Card
+          </button>
+</div>
+</div>
+<!-- RIGHT SIDE: WESLEY'S CHORES & PANTRY (Cols 8-12; collapses into a slender summary rail when timeline expands) -->
+<div class="col-span-5 flex flex-col justify-between gap-3.5 min-h-0 bento-transition" id="rightChoresCol">
+<!-- Standard Full Chores Card Container -->
+<div class="ceramic-card rounded-3xl p-5 2xl:p-6 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden bento-transition" id="fullChoresCard">
+<div class="flex-1 flex flex-col justify-between min-h-0">
+<!-- Header: Clean, Warm Domestic Tone -->
+<div class="flex items-center justify-between gap-2 pb-3 border-b border-[#f0ede6] shrink-0">
+<div class="flex items-center gap-2.5">
+<span class="h-8 w-8 rounded-xl bg-[#f4f2ec] border border-[#e2ded5] text-[#2b59ff] flex items-center justify-center font-bold text-sm shadow-xs">
+<span class="material-symbols-outlined text-[18px]">task_alt</span>
+</span>
+<div>
+<h2 class="text-lg font-bold tracking-tight text-[#1b1c1a]">Wesley's Chores</h2>
+<span class="font-mono text-xs text-[#8d716a]">Daily Contributions &amp; Goals</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f7f6f2] border border-[#e2ded5] text-[#59413b] font-mono text-xs font-semibold">
+<span class="material-symbols-outlined text-[15px] text-[#2b59ff]">credit_card</span>
+                Greenlight
+              </div>
+</div>
+<!-- Allowance Goal Progress Dial / Card -->
+<div class="my-3 p-3.5 rounded-2xl bg-[#faf9f6] border border-[#ede9e1] relative shrink-0">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-mono text-[10px] uppercase tracking-wider text-[#8d716a] font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-[#d97706]">account_balance_wallet</span>
+                    Weekly Allowance Progress
+                  </span>
+<div class="flex items-baseline gap-2 mt-0.5">
+<span class="text-3xl font-extrabold text-[#1b1c1a]" id="earnedAmountText">$18.50</span>
+<span class="text-xs font-semibold text-[#8d716a]">of $25.00 Earned</span>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-lg bg-white border border-[#e2ded5] text-[#1b1c1a] font-mono text-xs font-bold tracking-wider" id="targetPercentBadge">
+                  74% COMPLETE
+                </span>
+</div>
+<!-- Refined Tactile Progress Bar -->
+<div class="w-full h-2.5 bg-[#eae6de] rounded-full overflow-hidden mt-2.5 p-0.5">
+<div class="h-full bg-gradient-to-r from-[#d97706] to-[#3aa677] rounded-full transition-all duration-500" id="choreProgressBar" style="width: 74%"></div>
+</div>
+<div class="mt-2 flex items-center justify-between text-xs text-[#59413b]">
+<span class="font-mono text-[11px] text-[#8d716a]">$6.50 remaining for Saturday outing</span>
+<span class="font-mono font-bold text-[11px] text-[#006a46]" id="choreRatioText">3 of 4 Completed</span>
+</div>
+</div>
+<!-- Chore Task List with Tactile Switches / Checkboxes -->
+<div class="space-y-2 flex-1 overflow-hidden" id="choreList">
+<!-- Chore 1: Completed -->
+<div class="flex items-center justify-between p-2.5 rounded-2xl bg-[#faf9f6] border border-[#ede9e1]">
+<div class="flex items-center gap-3">
+<div class="h-7 w-7 rounded-xl bg-[#edf7f2] border border-[#bbf7d0] flex items-center justify-center text-[#006a46] shrink-0">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div>
+<span class="text-xs font-semibold text-[#59413b] line-through">Empty Dishwasher</span>
+<p class="font-mono text-[10px] text-[#8d716a]">4:30 PM • Verified by Daniela</p>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-md bg-[#edf7f2] font-mono text-xs font-bold text-[#006a46]">+$1.50</span>
+</div>
+<!-- Chore 2: Completed -->
+<div class="flex items-center justify-between p-2.5 rounded-2xl bg-[#faf9f6] border border-[#ede9e1]">
+<div class="flex items-center gap-3">
+<div class="h-7 w-7 rounded-xl bg-[#edf7f2] border border-[#bbf7d0] flex items-center justify-center text-[#006a46] shrink-0">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div>
+<span class="text-xs font-semibold text-[#59413b] line-through">Feed Buster the Dog</span>
+<p class="font-mono text-[10px] text-[#8d716a]">5:00 PM • Kibble + Fresh Water</p>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-md bg-[#edf7f2] font-mono text-xs font-bold text-[#006a46]">+$1.00</span>
+</div>
+<!-- Chore 3: Completed -->
+<div class="flex items-center justify-between p-2.5 rounded-2xl bg-[#faf9f6] border border-[#ede9e1]">
+<div class="flex items-center gap-3">
+<div class="h-7 w-7 rounded-xl bg-[#edf7f2] border border-[#bbf7d0] flex items-center justify-center text-[#006a46] shrink-0">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div>
+<span class="text-xs font-semibold text-[#59413b] line-through">20 Mins Reading Log</span>
+<p class="font-mono text-[10px] text-[#8d716a]">6:00 PM • Hatchet (Ch. 4)</p>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-md bg-[#edf7f2] font-mono text-xs font-bold text-[#006a46]">+$2.00</span>
+</div>
+<!-- Chore 4: ACTIVE TACTILE CHORE -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-white border border-[#d2dbe8] shadow-xs cursor-pointer transition-all hover:border-[#2b59ff] active:scale-[0.99]" id="interactiveChoreCard">
+<div class="flex items-center gap-3">
+<button class="h-7 w-7 rounded-xl bg-[#f4f7ff] border border-[#2b59ff]/40 flex items-center justify-center text-[#2b59ff] transition-all shrink-0" id="choreCheckBtn">
+<span class="material-symbols-outlined text-[16px]" id="choreCheckIcon">check_box_outline_blank</span>
+</button>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-xs font-bold text-[#1b1c1a]" id="choreTitle">Tidy Bedroom &amp; Backpack in Cubby</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="font-mono text-[10px] text-[#8d716a]" id="choreStatus">Ready to complete</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="px-2 py-0.5 rounded-md bg-[#f4f7ff] text-[#2b59ff] font-mono text-xs font-bold border border-[#d2dbe8]" id="choreRewardBadge">
+                    +$2.00
+                  </span>
+</div>
+</div>
+</div>
+</div>
+<!-- 4. Groceries & Pantry Snapshot Container -->
+<div class="pt-3 border-t border-[#f0ede6] shrink-0 mt-3">
+<div class="flex items-center justify-between pb-1.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-[#8d716a]">local_shipping</span>
+<span class="font-mono text-xs text-[#1b1c1a] font-bold uppercase tracking-wide">Pantry Cart Staging</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-[#fdf2f2] border border-[#fbd5d5] text-[#b91c1c] font-mono text-[10px] font-semibold uppercase">
+                Cut-off 10:00 PM
+              </span>
+</div>
+<!-- Compact Pantry Overview Card -->
+<div class="p-2.5 rounded-2xl bg-[#faf9f6] border border-[#ede9e1] flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<span class="h-7 w-7 rounded-xl bg-white border border-[#e2ded5] text-[#006a46] flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-[16px]">shopping_bag</span>
+</span>
+<div>
+<span class="text-xs font-bold text-[#1b1c1a]">Whole Foods Delivery</span>
+<p class="font-mono text-[10px] text-[#8d716a]">18 items staged • $142.50</p>
+</div>
+</div>
+<!-- Quick-Add Chip Buttons -->
+<div class="flex items-center gap-1.5">
+<button class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#edeae2] border border-[#dedad2] font-mono text-[10px] font-bold text-[#1b1c1a] transition-all flex items-center gap-1 active:scale-95 shadow-2xs" onclick="addPantryItem(this, 'Oat Milk')">
+                  + Oat Milk
+                </button>
+<button class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#edeae2] border border-[#dedad2] font-mono text-[10px] font-bold text-[#1b1c1a] transition-all flex items-center gap-1 active:scale-95 shadow-2xs" onclick="addPantryItem(this, 'Butter')">
+                  + Butter
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- SLENDER SUMMARY SIDE RAIL (Cleanly revealed when Timeline is expanded) -->
+<div class="hidden ceramic-card rounded-3xl p-4 flex flex-col justify-between items-center h-full w-full bento-transition" id="collapsedChoresRail">
+<div class="flex flex-col items-center gap-4 w-full">
+<div class="h-9 w-9 rounded-2xl bg-[#f4f2ec] border border-[#e2ded5] text-[#2b59ff] flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[20px]">task_alt</span>
+</div>
+<div class="text-center font-mono">
+<span class="text-[11px] font-bold uppercase text-[#8d716a] block">Wesley</span>
+<span class="text-sm font-extrabold text-[#1b1c1a] block" id="railEarnedText">$18.50</span>
+<span class="text-[10px] text-[#006a46] font-bold bg-[#edf7f2] px-2 py-0.5 rounded-full inline-block mt-1" id="railPercentText">74% Done</span>
+</div>
+<div class="w-full h-px bg-[#ede9e1] my-1"></div>
+<div class="flex flex-col items-center gap-2">
+<span class="text-[10px] font-mono uppercase text-[#8d716a] font-bold">1 Left</span>
+<div class="h-3 w-3 rounded-full bg-[#2b59ff] animate-pulse"></div>
+</div>
+<div class="w-full h-px bg-[#ede9e1] my-1"></div>
+<div class="flex flex-col items-center gap-1 text-center">
+<span class="material-symbols-outlined text-[20px] text-[#006a46]">shopping_bag</span>
+<span class="text-[10px] font-mono text-[#8d716a]">18 Items</span>
+<span class="text-[9px] font-mono bg-[#fdf2f2] text-[#b91c1c] px-1.5 py-0.5 rounded font-bold">10 PM</span>
+</div>
+</div>
+<button class="w-full py-2.5 rounded-2xl bg-[#f4f2ec] hover:bg-[#eae6df] border border-[#e2ded5] text-[#1b1c1a] font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-all active:scale-95 shadow-xs" id="restoreBentoBtn">
+<span class="material-symbols-outlined text-[16px]">chevron_left</span>
+            Expand Chores
+          </button>
+</div>
+</div>
+</div>
+<!-- Bottom Hardware Console Navigation Dock -->
+<div class="w-full pt-3 border-t border-[#e5e1d8] flex items-center justify-between shrink-0">
+<div class="flex items-center gap-2.5">
+<button class="px-4 py-2 rounded-2xl bg-white hover:bg-[#eae7df] font-mono text-xs text-[#1b1c1a] font-bold transition-all shadow-xs border border-[#e5e1d8] flex items-center gap-2 active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px] text-[#e85a36]">restaurant</span>
+          Dinner Hub
+        </button>
+<!-- Active Mode Button -->
+<button class="px-5 py-2 rounded-2xl bg-[#e85a36] text-white font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(232,90,54,0.25)] flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">checklist</span>
+          Chores &amp; Schedule
+        </button>
+<button class="px-4 py-2 rounded-2xl bg-white hover:bg-[#eae7df] font-mono text-xs text-[#1b1c1a] font-bold transition-all shadow-xs border border-[#e5e1d8] flex items-center gap-2 active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px] text-[#d97706]">lightbulb</span>
+          Lights &amp; HVAC
+        </button>
+<button class="px-4 py-2 rounded-2xl bg-white hover:bg-[#eae7df] font-mono text-xs text-[#1b1c1a] font-bold transition-all shadow-xs border border-[#e5e1d8] flex items-center gap-2 active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px] text-[#2b59ff]">graphic_eq</span>
+          Sound: Kitchen Hop FM
+        </button>
+</div>
+<!-- Hardware Chassis Telemetry -->
+<div class="flex items-center gap-4 text-[#8d716a] font-mono text-xs">
+<div class="flex items-center gap-1.5">
+<span class="h-2 w-2 rounded-full bg-[#3aa677]"></span>
+<span>REPO: TATUM_HOME</span>
+</div>
+<button class="px-3.5 py-1.5 rounded-xl bg-[#f4f2ec] hover:bg-[#eae7df] border border-[#e2ded5] font-mono text-xs text-[#1b1c1a] font-bold transition-colors flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-[#8d716a]">power_settings_new</span>
+          STANDBY
+        </button>
+</div>
+</div>
+</main>
+<!-- Bottom Chassis Information Bar (Exact Cozyla 24" Kiosk Frame Spec) -->
+
+</div>
+<!-- Vanilla Interactive Orchestration Engine -->
+<script>
+  // State management
+  let timelineExpanded = false;
+  let choreCompleted = false;
+
+  const leftTimelineCol = document.getElementById('leftTimelineCol');
+  const rightChoresCol = document.getElementById('rightChoresCol');
+  const compactGlancePods = document.getElementById('compactGlancePods');
+  const expandedTimelineView = document.getElementById('expandedTimelineView');
+  const fullChoresCard = document.getElementById('fullChoresCard');
+  const collapsedChoresRail = document.getElementById('collapsedChoresRail');
+  const toggleTimelineBtn = document.getElementById('toggleTimelineBtn');
+  const timelineToggleLabel = document.getElementById('timelineToggleLabel');
+  const timelineArrow = document.getElementById('timelineArrow');
+  const timelineBtnIcon = document.getElementById('timelineBtnIcon');
+  const overviewModeTag = document.getElementById('overviewModeTag');
+  const logisticsHeaderTitle = document.getElementById('logisticsHeaderTitle');
+  const bentoOverviewBtn = document.getElementById('bentoOverviewBtn');
+  const returnAmbientBtn = document.getElementById('returnAmbientBtn');
+  const restoreBentoBtn = document.getElementById('restoreBentoBtn');
+  const dinnerCard = document.getElementById('dinnerCard');
+  const dinnerSub = document.getElementById('dinnerSub');
+
+  // Toggle Functionality
+  function setTimelineExpansion(expand) {
+    timelineExpanded = expand;
+
+    if (timelineExpanded) {
+      // 1. Expand left column to col-span-11, shrink right column to col-span-1
+      leftTimelineCol.classList.remove('col-span-7');
+      leftTimelineCol.classList.add('col-span-11');
+      rightChoresCol.classList.remove('col-span-5');
+      rightChoresCol.classList.add('col-span-1');
+
+      // 2. Hide compact glance pods, show expanded timeline
+      compactGlancePods.classList.add('hidden');
+      expandedTimelineView.classList.remove('hidden');
+      expandedTimelineView.classList.add('flex');
+
+      // 3. Transform toggle button
+      timelineToggleLabel.textContent = 'Collapse Timeline View';
+      timelineArrow.textContent = 'expand_less';
+      timelineBtnIcon.textContent = 'close_fullscreen';
+      overviewModeTag.textContent = 'TIMELINE EXPANDED';
+
+      // 4. Update title
+      logisticsHeaderTitle.textContent = '[ 01 // MASTER FAMILY TIMELINE — 5 SCHEDULED ITEMS ]';
+
+      // 5. Shrink Dinner Card to single sleek row
+      dinnerSub.classList.add('hidden');
+
+      // 6. Smoothly collapse chores column to slender rail
+      fullChoresCard.classList.add('hidden');
+      collapsedChoresRail.classList.remove('hidden');
+
+    } else {
+      // Return to Bento overview
+      leftTimelineCol.classList.remove('col-span-11');
+      leftTimelineCol.classList.add('col-span-7');
+      rightChoresCol.classList.remove('col-span-1');
+      rightChoresCol.classList.add('col-span-5');
+
+      compactGlancePods.classList.remove('hidden');
+      expandedTimelineView.classList.add('hidden');
+      expandedTimelineView.classList.remove('flex');
+
+      timelineToggleLabel.textContent = 'Show Full Timeline (4 events)';
+      timelineArrow.textContent = 'expand_more';
+      timelineBtnIcon.textContent = 'schedule';
+      overviewModeTag.textContent = 'BENTO OVERVIEW';
+
+      logisticsHeaderTitle.textContent = "[ 01 // TODAY'S LOGISTICS ]";
+
+      dinnerSub.classList.remove('hidden');
+
+      fullChoresCard.classList.remove('hidden');
+      collapsedChoresRail.classList.add('hidden');
+    }
+  }
+
+  // Toggle Listeners
+  if (toggleTimelineBtn) {
+    toggleTimelineBtn.addEventListener('click', () => {
+      setTimelineExpansion(!timelineExpanded);
+    });
+  }
+  if (bentoOverviewBtn) {
+    bentoOverviewBtn.addEventListener('click', () => {
+      if (timelineExpanded) setTimelineExpansion(false);
+    });
+  }
+  if (restoreBentoBtn) {
+    restoreBentoBtn.addEventListener('click', () => {
+      setTimelineExpansion(false);
+    });
+  }
+  if (returnAmbientBtn) {
+    returnAmbientBtn.addEventListener('click', () => {
+      if (timelineExpanded) {
+        setTimelineExpansion(false);
+      } else {
+        returnAmbientBtn.classList.add('scale-95');
+        setTimeout(() => returnAmbientBtn.classList.remove('scale-95'), 180);
+      }
+    });
+  }
+
+  // Timeline Member Filter Chips
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => {
+        b.classList.remove('bg-white', 'font-bold', 'text-[#1b1c1a]', 'shadow-xs');
+        b.classList.add('text-[#8d716a]', 'font-medium');
+      });
+      btn.classList.add('bg-white', 'font-bold', 'text-[#1b1c1a]', 'shadow-xs');
+      btn.classList.remove('text-[#8d716a]', 'font-medium');
+
+      const filter = btn.getAttribute('data-filter');
+      const rows = document.querySelectorAll('.timeline-row');
+      rows.forEach(row => {
+        const member = row.getAttribute('data-member');
+        if (filter === 'all' || member === 'all' || member === filter) {
+          row.style.display = 'flex';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Interactive Chore Checkbox
+  (function() {
+    const card = document.getElementById('interactiveChoreCard');
+    const btn = document.getElementById('choreCheckBtn');
+    const icon = document.getElementById('choreCheckIcon');
+    const title = document.getElementById('choreTitle');
+    const status = document.getElementById('choreStatus');
+    const rewardBadge = document.getElementById('choreRewardBadge');
+    const progressBar = document.getElementById('choreProgressBar');
+    const earnedAmountText = document.getElementById('earnedAmountText');
+    const targetPercentBadge = document.getElementById('targetPercentBadge');
+    const choreRatioText = document.getElementById('choreRatioText');
+    const memberWesleyStatus = document.getElementById('memberWesleyStatus');
+    const railEarnedText = document.getElementById('railEarnedText');
+    const railPercentText = document.getElementById('railPercentText');
+
+    if (card) {
+      card.addEventListener('click', () => {
+        choreCompleted = !choreCompleted;
+        if (choreCompleted) {
+          card.classList.remove('border-[#d2dbe8]');
+          card.classList.add('bg-[#faf9f6]', 'border-[#ede9e1]', 'pop-anim');
+          
+          btn.classList.remove('bg-[#f4f7ff]', 'border-[#2b59ff]/40', 'text-[#2b59ff]');
+          btn.classList.add('bg-[#edf7f2]', 'border-[#bbf7d0]', 'text-[#006a46]');
+          icon.textContent = 'check';
+
+          title.classList.add('line-through', 'text-[#59413b]', 'font-semibold');
+          title.classList.remove('font-bold', 'text-[#1b1c1a]');
+          
+          status.textContent = 'Completed & Verified';
+          status.classList.add('text-[#006a46]');
+          status.classList.remove('text-[#8d716a]');
+
+          rewardBadge.classList.remove('bg-[#f4f7ff]', 'text-[#2b59ff]', 'border-[#d2dbe8]');
+          rewardBadge.classList.add('bg-[#edf7f2]', 'text-[#006a46]', 'border-[#bbf7d0]');
+
+          if (progressBar) progressBar.style.width = '82%';
+          if (earnedAmountText) earnedAmountText.textContent = '$20.50';
+          if (targetPercentBadge) targetPercentBadge.textContent = '82% COMPLETE';
+          if (choreRatioText) choreRatioText.textContent = '4 of 4 Completed';
+          if (memberWesleyStatus) memberWesleyStatus.textContent = '4/4 Complete!';
+          if (railEarnedText) railEarnedText.textContent = '$20.50';
+          if (railPercentText) railPercentText.textContent = '82% Done';
+
+        } else {
+          card.classList.add('border-[#d2dbe8]');
+          card.classList.remove('bg-[#faf9f6]', 'border-[#ede9e1]', 'pop-anim');
+
+          btn.classList.add('bg-[#f4f7ff]', 'border-[#2b59ff]/40', 'text-[#2b59ff]');
+          btn.classList.remove('bg-[#edf7f2]', 'border-[#bbf7d0]', 'text-[#006a46]');
+          icon.textContent = 'check_box_outline_blank';
+
+          title.classList.remove('line-through', 'text-[#59413b]', 'font-semibold');
+          title.classList.add('font-bold', 'text-[#1b1c1a]');
+
+          status.textContent = 'Ready to complete';
+          status.classList.remove('text-[#006a46]');
+          status.classList.add('text-[#8d716a]');
+
+          rewardBadge.classList.add('bg-[#f4f7ff]', 'text-[#2b59ff]', 'border-[#d2dbe8]');
+          rewardBadge.classList.remove('bg-[#edf7f2]', 'text-[#006a46]', 'border-[#bbf7d0]');
+
+          if (progressBar) progressBar.style.width = '74%';
+          if (earnedAmountText) earnedAmountText.textContent = '$18.50';
+          if (targetPercentBadge) targetPercentBadge.textContent = '74% COMPLETE';
+          if (choreRatioText) choreRatioText.textContent = '3 of 4 Completed';
+          if (memberWesleyStatus) memberWesleyStatus.textContent = '3/4 Done';
+          if (railEarnedText) railEarnedText.textContent = '$18.50';
+          if (railPercentText) railPercentText.textContent = '74% Done';
+        }
+      });
+    }
+  })();
+
+  // Claim Pickup Action Handler
+  function claimPickupAction(btn) {
+    btn.innerHTML = '✓ Daniela Claimed';
+    btn.classList.remove('bg-white', 'border-[#d6be8c]', 'text-[#854d0e]');
+    btn.classList.add('bg-[#edf7f2]', 'border-[#bbf7d0]', 'text-[#006a46]');
+    setTimeout(() => {
+      btn.innerHTML = 'Claim Pickup';
+      btn.classList.add('bg-white', 'border-[#d6be8c]', 'text-[#854d0e]');
+      btn.classList.remove('bg-[#edf7f2]', 'border-[#bbf7d0]', 'text-[#006a46]');
+    }, 2500);
+  }
+
+  // Quick Action Button Feedback
+  function quickActionFeedback(btn, message) {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">check</span> ${message}`;
+    btn.classList.add('text-[#006a46]');
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.classList.remove('text-[#006a46]');
+    }, 1500);
+  }
+
+  // Quick-Add Pantry Item Feedback
+  function addPantryItem(btn, itemName) {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✓ Added';
+    btn.classList.add('bg-[#edf7f2]', 'text-[#006a46]', 'border-[#bbf7d0]');
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.classList.remove('bg-[#edf7f2]', 'text-[#006a46]', 'border-[#bbf7d0]');
+    }, 1200);
+  }
+</script>
+
+
+</body></html>
