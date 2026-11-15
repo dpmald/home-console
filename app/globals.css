@@ -4,6 +4,8 @@
    ══════════════════════════════════════════════════════════════════ */
 
 :root {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Space Grotesk', ui-monospace, monospace, sans-serif;
   --bg: #edeae3;
   --dot: #d5cfc4;
   --frame: rgba(250, 249, 245, 0.94);
