@@ -653,7 +653,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 height: '62vh',
               }}
             >
-              {/* Left Primary Glanceable Card: Clean Giant Clock + Date + Outdoor Temp */}
+              {/* Left Primary Glanceable Card: Clean Giant Clock + Date + Outdoor Temp + Conditional Schedule Callout */}
               <div
                 className="ceramic-card"
                 style={{
@@ -667,7 +667,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     'radial-gradient(circle at 86% 16%, rgba(217, 78, 52, 0.085), transparent 54%), var(--surface)',
                 }}
               >
-                <div style={{ marginTop: 28 }}>
+                <div style={{ marginTop: state.events.length > 0 ? 8 : 28 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
                     <span
                       style={{
@@ -730,166 +730,336 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     </span>
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
                   </div>
+
+                  {/* Conditional SCHEDULE & LOGISTICS Callout (Only shown when events exist) */}
+                  {state.events.length > 0 && (
+                    <div
+                      onClick={() => setMode('timeline')}
+                      className="ceramic-well"
+                      style={{
+                        marginTop: 24,
+                        padding: '16px 20px',
+                        borderRadius: 18,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                        <div
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 12,
+                            background: 'rgba(43, 89, 255, 0.1)',
+                            border: '1px solid rgba(43, 89, 255, 0.22)',
+                            color: 'var(--cobalt)',
+                            display: 'grid',
+                            placeItems: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                            calendar_clock
+                          </span>
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span
+                              className="font-mono"
+                              style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--cobalt)', letterSpacing: '0.06em' }}
+                            >
+                              SCHEDULE &amp; LOGISTICS
+                            </span>
+                            {nextUnassigned && (
+                              <>
+                                <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--dot)' }} />
+                                <span
+                                  className="font-mono"
+                                  style={{
+                                    fontSize: '0.64rem',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                    background: '#fdeee9',
+                                    color: 'var(--terracotta)',
+                                  }}
+                                >
+                                  DRIVER NEEDED
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.96rem', fontWeight: 700, marginTop: 3 }}>
+                            {nextUnassigned
+                              ? `${fmtTime(nextUnassigned.start_time)} • ${nextUnassigned.title}`
+                              : `${fmtTime(state.events[0].start_time)} • ${state.events[0].title}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 10,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: 'var(--cobalt)',
+                        }}
+                      >
+                        <span>View Family Schedule</span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                          arrow_forward
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Right Stack: [MENU // TONIGHT] Card + Conditional Rotary Timer Card */}
+              {/* Right Stack: Dinner Card + Conditional Bottom Container (Voice Timer OR Evening Routine & Restock) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minHeight: 0 }}>
-                {/* Card 1: [MENU // TONIGHT] */}
+                {/* Card 1: Undecided ("Tonight's Dinner Decision") vs Claimed ("[MENU // TONIGHT]") */}
                 <div
                   className="ceramic-card"
                   style={{
                     padding: '24px 28px',
-                    flex: activeTimer ? '0 0 auto' : 1,
+                    flex: activeTimer || state.groceries.length > 0 || state.events.length > 0 ? '0 0 auto' : 1,
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                   }}
                 >
-                  <div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 10,
-                        marginBottom: 12,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span
-                          className="font-mono"
+                  {d.status === 'unclaimed' ? (
+                    <>
+                      <div>
+                        <h2 style={{ fontSize: '1.46rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                          Tonight&apos;s Dinner Decision
+                        </h2>
+                        <p
                           style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            color: 'var(--terracotta)',
-                            letterSpacing: '0.05em',
+                            fontSize: '0.86rem',
+                            color: 'var(--text-secondary)',
+                            marginTop: 6,
+                            lineHeight: 1.5,
                           }}
                         >
-                          [MENU // TONIGHT]
-                        </span>
-                        <span
-                          className="font-mono"
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            padding: '3px 10px',
-                            borderRadius: 6,
-                            background: '#fdeee9',
-                            color: 'var(--terracotta)',
-                            letterSpacing: '0.04em',
-                          }}
-                        >
-                          {d.status === 'unclaimed'
-                            ? 'UNCLAIMED'
-                            : d.chef === 'takeout'
-                              ? 'TAKEOUT'
-                              : isParent(d.chef)
-                                ? `${NAMES[d.chef].toUpperCase()} LEAD`
-                                : 'PLANNED'}
-                        </span>
+                          {state.backlog.length > 0
+                            ? `No cook selected yet. ${state.backlog.length} ${
+                                state.backlog.length === 1 ? 'kit' : 'kits'
+                              } ready to cook in <25m.`
+                            : 'No cook selected yet. Tap below or claim dinner in Slack #food.'}
+                        </p>
+
+                        {/* Conditional Backlog Meal Kit Rows (Only rendered when backlog items exist) */}
+                        {state.backlog.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+                            {state.backlog.slice(0, 2).map((b, idx) => (
+                              <div
+                                key={b.id}
+                                className="ceramic-well"
+                                style={{
+                                  padding: '10px 14px',
+                                  borderRadius: 14,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: 10,
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                  <span
+                                    className="material-symbols-outlined"
+                                    style={{ fontSize: 18, color: idx === 0 ? 'var(--emerald)' : 'var(--terracotta)' }}
+                                  >
+                                    {idx === 0 ? 'eco' : 'ramen_dining'}
+                                  </span>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        fontSize: '0.82rem',
+                                        fontWeight: 700,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                      }}
+                                    >
+                                      {b.recipe_or_item_name}
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                                      {b.key_perishables.join(' • ') || 'Ready in fridge'}
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  className={`hw-btn ${idx === 0 ? 'emerald' : ''}`}
+                                  style={{ padding: '5px 12px', fontSize: '0.68rem', borderRadius: 8 }}
+                                  onClick={() => act({ type: 'cook_from_backlog', backlogId: b.id })}
+                                >
+                                  SELECT
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      <span
-                        className="font-mono"
+                      {/* 2x2 Chef Assignment Buttons (Matches Stitch Undecided Card) */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+                        <button
+                          className="hw-btn"
+                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--emerald)' }}>
+                            skillet
+                          </span>
+                          <span>Daniela cooks</span>
+                        </button>
+                        <button
+                          className="hw-btn"
+                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--amber)' }}>
+                            soup_kitchen
+                          </span>
+                          <span>Warren cooks</span>
+                        </button>
+                        <button
+                          className="hw-btn"
+                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
+                            takeout_dining
+                          </span>
+                          <span>Takeout / Order In</span>
+                        </button>
+                        <button
+                          className="hw-btn"
+                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
+                            kitchen
+                          </span>
+                          <span>Leftovers &amp; Fend</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span
+                              className="font-mono"
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                color: 'var(--terracotta)',
+                                letterSpacing: '0.05em',
+                              }}
+                            >
+                              [MENU // TONIGHT]
+                            </span>
+                            <span
+                              className="font-mono"
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                padding: '3px 10px',
+                                borderRadius: 6,
+                                background: '#fdeee9',
+                                color: 'var(--terracotta)',
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              {d.chef === 'takeout'
+                                ? 'TAKEOUT'
+                                : isParent(d.chef)
+                                  ? `${NAMES[d.chef].toUpperCase()} LEAD`
+                                  : 'PLANNED'}
+                            </span>
+                          </div>
+
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              color: 'var(--muted)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
+                              skillet
+                            </span>
+                            6:30 PM PREP
+                          </span>
+                        </div>
+
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+                          {d.recipe_name || `${isParent(d.chef) ? NAMES[d.chef] : 'Family'}'s Dinner`}
+                        </h2>
+
+                        <p
+                          style={{
+                            fontSize: '0.88rem',
+                            color: 'var(--text-secondary)',
+                            marginTop: 8,
+                            lineHeight: 1.55,
+                          }}
+                        >
+                          {state.backlog.find((b) => b.id === d.linked_backlog_id)?.key_perishables.join(', ') ||
+                            'All fresh ingredients prepped on station.'}
+                        </p>
+                      </div>
+
+                      <div
                         style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          color: 'var(--muted)',
-                          display: 'inline-flex',
+                          marginTop: 18,
+                          paddingTop: 14,
+                          borderTop: '1px solid var(--border-subtle)',
+                          display: 'flex',
                           alignItems: 'center',
-                          gap: 5,
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          flexWrap: 'wrap',
                         }}
                       >
-                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
-                          skillet
-                        </span>
-                        6:30 PM PREP
-                      </span>
-                    </div>
+                        <div
+                          className="font-mono"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            color: 'var(--muted)',
+                          }}
+                        >
+                          <span style={{ color: 'var(--emerald)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                              eco
+                            </span>
+                            4 Servings
+                          </span>
+                          <span>•</span>
+                          <span>Prep: 20 min</span>
+                        </div>
 
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
-                      {d.status === 'unclaimed'
-                        ? "Tonight's Dinner Unclaimed"
-                        : d.recipe_name || `${isParent(d.chef) ? NAMES[d.chef] : 'Family'}'s Dinner`}
-                    </h2>
-
-                    <p
-                      style={{
-                        fontSize: '0.88rem',
-                        color: 'var(--text-secondary)',
-                        marginTop: 8,
-                        lineHeight: 1.55,
-                      }}
-                    >
-                      {d.status === 'unclaimed'
-                        ? 'No cook selected yet. Tap a chef below or claim dinner in Slack #food.'
-                        : state.backlog.find((b) => b.id === d.linked_backlog_id)?.key_perishables.join(', ') ||
-                          'All fresh ingredients prepped on station.'}
-                    </p>
-                  </div>
-
-                  {/* Clean Bottom Footer inside [MENU // TONIGHT] Card */}
-                  <div
-                    style={{
-                      marginTop: 18,
-                      paddingTop: 14,
-                      borderTop: '1px solid var(--border-subtle)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 10,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <div
-                      className="font-mono"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        color: 'var(--muted)',
-                      }}
-                    >
-                      <span style={{ color: 'var(--emerald)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
-                          eco
-                        </span>
-                        {d.status === 'unclaimed' ? `${state.backlog.length} Kits Ready` : '4 Servings'}
-                      </span>
-                      <span>•</span>
-                      <span>Prep: 20 min</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {d.status === 'unclaimed' ? (
-                        <>
-                          <button
-                            className="hw-btn"
-                            style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                            onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
-                          >
-                            DANIELA
-                          </button>
-                          <button
-                            className="hw-btn"
-                            style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                            onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
-                          >
-                            WARREN
-                          </button>
-                          <button
-                            className="hw-btn"
-                            style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                            onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
-                          >
-                            TAKEOUT
-                          </button>
-                        </>
-                      ) : (
-                        <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <button
                             className="hw-btn"
                             style={{ padding: '6px 12px', fontSize: '0.72rem' }}
@@ -898,7 +1068,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
                               menu_book
                             </span>
-                            <span>MARK COOKED</span>
+                            <span>VIEW RECIPE</span>
                           </button>
                           <button
                             className="hw-btn"
@@ -907,13 +1077,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           >
                             RESET
                           </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                {/* Card 2: Physical Rotary Kitchen Timer Widget (Conditional on an active voice-triggered timer) */}
+                {/* Card 2A: Physical Rotary Kitchen Timer Widget (Conditional on an active voice-triggered timer) */}
                 {activeTimer && (
                   <div
                     className="ceramic-card"
@@ -1016,6 +1186,143 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           REMAINING
                         </span>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Card 2B: Conditional [ EVENING ROUTINE & RESTOCK ] Card (Only shown when no active timer AND groceries/events exist) */}
+                {!activeTimer && (state.groceries.length > 0 || state.events.length > 0) && (
+                  <div
+                    className="ceramic-card"
+                    style={{
+                      padding: '20px 24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 14,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: 'var(--cobalt)',
+                          }}
+                        />
+                        <span
+                          className="font-mono"
+                          style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--cobalt)', letterSpacing: '0.05em' }}
+                        >
+                          [ EVENING ROUTINE &amp; RESTOCK ]
+                        </span>
+                      </div>
+
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          color: 'var(--muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--emerald)' }}>
+                          check_circle
+                        </span>
+                        {doneChores}/{state.chores.length} Done
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns:
+                          state.groceries.length > 0 && state.events.length > 0 ? '1fr 1fr' : '1fr',
+                        gap: 12,
+                      }}
+                    >
+                      {state.groceries.length > 0 && (
+                        <div
+                          className="ceramic-well"
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: 16,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span className="font-mono" style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--muted)' }}>
+                                RESTOCK STAGING
+                              </span>
+                              <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
+                                shopping_cart
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '1.12rem', fontWeight: 800, marginTop: 4 }}>
+                              {state.groceries.length} {state.groceries.length === 1 ? 'item' : 'items'} low
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                              {state.groceries.map((g) => g.name).join(' & ')}
+                            </div>
+                          </div>
+                          <button
+                            className="hw-btn"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: '0.72rem' }}
+                            onClick={() => setMode('bento')}
+                          >
+                            + Add Item
+                          </button>
+                        </div>
+                      )}
+
+                      {state.events.length > 0 && (
+                        <div
+                          className="ceramic-well"
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: 16,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span className="font-mono" style={{ fontSize: '0.64rem', fontWeight: 700, color: 'var(--muted)' }}>
+                                NIGHT PREP
+                              </span>
+                              <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--cobalt)' }}>
+                                dark_mode
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '1.12rem', fontWeight: 800, marginTop: 4 }}>
+                              Wind-down 8:30
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                              {state.events[0].title}
+                            </div>
+                          </div>
+                          <button
+                            className="hw-btn"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: '0.72rem' }}
+                            onClick={() => setMode('timeline')}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--cobalt)' }}>
+                              check_circle
+                            </span>
+                            <span>Logistics Preview</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
