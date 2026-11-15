@@ -321,34 +321,142 @@ select {
   background: #ffffff;
 }
 
-/* ── Gemini Spark Orb & Ambient Launcher ── */
-@keyframes gemini-spin-pulse {
+/* ── Stitch "Gemini Voice" Overlay & Spark Launcher ── */
+@keyframes gemini-eq-bounce {
   0%, 100% {
-    transform: scale(1) rotate(0deg);
-    filter: drop-shadow(0 0 6px rgba(43, 89, 255, 0.35));
+    transform: scaleY(0.55);
   }
   50% {
-    transform: scale(1.12) rotate(12deg);
-    filter: drop-shadow(0 0 12px rgba(232, 90, 54, 0.55));
+    transform: scaleY(1.18);
   }
 }
 
-.gemini-spark-icon {
-  animation: gemini-spin-pulse 4s ease-in-out infinite;
+.gemini-badge-square {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #1d4ed8 0%, #7e3752 55%, #b83b24 100%);
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.22);
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+}
+
+.gemini-eq-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 16px;
+  border-radius: 9999px;
+  background: #f5efe8;
+  border: 1px solid rgba(229, 225, 216, 0.8);
+  height: 40px;
+}
+[data-theme="dark"] .gemini-eq-pill {
+  background: #292c27;
+  border-color: #343731;
+}
+
+.gemini-eq-bar {
+  width: 4px;
+  border-radius: 999px;
+  transform-origin: center bottom;
+  transition: height 0.2s ease;
+}
+.gemini-eq-pill.active .gemini-eq-bar {
+  animation: gemini-eq-bounce 0.85s ease-in-out infinite;
+}
+
+.gemini-voice-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(27, 28, 26, 0.28);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.gemini-voice-card {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  background: linear-gradient(160deg, #ffffff 0%, #fcfaf6 65%, #fdf6f2 100%);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 28px 32px;
+  box-shadow: 0 24px 64px rgba(35, 22, 14, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.gemini-voice-card::after {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 90, 54, 0.11) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.gemini-utterance-well {
+  background: #f6f4ef;
+  border-radius: 18px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+[data-theme="dark"] .gemini-utterance-well {
+  background: #252823;
+}
+
+.gemini-hl-terracotta {
+  background: #fbe5de;
+  color: #2d120b;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 7px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+[data-theme="dark"] .gemini-hl-terracotta {
+  background: rgba(232, 90, 54, 0.25);
+  color: #ffd7cc;
+}
+
+.gemini-hl-cobalt {
+  background: #e3e9fb;
+  color: #14224a;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 7px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+[data-theme="dark"] .gemini-hl-cobalt {
+  background: rgba(43, 89, 255, 0.28);
+  color: #dbe6ff;
 }
 
 .gemini-spark-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 9px;
+  padding: 6px 14px 6px 8px;
   border-radius: 9999px;
-  background: linear-gradient(135deg, rgba(43, 89, 255, 0.12) 0%, rgba(232, 90, 54, 0.14) 100%);
-  border: 1px solid rgba(43, 89, 255, 0.32);
+  background: var(--surface);
+  border: 1px solid var(--border);
   box-shadow: var(--bezel-shadow);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.76rem;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--text);
   cursor: pointer;
@@ -356,21 +464,10 @@ select {
 }
 .gemini-spark-btn:hover {
   border-color: var(--cobalt);
-  box-shadow: 0 3px 12px rgba(43, 89, 255, 0.18);
+  box-shadow: 0 3px 12px rgba(43, 89, 255, 0.14);
 }
 .gemini-spark-btn:active {
   transform: translateY(2px);
-}
-
-.gemini-ambient-card {
-  position: relative;
-  border-radius: 18px;
-  padding: 13px 16px;
-  background: linear-gradient(135deg, rgba(43, 89, 255, 0.07) 0%, rgba(232, 90, 54, 0.08) 55%, rgba(217, 119, 6, 0.07) 100%);
-  border: 1px solid rgba(43, 89, 255, 0.24);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .gemini-chip {

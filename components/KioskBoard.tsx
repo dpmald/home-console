@@ -30,28 +30,57 @@ type MemberFilter = 'all' | 'daniela' | 'warren' | 'wesley';
 
 const NPR_URL = process.env.NEXT_PUBLIC_NPR_STREAM_URL || 'https://npr-ice.streamguys1.com/live.mp3';
 
-function GeminiSparkIcon({ size = 18 }: { size?: number }) {
+function GeminiSparkIcon({ size = 18, white = false }: { size?: number; white?: boolean }) {
   return (
     <svg
-      className="gemini-spark-icon"
       width={size}
       height={size}
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      style={{ flexShrink: 0 }}
     >
-      <defs>
-        <linearGradient id="geminiSparkGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="var(--cobalt)" />
-          <stop offset="55%" stopColor="var(--terracotta)" />
-          <stop offset="100%" stopColor="var(--amber)" />
-        </linearGradient>
-      </defs>
+      {!white && (
+        <defs>
+          <linearGradient id="geminiSparkGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="var(--cobalt)" />
+            <stop offset="55%" stopColor="var(--terracotta)" />
+            <stop offset="100%" stopColor="var(--amber)" />
+          </linearGradient>
+        </defs>
+      )}
       <path
         d="M12 1.75C12.35 7.1 16.9 11.65 22.25 12C16.9 12.35 12.35 16.9 12 22.25C11.65 16.9 7.1 12.35 1.75 12C7.1 11.65 11.65 7.1 12 1.75Z"
-        fill="url(#geminiSparkGrad)"
+        fill={white ? '#ffffff' : 'url(#geminiSparkGrad)'}
       />
     </svg>
+  );
+}
+
+function GeminiEqualizerPill({ active = true }: { active?: boolean }) {
+  const bars: { color: string; height: number; delay: string }[] = [
+    { color: '#1d4ed8', height: 11, delay: '0s' },
+    { color: '#1d4ed8', height: 19, delay: '0.12s' },
+    { color: '#c2410c', height: 24, delay: '0.24s' },
+    { color: '#b93815', height: 14, delay: '0.08s' },
+    { color: '#15803d', height: 21, delay: '0.3s' },
+    { color: '#c2410c', height: 10, delay: '0.18s' },
+    { color: '#b93815', height: 17, delay: '0.36s' },
+  ];
+  return (
+    <div className={`gemini-eq-pill ${active ? 'active' : ''}`}>
+      {bars.map((b, i) => (
+        <span
+          key={i}
+          className="gemini-eq-bar"
+          style={{
+            background: b.color,
+            height: b.height,
+            animationDelay: b.delay,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -192,18 +221,59 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const [newBacklog, setNewBacklog] = useState('');
   const [newBacklogLoc, setNewBacklogLoc] = useState<BacklogLocation>('fridge');
   const [newGrocery, setNewGrocery] = useState('');
-  const [geminiToast, setGeminiToast] = useState<string | null>(null);
+  const [geminiOpen, setGeminiOpen] = useState(false);
+  const [geminiPreset, setGeminiPreset] = useState<'stitch' | 'recipe' | 'backlog' | 'wesley' | 'custom'>('stitch');
+  const [geminiCustomQuery, setGeminiCustomQuery] = useState('');
+  const [geminiListening, setGeminiListening] = useState(false);
+  const [geminiStampedAt, setGeminiStampedAt] = useState('07:18:24 PM');
   const nprRef = useRef<HTMLAudioElement | null>(null);
   const firedTimers = useRef<Set<string>>(new Set());
 
-  const engageGemini = useCallback((prompt?: string, label?: string) => {
-    setGeminiToast(
-      label
-        ? `✨ Launching Gemini (${label} copied to clipboard)…`
-        : '✨ Launching on-board Gemini app…',
+  const openGeminiOverlay = useCallback((preset: 'stitch' | 'recipe' | 'backlog' | 'wesley' = 'stitch') => {
+    setGeminiPreset(preset);
+    setGeminiStampedAt(
+      new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      }),
     );
-    setTimeout(() => setGeminiToast(null), 4000);
-    launchGeminiOnCozyla(prompt);
+    setGeminiOpen(true);
+  }, []);
+
+  const startGeminiDictation = useCallback(() => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      launchGeminiOnCozyla();
+      return;
+    }
+    try {
+      const rec = new SR();
+      rec.lang = 'en-US';
+      rec.interimResults = false;
+      setGeminiListening(true);
+      rec.onresult = (ev: any) => {
+        const transcript = ev.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setGeminiCustomQuery(transcript);
+          setGeminiPreset('custom');
+          setGeminiStampedAt(
+            new Date().toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: true,
+            }),
+          );
+        }
+      };
+      rec.onend = () => setGeminiListening(false);
+      rec.onerror = () => setGeminiListening(false);
+      rec.start();
+    } catch {
+      setGeminiListening(false);
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -526,11 +596,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
 
             <button
               className="gemini-spark-btn"
-              onClick={() => engageGemini()}
-              title="Open on-board Google Gemini app on the Cozyla"
+              onClick={() => openGeminiOverlay('stitch')}
+              title="Engage Gemini Voice Overlay"
             >
-              <GeminiSparkIcon size={16} />
-              <span>Gemini</span>
+              <span className="gemini-badge-square" style={{ width: 26, height: 26, borderRadius: 8 }}>
+                <GeminiSparkIcon size={15} white />
+              </span>
+              <span>Gemini Voice</span>
             </button>
 
             <VoiceOrb
@@ -721,121 +793,61 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   </div>
                 </div>
 
-                {/* On-Board Google Gemini Spark Dock (Launches com.google.android.apps.bard with Kitchen Context) */}
-                <div className="gemini-ambient-card" style={{ marginTop: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Stitch "Gemini Voice" Ambient Spark Bar — Opens the Stitch Gemini Voice Overlay */}
+                <div
+                  onClick={() => openGeminiOverlay('stitch')}
+                  className="ceramic-well"
+                  style={{
+                    marginTop: 14,
+                    padding: '13px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 14,
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, var(--surface) 0%, var(--surface-well) 100%)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 13, minWidth: 0 }}>
+                    <div className="gemini-badge-square" style={{ width: 40, height: 40, borderRadius: 12 }}>
+                      <GeminiSparkIcon size={21} white />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: '1.02rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
+                          Gemini Voice
+                        </span>
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 700,
+                            color: 'var(--terracotta)',
+                            letterSpacing: '0.06em',
+                          }}
+                        >
+                          DANIELA • AT COOKTOP
+                        </span>
+                      </div>
                       <div
                         style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 12,
-                          background: 'var(--surface)',
-                          border: '1px solid rgba(43, 89, 255, 0.25)',
-                          display: 'grid',
-                          placeItems: 'center',
+                          fontSize: '0.84rem',
+                          color: 'var(--text-secondary)',
+                          marginTop: 2,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
                         }}
                       >
-                        <GeminiSparkIcon size={20} />
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span
-                            className="font-mono"
-                            style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--cobalt)', letterSpacing: '0.06em' }}
-                          >
-                            GEMINI SPARK // ON-BOARD ASSISTANT
-                          </span>
-                          {geminiToast && (
-                            <span
-                              className="font-mono"
-                              style={{
-                                fontSize: '0.66rem',
-                                fontWeight: 700,
-                                padding: '2px 8px',
-                                borderRadius: 999,
-                                background: '#edf7f2',
-                                color: 'var(--emerald)',
-                              }}
-                            >
-                              {geminiToast}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: 1 }}>
-                          Launch the Cozyla&apos;s Gemini app or tap a spark chip to pass tonight&apos;s fridge &amp; meal context
-                        </div>
+                        &ldquo;Can I swap{' '}
+                        <strong style={{ color: '#b93815' }}>rice vinegar for mirin</strong> in the salmon glaze, and what&apos;s{' '}
+                        <strong style={{ color: '#1d4ed8' }}>Warren&apos;s ETA</strong>?&rdquo;
                       </div>
                     </div>
-
-                    <button
-                      className="gemini-spark-btn"
-                      onClick={() => engageGemini()}
-                    >
-                      <GeminiSparkIcon size={16} />
-                      <span>ENGAGE GEMINI</span>
-                    </button>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <button
-                      className="gemini-chip"
-                      onClick={() => {
-                        const targetMeal =
-                          d.recipe_name ||
-                          state.backlog[0]?.recipe_or_item_name ||
-                          'a quick weeknight family dinner';
-                        const perishables = state.backlog
-                          .flatMap((b) => b.key_perishables)
-                          .filter(Boolean)
-                          .join(', ');
-                        engageGemini(
-                          `We are cooking "${targetMeal}" tonight in our kitchen${
-                            perishables ? ` (perishables on hand: ${perishables})` : ''
-                          }. Give us a concise, step-by-step cooking timeline with prep order and temperatures.`,
-                          'Cooking Guide',
-                        );
-                      }}
-                    >
-                      <GeminiSparkIcon size={13} />
-                      <span>Walk Through Tonight&apos;s Recipe</span>
-                    </button>
-
-                    <button
-                      className="gemini-chip"
-                      onClick={() => {
-                        const kits = state.backlog
-                          .map(
-                            (b) =>
-                              `${b.recipe_or_item_name}${
-                                b.key_perishables.length ? ` (${b.key_perishables.join(', ')})` : ''
-                              }`,
-                          )
-                          .join('; ');
-                        engageGemini(
-                          `Here is what is sitting in our fridge backlog right now: ${
-                            kits || 'basic pantry staples'
-                          }. Suggest 2 fast, family-friendly 25-minute dinner remixes for Daniela, Warren, and Wesley using these perishable ingredients first.`,
-                          'Fridge Remix',
-                        );
-                      }}
-                    >
-                      <GeminiSparkIcon size={13} />
-                      <span>Remix Fridge Backlog ({state.backlog.length})</span>
-                    </button>
-
-                    <button
-                      className="gemini-chip"
-                      onClick={() =>
-                        engageGemini(
-                          `Hi Gemini! We're at the kitchen counter with Wesley. Explain things clearly, engagingly, and at a kid-friendly level when he asks a homework or science question.`,
-                          'Wesley Counter Mode',
-                        )
-                      }
-                    >
-                      <GeminiSparkIcon size={13} />
-                      <span>Wesley Homework / Q&amp;A Spark</span>
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    <GeminiEqualizerPill active />
                   </div>
                 </div>
               </div>
@@ -2035,6 +2047,314 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
             </button>
           </div>
         </footer>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            STITCH "GEMINI VOICE" OVERLAY WHEN ENGAGED
+            ════════════════════════════════════════════════════════════════════ */}
+        {geminiOpen && (
+          <div className="gemini-voice-overlay-backdrop" onClick={() => setGeminiOpen(false)}>
+            <div className="gemini-voice-card" onClick={(e) => e.stopPropagation()}>
+              {/* Top Row: Rounded-Square Gradient Spark Badge + "Gemini Voice" + 7-Bar Equalizer Pill */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div className="gemini-badge-square">
+                    <GeminiSparkIcon size={24} white />
+                  </div>
+                  <span style={{ fontSize: '1.42rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                    Gemini Voice
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <GeminiEqualizerPill active={geminiListening || true} />
+                  <button
+                    className="hw-btn pill"
+                    onClick={() => setGeminiOpen(false)}
+                    style={{ padding: '7px 12px' }}
+                    title="Close overlay"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      close
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 1: DANIELA • AT COOKTOP Utterance Well */}
+              <div className="gemini-utterance-well">
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: '#1549d6',
+                    color: '#ffffff',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    flexShrink: 0,
+                    marginTop: 2,
+                  }}
+                >
+                  {geminiPreset === 'wesley' ? 'W' : 'D'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    className="font-mono"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    <span style={{ color: '#1549d6' }}>
+                      {geminiPreset === 'wesley' ? 'WESLEY • AT KITCHEN ISLAND' : 'DANIELA • AT COOKTOP'}
+                    </span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{geminiStampedAt}</span>
+                  </div>
+
+                  <div style={{ fontSize: '1.16rem', lineHeight: 1.5, marginTop: 5, fontWeight: 500 }}>
+                    {geminiPreset === 'stitch' && (
+                      <>
+                        &ldquo;Hey Gemini, can I swap{' '}
+                        <strong style={{ color: '#b5381a' }}>rice vinegar for mirin</strong> in the salmon glaze, and
+                        what&apos;s <strong style={{ color: '#1549d6' }}>Warren&apos;s ETA</strong>?&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'recipe' && (
+                      <>
+                        &ldquo;Hey Gemini, walk me through cooking{' '}
+                        <strong style={{ color: '#b5381a' }}>
+                          {d.recipe_name || state.backlog[0]?.recipe_or_item_name || 'Crispy Miso Salmon Rice Bowls'}
+                        </strong>{' '}
+                        and check how much time is left on{' '}
+                        <strong style={{ color: '#1549d6' }}>{activeTimer?.label || 'the kitchen timer'}</strong>.&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'backlog' && (
+                      <>
+                        &ldquo;Hey Gemini, what 20-minute dinner can we make tonight using{' '}
+                        <strong style={{ color: '#b5381a' }}>
+                          {state.backlog
+                            .slice(0, 2)
+                            .map((b) => b.recipe_or_item_name)
+                            .join(' & ') || 'our fridge backlog'}
+                        </strong>
+                        , and who is <strong style={{ color: '#1549d6' }}>on pickup duty</strong>?&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'wesley' && (
+                      <>
+                        &ldquo;Hey Gemini, why does{' '}
+                        <strong style={{ color: '#b5381a' }}>caramelizing sugar turn brown</strong> in the pan, and how
+                        many <strong style={{ color: '#1549d6' }}>Greenlight chores</strong> do I have left today?&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'custom' && <>&ldquo;{geminiCustomQuery}&rdquo;</>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: GEMINI RESPONSE Well with Semantic Terracotta & Cobalt Highlight Pills */}
+              <div className="gemini-utterance-well" style={{ padding: '20px 22px' }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: '#c23d1b',
+                    color: '#ffffff',
+                    display: 'grid',
+                    placeItems: 'center',
+                    flexShrink: 0,
+                    marginTop: 2,
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 19 }}>
+                    reviews
+                  </span>
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    className="font-mono"
+                    style={{
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.06em',
+                      color: '#b5381a',
+                    }}
+                  >
+                    GEMINI RESPONSE
+                  </div>
+
+                  <div style={{ fontSize: '1.2rem', lineHeight: 1.62, marginTop: 6 }}>
+                    {geminiPreset === 'stitch' && (
+                      <>
+                        &ldquo;<strong>Yes!</strong> For mirin, use{' '}
+                        <span className="gemini-hl-terracotta">rice vinegar with a pinch of brown sugar</span> (about ½
+                        tsp sugar per tablespoon of vinegar) to match the sweetness. And{' '}
+                        <span className="gemini-hl-cobalt">
+                          {state.lateTonight[0]
+                            ? `Warren is wrapping up until ${fmtTime(state.lateTonight[0].until)}`
+                            : 'Warren is 12 minutes away'}
+                        </span>{' '}
+                        on I-280, arriving right at 5:27 PM—just as the jasmine rice finishes simmering.&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'recipe' && (
+                      <>
+                        &ldquo;<strong>Ready on station!</strong> Sear at high heat for{' '}
+                        <span className="gemini-hl-terracotta">4 minutes skin-side down, then baste with glaze</span>{' '}
+                        for the final 90 seconds. Your{' '}
+                        <span className="gemini-hl-cobalt">
+                          {activeTimer?.label || 'Kitchen Timer'} has {timerMM}:{timerSS} remaining
+                        </span>
+                        , so drop the greens in right when it hits 3 minutes.&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'backlog' && (
+                      <>
+                        &ldquo;<strong>Best match tonight:</strong> Fire up the{' '}
+                        <span className="gemini-hl-terracotta">
+                          {state.backlog[0]?.recipe_or_item_name || 'Miso Glazed Salmon'} (uses{' '}
+                          {state.backlog[0]?.key_perishables.join(', ') || 'fresh scallions & bok choy'})
+                        </span>{' '}
+                        so those perishables don&apos;t age out. And{' '}
+                        <span className="gemini-hl-cobalt">
+                          {nextUnassigned
+                            ? `${nextUnassigned.title} at ${fmtTime(nextUnassigned.start_time)} still needs a driver`
+                            : 'all family pickups are assigned tonight'}
+                        </span>
+                        .&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'wesley' && (
+                      <>
+                        &ldquo;<strong>Great question, Wesley!</strong> Around 320°F, heat breaks sugar molecules apart
+                        and recombines them into{' '}
+                        <span className="gemini-hl-terracotta">golden, nutty caramel compounds</span>. Also, you have{' '}
+                        <span className="gemini-hl-cobalt">
+                          {doneChores} of {state.chores.length} chores done (${allowanceEarned} earned)
+                        </span>{' '}
+                        toward Friday&apos;s Greenlight payout!&rdquo;
+                      </>
+                    )}
+                    {geminiPreset === 'custom' && (
+                      <>
+                        &ldquo;<strong>On it!</strong> I&apos;ve matched that with tonight&apos;s{' '}
+                        <span className="gemini-hl-terracotta">
+                          {d.recipe_name || state.backlog[0]?.recipe_or_item_name || 'kitchen menu & fridge backlog'}
+                        </span>{' '}
+                        and checked your schedule ({' '}
+                        <span className="gemini-hl-cobalt">
+                          {timerMM}:{timerSS} left on {activeTimer?.label || 'timer'}
+                        </span>
+                        ). Tap <strong>Open Gemini App</strong> below to continue in full Gemini Live!&rdquo;
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Footer: Scenario Switcher + Speak Out Loud + Launch On-Board Gemini Android App */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                  paddingTop: 6,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  {(
+                    [
+                      ['stitch', 'Mirin Swap + ETA'],
+                      ['recipe', 'Cooktop Timing'],
+                      ['backlog', 'Fridge Remix'],
+                      ['wesley', 'Wesley Q&A'],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      className={`gemini-chip ${geminiPreset === id ? 'active' : ''}`}
+                      style={
+                        geminiPreset === id
+                          ? { borderColor: 'var(--cobalt)', background: '#e3e9fb', color: '#14224a' }
+                          : undefined
+                      }
+                      onClick={() => setGeminiPreset(id)}
+                    >
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="hw-btn" onClick={startGeminiDictation}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
+                      mic
+                    </span>
+                    <span>{geminiListening ? 'LISTENING…' : 'ASK BY VOICE'}</span>
+                  </button>
+
+                  <button
+                    className="hw-btn"
+                    onClick={() =>
+                      speakOnCozyla(
+                        geminiPreset === 'stitch'
+                          ? 'Yes! For mirin, use rice vinegar with a pinch of brown sugar. And Warren is 12 minutes away on I-280, arriving right at 5:27 PM.'
+                          : geminiPreset === 'recipe'
+                            ? `Sear for 4 minutes skin-side down, then baste with glaze. Your timer has ${timerMM} minutes remaining.`
+                            : geminiPreset === 'backlog'
+                              ? `Best match tonight is ${state.backlog[0]?.recipe_or_item_name || 'Miso Glazed Salmon'} from the fridge backlog.`
+                              : `Around 320 degrees, sugar molecules break apart into nutty caramel compounds. You have ${doneChores} of ${state.chores.length} chores done today!`,
+                      )
+                    }
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
+                      volume_up
+                    </span>
+                    <span>READ ALOUD</span>
+                  </button>
+
+                  <button
+                    className="hw-btn terracotta"
+                    onClick={() => {
+                      const promptText =
+                        geminiPreset === 'custom' && geminiCustomQuery
+                          ? geminiCustomQuery
+                          : geminiPreset === 'stitch'
+                            ? "Can I swap rice vinegar for mirin in the salmon glaze, and what's a good glaze ratio?"
+                            : geminiPreset === 'recipe'
+                              ? `Walk me through cooking ${d.recipe_name || state.backlog[0]?.recipe_or_item_name || 'Crispy Miso Salmon Rice Bowls'} step by step.`
+                              : geminiPreset === 'backlog'
+                                ? `We have ${state.backlog.map((b) => b.recipe_or_item_name).join(', ')} in our fridge backlog. Give us a 20-minute dinner idea.`
+                                : 'Explain why caramelizing sugar turns brown in a kid-friendly way for Wesley.';
+                      launchGeminiOnCozyla(promptText);
+                    }}
+                  >
+                    <GeminiSparkIcon size={15} white />
+                    <span>OPEN GEMINI APP</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
