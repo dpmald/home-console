@@ -3,7 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserSupabase } from '@/lib/supabase/browser';
 import { NAMES, PARENTS, SOURCE_LABEL, isParent } from '@/lib/family';
 import { daysBetween, fmtDay, fmtShortDate, fmtTime, isAllDay } from '@/lib/time';
-import { isFullyKiosk, speakOnCozyla, useCozylaKiosk, wakeCozylaScreen, wakeSpotifyOnCozyla } from '@/lib/cozyla';
+import {
+  isFullyKiosk,
+  launchGeminiOnCozyla,
+  speakOnCozyla,
+  useCozylaKiosk,
+  wakeCozylaScreen,
+  wakeSpotifyOnCozyla,
+} from '@/lib/cozyla';
 import type { BacklogLocation, KioskAction, KitchenState } from '@/lib/types';
 import type { Weather } from '@/lib/weather';
 import type { SpotifyNowPlaying } from '@/lib/spotify';
@@ -22,6 +29,31 @@ type ViewMode = 'ambient' | 'bento' | 'timeline';
 type MemberFilter = 'all' | 'daniela' | 'warren' | 'wesley';
 
 const NPR_URL = process.env.NEXT_PUBLIC_NPR_STREAM_URL || 'https://npr-ice.streamguys1.com/live.mp3';
+
+function GeminiSparkIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      className="gemini-spark-icon"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id="geminiSparkGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="var(--cobalt)" />
+          <stop offset="55%" stopColor="var(--terracotta)" />
+          <stop offset="100%" stopColor="var(--amber)" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12 1.75C12.35 7.1 16.9 11.65 22.25 12C16.9 12.35 12.35 16.9 12 22.25C11.65 16.9 7.1 12.35 1.75 12C7.1 11.65 11.65 7.1 12 1.75Z"
+        fill="url(#geminiSparkGrad)"
+      />
+    </svg>
+  );
+}
 
 function chime() {
   try {
@@ -160,8 +192,19 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const [newBacklog, setNewBacklog] = useState('');
   const [newBacklogLoc, setNewBacklogLoc] = useState<BacklogLocation>('fridge');
   const [newGrocery, setNewGrocery] = useState('');
+  const [geminiToast, setGeminiToast] = useState<string | null>(null);
   const nprRef = useRef<HTMLAudioElement | null>(null);
   const firedTimers = useRef<Set<string>>(new Set());
+
+  const engageGemini = useCallback((prompt?: string, label?: string) => {
+    setGeminiToast(
+      label
+        ? `✨ Launching Gemini (${label} copied to clipboard)…`
+        : '✨ Launching on-board Gemini app…',
+    );
+    setTimeout(() => setGeminiToast(null), 4000);
+    launchGeminiOnCozyla(prompt);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -481,6 +524,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
               </span>
             </div>
 
+            <button
+              className="gemini-spark-btn"
+              onClick={() => engageGemini()}
+              title="Open on-board Google Gemini app on the Cozyla"
+            >
+              <GeminiSparkIcon size={16} />
+              <span>Gemini</span>
+            </button>
+
             <VoiceOrb
               onStartTimer={startTimer}
               onCancelTimers={() => setTimers([])}
@@ -666,6 +718,124 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
                       arrow_forward
                     </span>
+                  </div>
+                </div>
+
+                {/* On-Board Google Gemini Spark Dock (Launches com.google.android.apps.bard with Kitchen Context) */}
+                <div className="gemini-ambient-card" style={{ marginTop: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 12,
+                          background: 'var(--surface)',
+                          border: '1px solid rgba(43, 89, 255, 0.25)',
+                          display: 'grid',
+                          placeItems: 'center',
+                        }}
+                      >
+                        <GeminiSparkIcon size={20} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            className="font-mono"
+                            style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--cobalt)', letterSpacing: '0.06em' }}
+                          >
+                            GEMINI SPARK // ON-BOARD ASSISTANT
+                          </span>
+                          {geminiToast && (
+                            <span
+                              className="font-mono"
+                              style={{
+                                fontSize: '0.66rem',
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: 999,
+                                background: '#edf7f2',
+                                color: 'var(--emerald)',
+                              }}
+                            >
+                              {geminiToast}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: 1 }}>
+                          Launch the Cozyla&apos;s Gemini app or tap a spark chip to pass tonight&apos;s fridge &amp; meal context
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      className="gemini-spark-btn"
+                      onClick={() => engageGemini()}
+                    >
+                      <GeminiSparkIcon size={16} />
+                      <span>ENGAGE GEMINI</span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      className="gemini-chip"
+                      onClick={() => {
+                        const targetMeal =
+                          d.recipe_name ||
+                          state.backlog[0]?.recipe_or_item_name ||
+                          'a quick weeknight family dinner';
+                        const perishables = state.backlog
+                          .flatMap((b) => b.key_perishables)
+                          .filter(Boolean)
+                          .join(', ');
+                        engageGemini(
+                          `We are cooking "${targetMeal}" tonight in our kitchen${
+                            perishables ? ` (perishables on hand: ${perishables})` : ''
+                          }. Give us a concise, step-by-step cooking timeline with prep order and temperatures.`,
+                          'Cooking Guide',
+                        );
+                      }}
+                    >
+                      <GeminiSparkIcon size={13} />
+                      <span>Walk Through Tonight&apos;s Recipe</span>
+                    </button>
+
+                    <button
+                      className="gemini-chip"
+                      onClick={() => {
+                        const kits = state.backlog
+                          .map(
+                            (b) =>
+                              `${b.recipe_or_item_name}${
+                                b.key_perishables.length ? ` (${b.key_perishables.join(', ')})` : ''
+                              }`,
+                          )
+                          .join('; ');
+                        engageGemini(
+                          `Here is what is sitting in our fridge backlog right now: ${
+                            kits || 'basic pantry staples'
+                          }. Suggest 2 fast, family-friendly 25-minute dinner remixes for Daniela, Warren, and Wesley using these perishable ingredients first.`,
+                          'Fridge Remix',
+                        );
+                      }}
+                    >
+                      <GeminiSparkIcon size={13} />
+                      <span>Remix Fridge Backlog ({state.backlog.length})</span>
+                    </button>
+
+                    <button
+                      className="gemini-chip"
+                      onClick={() =>
+                        engageGemini(
+                          `Hi Gemini! We're at the kitchen counter with Wesley. Explain things clearly, engagingly, and at a kid-friendly level when he asks a homework or science question.`,
+                          'Wesley Counter Mode',
+                        )
+                      }
+                    >
+                      <GeminiSparkIcon size={13} />
+                      <span>Wesley Homework / Q&amp;A Spark</span>
+                    </button>
                   </div>
                 </div>
               </div>

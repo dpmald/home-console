@@ -321,6 +321,81 @@ select {
   background: #ffffff;
 }
 
+/* ── Gemini Spark Orb & Ambient Launcher ── */
+@keyframes gemini-spin-pulse {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 6px rgba(43, 89, 255, 0.35));
+  }
+  50% {
+    transform: scale(1.12) rotate(12deg);
+    filter: drop-shadow(0 0 12px rgba(232, 90, 54, 0.55));
+  }
+}
+
+.gemini-spark-icon {
+  animation: gemini-spin-pulse 4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.gemini-spark-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(43, 89, 255, 0.12) 0%, rgba(232, 90, 54, 0.14) 100%);
+  border: 1px solid rgba(43, 89, 255, 0.32);
+  box-shadow: var(--bezel-shadow);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.gemini-spark-btn:hover {
+  border-color: var(--cobalt);
+  box-shadow: 0 3px 12px rgba(43, 89, 255, 0.18);
+}
+.gemini-spark-btn:active {
+  transform: translateY(2px);
+}
+
+.gemini-ambient-card {
+  position: relative;
+  border-radius: 18px;
+  padding: 13px 16px;
+  background: linear-gradient(135deg, rgba(43, 89, 255, 0.07) 0%, rgba(232, 90, 54, 0.08) 55%, rgba(217, 119, 6, 0.07) 100%);
+  border: 1px solid rgba(43, 89, 255, 0.24);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gemini-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--dot);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.08s ease, border-color 0.14s ease;
+}
+.gemini-chip:hover {
+  border-color: var(--cobalt);
+}
+.gemini-chip:active {
+  transform: translateY(1px);
+}
+
 /* ── Legacy utility classes used by /guide ── */
 .card {
   background: var(--surface);

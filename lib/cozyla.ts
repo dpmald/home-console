@@ -18,7 +18,9 @@ declare global {
       stopSound?: () => void;
       vibrate?: (millis: number) => void;
       startApplication?: (packageName: string, action?: string, url?: string) => void;
+      startIntent?: (url: string) => void;
       bringToForeground?: (millis?: number) => void;
+      setClipboardText?: (text: string) => void;
       clearCache?: () => void;
       loadStartUrl?: () => void;
       getDeviceName?: () => string;
@@ -69,6 +71,58 @@ export function wakeSpotifyOnCozyla() {
     }
   } catch {}
   return false;
+}
+
+/**
+ * Launches the on-board Google Gemini Android app (`com.google.android.apps.bard`)
+ * on the Cozyla 24" console. If a contextual kitchen prompt is provided, copies it
+ * to the system clipboard and passes it via Android intent extras so it is ready to
+ * send or speak in Gemini Live.
+ */
+export function launchGeminiOnCozyla(prompt?: string) {
+  if (typeof window === 'undefined') return;
+
+  if (prompt) {
+    try {
+      window.fully?.setClipboardText?.(prompt);
+    } catch {}
+    try {
+      navigator.clipboard?.writeText?.(prompt);
+    } catch {}
+  }
+
+  try {
+    // 1. Fully Kiosk JS Bridge (direct Android package launch or SEND intent)
+    if (window.fully) {
+      if (prompt && window.fully.startIntent) {
+        const encoded = encodeURIComponent(prompt);
+        window.fully.startIntent(
+          `intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=${encoded};package=com.google.android.apps.bard;end`,
+        );
+        return;
+      }
+      if (window.fully.startApplication) {
+        window.fully.startApplication('com.google.android.apps.bard');
+        return;
+      }
+    }
+
+    // 2. Android Chrome / WebView Intent URI fallback (works even before JS Interface is toggled ON)
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      const fallback = encodeURIComponent('https://gemini.google.com/app');
+      if (prompt) {
+        const encoded = encodeURIComponent(prompt);
+        window.location.href = `intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=${encoded};package=com.google.android.apps.bard;S.browser_fallback_url=${fallback};end`;
+      } else {
+        window.location.href = `intent:#Intent;package=com.google.android.apps.bard;S.browser_fallback_url=${fallback};end`;
+      }
+      return;
+    }
+
+    // 3. Desktop / laptop preview fallback
+    window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer');
+  } catch {}
 }
 
 /**
