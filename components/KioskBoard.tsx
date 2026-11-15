@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserSupabase } from '@/lib/supabase/browser';
 import { NAMES, PARENTS, SOURCE_LABEL, isParent } from '@/lib/family';
-import { daysBetween, fmtDay, fmtShortDate, fmtTime, isAllDay } from '@/lib/time';
+import { daysBetween, fmtDay, fmtEventTime, fmtShortDate, fmtTime, isAllDay } from '@/lib/time';
 import {
   isFullyKiosk,
   launchGeminiOnCozyla,
@@ -289,16 +289,20 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     }
   }, [applyVoiceCommandIfTimer]);
 
-  const refresh = useCallback(async () => {
+  const refreshKitchen = useCallback(async () => {
     try {
       const r = await fetch('/api/kiosk', { cache: 'no-store' });
       if (r.ok) setState(await r.json());
     } catch {}
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await refreshKitchen();
     try {
       const sr = await fetch('/api/spotify', { cache: 'no-store' });
       if (sr.ok) setSpotify(await sr.json());
     } catch {}
-  }, []);
+  }, [refreshKitchen]);
 
   useCozylaKiosk(refresh);
 
@@ -397,10 +401,17 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
 
   // Supabase Realtime broadcast subscription + fallback poll
   useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const sb = browserSupabase();
     const channel = sb
       ?.channel('kitchen')
-      .on('broadcast', { event: 'db_change' }, () => refresh())
+      .on('broadcast', { event: 'db_change' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          debounceTimer = null;
+          refreshKitchen();
+        }, 350);
+      })
       .subscribe();
     const poll = setInterval(refresh, 45_000);
     const wx = setInterval(async () => {
@@ -408,11 +419,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
       if (r.ok) setWeather(await r.json());
     }, 600_000);
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       if (channel && sb) sb.removeChannel(channel);
       clearInterval(poll);
       clearInterval(wx);
     };
-  }, [refresh]);
+  }, [refresh, refreshKitchen]);
 
   const playNpr = useCallback(() => {
     if (!nprRef.current) nprRef.current = new Audio(NPR_URL);
@@ -790,8 +802,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           </div>
                           <div style={{ fontSize: '0.96rem', fontWeight: 700, marginTop: 3 }}>
                             {nextUnassigned
-                              ? `${fmtTime(nextUnassigned.start_time)} • ${nextUnassigned.title}`
-                              : `${fmtTime(state.events[0].start_time)} • ${state.events[0].title}`}
+                              ? `${fmtEventTime(nextUnassigned.start_time, state.date)} • ${nextUnassigned.title}`
+                              : `${fmtEventTime(state.events[0].start_time, state.date)} • ${state.events[0].title}`}
                           </div>
                         </div>
                       </div>
@@ -1450,7 +1462,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       (ev.logistics_type === 'pickup' || ev.logistics_type === 'appointment') &&
                       ev.assigned_parent === 'unassigned';
                     const isLate = ev.logistics_type === 'late_office';
-                    const timeStr = isAllDay(ev.start_time, ev.end_time) ? 'ALL DAY' : fmtTime(ev.start_time);
+                    const timeStr = isAllDay(ev.start_time, ev.end_time) ? 'ALL DAY' : fmtEventTime(ev.start_time, state.date);
                     return (
                       <div
                         key={ev.id}
@@ -1466,7 +1478,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-                          <div style={{ width: 82, flexShrink: 0 }}>
+                          <div style={{ width: 128, flexShrink: 0 }}>
                             <div
                               className="font-mono"
                               style={{

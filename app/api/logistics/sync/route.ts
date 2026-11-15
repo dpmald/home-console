@@ -22,7 +22,7 @@ function classify(title: string, startIso: string, endIso: string): LogisticsTyp
   if (/\b(pick\s*up|drop\s*off|carpool|bus|aftercare|camp|school\s*run|wesley\s*from|wesley\s*to)\b/.test(t)) {
     return 'pickup';
   }
-  if (/\b(dentist|doctor|dr\.?\b|orthodont|pediatric|vet\b|checkup|appt|appointment|physical|therapy|eye\s*exam|haircut)\b/.test(t)) {
+  if (/\b(dentist|doctor|dr\.?\b|orthodont|pediatric|vet\b|checkup|appt|appointment|physical|therapy|eye\s*exam|haircut|mri|radiology|ultrasound|x-ray)\b/.test(t)) {
     return 'appointment';
   }
   const endsLate = localHour(new Date(endIso)) >= 18 || localHour(new Date(startIso)) >= 18;

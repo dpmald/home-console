@@ -69,6 +69,14 @@ export function nextSaturday(fromISO: string): string {
 const timeFmt = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
 export const fmtTime = (iso: string | Date) => timeFmt.format(new Date(iso));
 
+export function fmtEventTime(iso: string | Date, refDate = todayISO()): string {
+  const d = new Date(iso);
+  const evDate = todayISO(d);
+  if (evDate === refDate) return fmtTime(d);
+  if (evDate === addDays(refDate, 1)) return `Tomorrow ${fmtTime(d)}`;
+  return `${fmtShortDate(evDate)} ${fmtTime(d)}`;
+}
+
 const dayFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'short', day: 'numeric' });
 export const fmtDay = (dateISO: string) => dayFmt.format(new Date(`${dateISO}T12:00:00Z`));
 

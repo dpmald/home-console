@@ -1,6 +1,7 @@
 // Core family-data operations. Shared by Slack, the kiosk, voice and crons
 // so every surface behaves identically.
 import { db, unwrap } from './supabase/server';
+import { syncIcsCalendarsIfConfigured } from './gcal';
 import { addDays, dayBoundsUTC, dowOf, fmtTime, localHour, todayISO } from './time';
 import { NAMES, isParent, ownerOfCalendar } from './family';
 import type {
@@ -14,6 +15,11 @@ const now = () => new Date().toISOString();
 const DINNER_COLS = 'date, chef, recipe_name, linked_backlog_id, status, unavailable, claimed_via';
 
 export async function getDinner(date: string): Promise<DinnerRow> {
+  const existing = unwrap<DinnerRow | null>(
+    await db().from('dinner_schedule').select(DINNER_COLS).eq('date', date).maybeSingle(),
+    'get dinner',
+  );
+  if (existing) return existing;
   unwrap(
     await db().from('dinner_schedule').upsert({ date }, { onConflict: 'date', ignoreDuplicates: true }),
     'ensure dinner',
@@ -195,6 +201,12 @@ export async function ensureChoresForDate(date: string) {
 }
 
 export async function listChores(date: string): Promise<Chore[]> {
+  const existing = unwrap<Chore[]>(
+    await db().from('wesley_chores').select('*').eq('chore_date', date).order('sort_order'),
+    'list chores',
+  );
+  if (existing.length > 0) return existing;
+  await ensureChoresForDate(date);
   return unwrap(
     await db().from('wesley_chores').select('*').eq('chore_date', date).order('sort_order'),
     'list chores',
@@ -262,7 +274,8 @@ export async function markGreenlightVerified(start: string, end: string) {
 
 // ──────────────────────────── Logistics ────────────────────────────
 export async function eventsForDate(date: string): Promise<LogisticsEvent[]> {
-  const [s, e] = dayBoundsUTC(date);
+  const [s] = dayBoundsUTC(date);
+  const [, e] = dayBoundsUTC(addDays(date, 1));
   return unwrap(
     await db()
       .from('family_logistics')
@@ -342,7 +355,7 @@ export async function recentOrders(limit = 3): Promise<CartProposal[]> {
 }
 
 export async function getKitchenState(date = todayISO()): Promise<KitchenState> {
-  await ensureChoresForDate(date);
+  await Promise.all([ensureChoresForDate(date), syncIcsCalendarsIfConfigured()]);
   const [dinner, backlog, chores, events, groceries, orders] = await Promise.all([
     getDinner(date),
     listBacklog(),
