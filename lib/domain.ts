@@ -355,7 +355,7 @@ export async function recentOrders(limit = 3): Promise<CartProposal[]> {
 }
 
 export async function getKitchenState(date = todayISO()): Promise<KitchenState> {
-  await Promise.all([ensureChoresForDate(date), syncIcsCalendarsIfConfigured()]);
+  await syncIcsCalendarsIfConfigured();
   const [dinner, backlog, chores, events, groceries, orders] = await Promise.all([
     getDinner(date),
     listBacklog(),

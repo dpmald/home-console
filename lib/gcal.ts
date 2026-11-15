@@ -129,26 +129,42 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
       const ids = parsed.map((p) => p.external_event_id);
       const { data: existing } = await db()
         .from('family_logistics')
-        .select('external_event_id, assigned_parent, logistics_type')
+        .select('external_event_id, source_calendar, title, start_time, end_time, assigned_parent, logistics_type')
         .in('external_event_id', ids);
       const byExt = new Map((existing ?? []).map((e: any) => [e.external_event_id, e]));
 
-      const rows = parsed.map((e) => {
-        const prev = byExt.get(e.external_event_id);
-        const type = prev?.logistics_type ?? classify(e.title, e.start_time, e.end_time);
-        const assigned =
-          prev && prev.assigned_parent !== 'unassigned'
-            ? prev.assigned_parent
-            : defaultAssignee(type, e.source_calendar, e.title);
-        return {
-          ...e,
-          logistics_type: type,
-          assigned_parent: assigned,
-          updated_at: new Date().toISOString(),
-        };
-      });
+      const sameInstant = (a?: string, b?: string) =>
+        Boolean(a && b && Date.parse(a) === Date.parse(b));
 
-      await db().from('family_logistics').upsert(rows, { onConflict: 'external_event_id' });
+      const rows = parsed
+        .map((e) => {
+          const prev = byExt.get(e.external_event_id);
+          const type = prev?.logistics_type ?? classify(e.title, e.start_time, e.end_time);
+          const assigned =
+            prev && prev.assigned_parent !== 'unassigned'
+              ? prev.assigned_parent
+              : defaultAssignee(type, e.source_calendar, e.title);
+          const unchanged =
+            prev &&
+            prev.title === e.title &&
+            prev.source_calendar === e.source_calendar &&
+            prev.logistics_type === type &&
+            prev.assigned_parent === assigned &&
+            sameInstant(prev.start_time, e.start_time) &&
+            sameInstant(prev.end_time, e.end_time);
+          if (unchanged) return null;
+          return {
+            ...e,
+            logistics_type: type,
+            assigned_parent: assigned,
+            updated_at: new Date().toISOString(),
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+
+      if (rows.length > 0) {
+        await db().from('family_logistics').upsert(rows, { onConflict: 'external_event_id' });
+      }
     } catch {}
   }
 }

@@ -142,7 +142,18 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  flag_key text := 'kitchen.notified_' || TG_TABLE_NAME;
 begin
+  if TG_OP = 'UPDATE' and NEW is not distinct from OLD then
+    return null;
+  end if;
+
+  if coalesce(current_setting(flag_key, true), '') = txid_current()::text then
+    return null;
+  end if;
+  perform set_config(flag_key, txid_current()::text, true);
+
   perform realtime.send(
     jsonb_build_object('table', TG_TABLE_NAME, 'op', TG_OP),
     'db_change',
@@ -154,9 +165,9 @@ end;
 $$;
 revoke execute on function public.broadcast_kitchen_change() from public, anon, authenticated;
 
-create or replace trigger kitchen_broadcast after insert or update or delete on public.fridge_backlog for each statement execute function public.broadcast_kitchen_change();
-create or replace trigger kitchen_broadcast after insert or update or delete on public.dinner_schedule for each statement execute function public.broadcast_kitchen_change();
-create or replace trigger kitchen_broadcast after insert or update or delete on public.wesley_chores for each statement execute function public.broadcast_kitchen_change();
-create or replace trigger kitchen_broadcast after insert or update or delete on public.family_logistics for each statement execute function public.broadcast_kitchen_change();
-create or replace trigger kitchen_broadcast after insert or update or delete on public.grocery_items for each statement execute function public.broadcast_kitchen_change();
-create or replace trigger kitchen_broadcast after insert or update or delete on public.cart_proposals for each statement execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.fridge_backlog for each row execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.dinner_schedule for each row execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.wesley_chores for each row execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.family_logistics for each row execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.grocery_items for each row execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.cart_proposals for each row execute function public.broadcast_kitchen_change();
