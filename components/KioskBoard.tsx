@@ -207,30 +207,20 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const [mode, setMode] = useState<ViewMode>('bento');
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
   const [now, setNow] = useState<Date>(() => new Date());
-  const [timers, setTimers] = useState<Timer[]>([
-    {
-      id: 'default-simmer',
-      label: 'Kitchen Timer',
-      initialSecs: 600,
-      endsAt: Date.now() + 522 * 1000,
-      pausedRemaining: 522,
-    },
-  ]);
+  const [timers, setTimers] = useState<Timer[]>([]);
   const [nprPlaying, setNprPlaying] = useState(false);
   const [spotify, setSpotify] = useState<SpotifyNowPlaying>({ configured: false, playing: false });
   const [newBacklog, setNewBacklog] = useState('');
   const [newBacklogLoc, setNewBacklogLoc] = useState<BacklogLocation>('fridge');
   const [newGrocery, setNewGrocery] = useState('');
   const [geminiOpen, setGeminiOpen] = useState(false);
-  const [geminiPreset, setGeminiPreset] = useState<'stitch' | 'recipe' | 'backlog' | 'wesley' | 'custom'>('stitch');
   const [geminiCustomQuery, setGeminiCustomQuery] = useState('');
   const [geminiListening, setGeminiListening] = useState(false);
-  const [geminiStampedAt, setGeminiStampedAt] = useState('07:18:24 PM');
+  const [geminiStampedAt, setGeminiStampedAt] = useState('');
   const nprRef = useRef<HTMLAudioElement | null>(null);
   const firedTimers = useRef<Set<string>>(new Set());
 
-  const openGeminiOverlay = useCallback((preset: 'stitch' | 'recipe' | 'backlog' | 'wesley' = 'stitch') => {
-    setGeminiPreset(preset);
+  const openGeminiOverlay = useCallback(() => {
     setGeminiStampedAt(
       new Date().toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -257,7 +247,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
         const transcript = ev.results?.[0]?.[0]?.transcript;
         if (transcript) {
           setGeminiCustomQuery(transcript);
-          setGeminiPreset('custom');
           setGeminiStampedAt(
             new Date().toLocaleTimeString('en-US', {
               hour: '2-digit',
@@ -486,8 +475,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const [clockDigits, clockAmPm] = rawTime.split(' ');
   const d = state.dinner;
   const doneChores = state.chores.filter((c) => c.completed).length;
-  const totalChores = state.chores.length || 1;
-  const chorePct = Math.round((doneChores / totalChores) * 100);
+  const chorePct = state.chores.length > 0 ? Math.round((doneChores / state.chores.length) * 100) : 0;
   const allowanceEarned = (doneChores * 5).toFixed(2);
   const allowanceTotal = (state.chores.length * 5).toFixed(2);
   const pendingOrders = state.orders.filter((o) => o.status === 'pending');
@@ -596,7 +584,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
 
             <button
               className="gemini-spark-btn"
-              onClick={() => openGeminiOverlay('stitch')}
+              onClick={() => openGeminiOverlay()}
               title="Engage Gemini Voice Overlay"
             >
               <span className="gemini-badge-square" style={{ width: 26, height: 26, borderRadius: 8 }}>
@@ -778,7 +766,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           ? `${fmtTime(nextUnassigned.start_time)} • ${nextUnassigned.title}`
                           : state.events[0]
                             ? `${fmtTime(state.events[0].start_time)} • ${state.events[0].title}`
-                            : 'All pickups and appointments covered today'}
+                            : 'No events scheduled today'}
                       </div>
                     </div>
                   </div>
@@ -795,7 +783,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
 
                 {/* Stitch "Gemini Voice" Ambient Spark Bar — Opens the Stitch Gemini Voice Overlay */}
                 <div
-                  onClick={() => openGeminiOverlay('stitch')}
+                  onClick={() => openGeminiOverlay()}
                   className="ceramic-well"
                   style={{
                     marginTop: 14,
@@ -826,7 +814,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             letterSpacing: '0.06em',
                           }}
                         >
-                          DANIELA • AT COOKTOP
+                          ON-BOARD ASSISTANT
                         </span>
                       </div>
                       <div
@@ -839,15 +827,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           textOverflow: 'ellipsis',
                         }}
                       >
-                        &ldquo;Can I swap{' '}
-                        <strong style={{ color: '#b93815' }}>rice vinegar for mirin</strong> in the salmon glaze, and what&apos;s{' '}
-                        <strong style={{ color: '#1d4ed8' }}>Warren&apos;s ETA</strong>?&rdquo;
+                        {geminiCustomQuery
+                          ? `“${geminiCustomQuery}”`
+                          : 'Tap to ask Gemini by voice or launch the on-board Gemini app'}
                       </div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <GeminiEqualizerPill active />
+                    <GeminiEqualizerPill active={geminiListening} />
                   </div>
                 </div>
               </div>
@@ -1250,6 +1238,20 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     padding: '10px 0',
                   }}
                 >
+                  {filteredEvents.length === 0 && (
+                    <div
+                      className="ceramic-well"
+                      style={{
+                        padding: '18px 20px',
+                        color: 'var(--muted)',
+                        fontSize: '0.86rem',
+                        textAlign: 'center',
+                        margin: 'auto 0',
+                      }}
+                    >
+                      No calendar events synced for today yet.
+                    </div>
+                  )}
                   {filteredEvents.map((ev) => {
                     const needsOwner =
                       (ev.logistics_type === 'pickup' || ev.logistics_type === 'appointment') &&
@@ -1721,6 +1723,20 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       gap: 7,
                     }}
                   >
+                    {state.chores.length === 0 && (
+                      <div
+                        className="ceramic-well"
+                        style={{
+                          padding: '16px 18px',
+                          color: 'var(--muted)',
+                          fontSize: '0.82rem',
+                          textAlign: 'center',
+                          margin: 'auto 0',
+                        }}
+                      >
+                        No chores scheduled yet.
+                      </div>
+                    )}
                     {state.chores.map((c) => (
                       <div
                         key={c.id}
@@ -1801,18 +1817,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       </span>
                       Pantry Cart Staging ({state.groceries.length})
                     </span>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      {['Oat Milk', 'Paper Towels'].map((item) => (
-                        <button
-                          key={item}
-                          className="hw-btn"
-                          style={{ padding: '3px 8px', fontSize: '0.66rem' }}
-                          onClick={() => act({ type: 'add_grocery', name: item })}
-                        >
-                          + {item}
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   <form
@@ -2073,7 +2077,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <GeminiEqualizerPill active={geminiListening || true} />
+                  <GeminiEqualizerPill active={geminiListening} />
                   <button
                     className="hw-btn pill"
                     onClick={() => setGeminiOpen(false)}
@@ -2087,7 +2091,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 </div>
               </div>
 
-              {/* Card 1: DANIELA • AT COOKTOP Utterance Well */}
+              {/* Card 1: Cooktop Utterance Well */}
               <div className="gemini-utterance-well">
                 <div
                   style={{
@@ -2104,7 +2108,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     marginTop: 2,
                   }}
                 >
-                  {geminiPreset === 'wesley' ? 'W' : 'D'}
+                  D
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
@@ -2118,55 +2122,25 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       letterSpacing: '0.06em',
                     }}
                   >
-                    <span style={{ color: '#1549d6' }}>
-                      {geminiPreset === 'wesley' ? 'WESLEY • AT KITCHEN ISLAND' : 'DANIELA • AT COOKTOP'}
-                    </span>
-                    <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{geminiStampedAt}</span>
+                    <span style={{ color: '#1549d6' }}>AT COOKTOP</span>
+                    {geminiStampedAt && (
+                      <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{geminiStampedAt}</span>
+                    )}
                   </div>
 
                   <div style={{ fontSize: '1.16rem', lineHeight: 1.5, marginTop: 5, fontWeight: 500 }}>
-                    {geminiPreset === 'stitch' && (
-                      <>
-                        &ldquo;Hey Gemini, can I swap{' '}
-                        <strong style={{ color: '#b5381a' }}>rice vinegar for mirin</strong> in the salmon glaze, and
-                        what&apos;s <strong style={{ color: '#1549d6' }}>Warren&apos;s ETA</strong>?&rdquo;
-                      </>
+                    {geminiCustomQuery ? (
+                      <>&ldquo;{geminiCustomQuery}&rdquo;</>
+                    ) : (
+                      <span style={{ color: 'var(--muted)' }}>
+                        Tap <strong>Ask by Voice</strong> or type below to speak with Gemini at the cooktop…
+                      </span>
                     )}
-                    {geminiPreset === 'recipe' && (
-                      <>
-                        &ldquo;Hey Gemini, walk me through cooking{' '}
-                        <strong style={{ color: '#b5381a' }}>
-                          {d.recipe_name || state.backlog[0]?.recipe_or_item_name || 'Crispy Miso Salmon Rice Bowls'}
-                        </strong>{' '}
-                        and check how much time is left on{' '}
-                        <strong style={{ color: '#1549d6' }}>{activeTimer?.label || 'the kitchen timer'}</strong>.&rdquo;
-                      </>
-                    )}
-                    {geminiPreset === 'backlog' && (
-                      <>
-                        &ldquo;Hey Gemini, what 20-minute dinner can we make tonight using{' '}
-                        <strong style={{ color: '#b5381a' }}>
-                          {state.backlog
-                            .slice(0, 2)
-                            .map((b) => b.recipe_or_item_name)
-                            .join(' & ') || 'our fridge backlog'}
-                        </strong>
-                        , and who is <strong style={{ color: '#1549d6' }}>on pickup duty</strong>?&rdquo;
-                      </>
-                    )}
-                    {geminiPreset === 'wesley' && (
-                      <>
-                        &ldquo;Hey Gemini, why does{' '}
-                        <strong style={{ color: '#b5381a' }}>caramelizing sugar turn brown</strong> in the pan, and how
-                        many <strong style={{ color: '#1549d6' }}>Greenlight chores</strong> do I have left today?&rdquo;
-                      </>
-                    )}
-                    {geminiPreset === 'custom' && <>&ldquo;{geminiCustomQuery}&rdquo;</>}
                   </div>
                 </div>
               </div>
 
-              {/* Card 2: GEMINI RESPONSE Well with Semantic Terracotta & Cobalt Highlight Pills */}
+              {/* Card 2: GEMINI RESPONSE Well (Live Kitchen Context Summary) */}
               <div className="gemini-utterance-well" style={{ padding: '20px 22px' }}>
                 <div
                   style={{
@@ -2199,159 +2173,63 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     GEMINI RESPONSE
                   </div>
 
-                  <div style={{ fontSize: '1.2rem', lineHeight: 1.62, marginTop: 6 }}>
-                    {geminiPreset === 'stitch' && (
+                  <div style={{ fontSize: '1.14rem', lineHeight: 1.62, marginTop: 6 }}>
+                    {geminiCustomQuery ? (
                       <>
-                        &ldquo;<strong>Yes!</strong> For mirin, use{' '}
-                        <span className="gemini-hl-terracotta">rice vinegar with a pinch of brown sugar</span> (about ½
-                        tsp sugar per tablespoon of vinegar) to match the sweetness. And{' '}
+                        Ready to send <span className="gemini-hl-terracotta">{geminiCustomQuery}</span> with live
+                        kitchen context ({' '}
                         <span className="gemini-hl-cobalt">
-                          {state.lateTonight[0]
-                            ? `Warren is wrapping up until ${fmtTime(state.lateTonight[0].until)}`
-                            : 'Warren is 12 minutes away'}
-                        </span>{' '}
-                        on I-280, arriving right at 5:27 PM—just as the jasmine rice finishes simmering.&rdquo;
-                      </>
-                    )}
-                    {geminiPreset === 'recipe' && (
-                      <>
-                        &ldquo;<strong>Ready on station!</strong> Sear at high heat for{' '}
-                        <span className="gemini-hl-terracotta">4 minutes skin-side down, then baste with glaze</span>{' '}
-                        for the final 90 seconds. Your{' '}
-                        <span className="gemini-hl-cobalt">
-                          {activeTimer?.label || 'Kitchen Timer'} has {timerMM}:{timerSS} remaining
+                          {d.recipe_name || `${state.backlog.length} backlog items`}
                         </span>
-                        , so drop the greens in right when it hits 3 minutes.&rdquo;
+                        ). Tap <strong>Open Gemini App</strong> to continue in Gemini Live.
                       </>
-                    )}
-                    {geminiPreset === 'backlog' && (
+                    ) : (
                       <>
-                        &ldquo;<strong>Best match tonight:</strong> Fire up the{' '}
+                        Connected to live kitchen state:{' '}
                         <span className="gemini-hl-terracotta">
-                          {state.backlog[0]?.recipe_or_item_name || 'Miso Glazed Salmon'} (uses{' '}
-                          {state.backlog[0]?.key_perishables.join(', ') || 'fresh scallions & bok choy'})
+                          {d.recipe_name
+                            ? `Tonight: ${d.recipe_name}`
+                            : `${state.backlog.length} meals in fridge backlog`}
                         </span>{' '}
-                        so those perishables don&apos;t age out. And{' '}
+                        and{' '}
                         <span className="gemini-hl-cobalt">
-                          {nextUnassigned
-                            ? `${nextUnassigned.title} at ${fmtTime(nextUnassigned.start_time)} still needs a driver`
-                            : 'all family pickups are assigned tonight'}
+                          {activeTimer
+                            ? `${timerMM}:${timerSS} remaining on ${activeTimer.label}`
+                            : `${state.events.length} schedule items today`}
                         </span>
-                        .&rdquo;
-                      </>
-                    )}
-                    {geminiPreset === 'wesley' && (
-                      <>
-                        &ldquo;<strong>Great question, Wesley!</strong> Around 320°F, heat breaks sugar molecules apart
-                        and recombines them into{' '}
-                        <span className="gemini-hl-terracotta">golden, nutty caramel compounds</span>. Also, you have{' '}
-                        <span className="gemini-hl-cobalt">
-                          {doneChores} of {state.chores.length} chores done (${allowanceEarned} earned)
-                        </span>{' '}
-                        toward Friday&apos;s Greenlight payout!&rdquo;
-                      </>
-                    )}
-                    {geminiPreset === 'custom' && (
-                      <>
-                        &ldquo;<strong>On it!</strong> I&apos;ve matched that with tonight&apos;s{' '}
-                        <span className="gemini-hl-terracotta">
-                          {d.recipe_name || state.backlog[0]?.recipe_or_item_name || 'kitchen menu & fridge backlog'}
-                        </span>{' '}
-                        and checked your schedule ({' '}
-                        <span className="gemini-hl-cobalt">
-                          {timerMM}:{timerSS} left on {activeTimer?.label || 'timer'}
-                        </span>
-                        ). Tap <strong>Open Gemini App</strong> below to continue in full Gemini Live!&rdquo;
+                        .
                       </>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Interactive Footer: Scenario Switcher + Speak Out Loud + Launch On-Board Gemini Android App */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  flexWrap: 'wrap',
-                  paddingTop: 6,
+              {/* Prompt Input + Voice & Native Gemini Launch Controls */}
+              <form
+                style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  launchGeminiOnCozyla(geminiCustomQuery || undefined);
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  {(
-                    [
-                      ['stitch', 'Mirin Swap + ETA'],
-                      ['recipe', 'Cooktop Timing'],
-                      ['backlog', 'Fridge Remix'],
-                      ['wesley', 'Wesley Q&A'],
-                    ] as const
-                  ).map(([id, label]) => (
-                    <button
-                      key={id}
-                      className={`gemini-chip ${geminiPreset === id ? 'active' : ''}`}
-                      style={
-                        geminiPreset === id
-                          ? { borderColor: 'var(--cobalt)', background: '#e3e9fb', color: '#14224a' }
-                          : undefined
-                      }
-                      onClick={() => setGeminiPreset(id)}
-                    >
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="hw-btn" onClick={startGeminiDictation}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
-                      mic
-                    </span>
-                    <span>{geminiListening ? 'LISTENING…' : 'ASK BY VOICE'}</span>
-                  </button>
-
-                  <button
-                    className="hw-btn"
-                    onClick={() =>
-                      speakOnCozyla(
-                        geminiPreset === 'stitch'
-                          ? 'Yes! For mirin, use rice vinegar with a pinch of brown sugar. And Warren is 12 minutes away on I-280, arriving right at 5:27 PM.'
-                          : geminiPreset === 'recipe'
-                            ? `Sear for 4 minutes skin-side down, then baste with glaze. Your timer has ${timerMM} minutes remaining.`
-                            : geminiPreset === 'backlog'
-                              ? `Best match tonight is ${state.backlog[0]?.recipe_or_item_name || 'Miso Glazed Salmon'} from the fridge backlog.`
-                              : `Around 320 degrees, sugar molecules break apart into nutty caramel compounds. You have ${doneChores} of ${state.chores.length} chores done today!`,
-                      )
-                    }
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
-                      volume_up
-                    </span>
-                    <span>READ ALOUD</span>
-                  </button>
-
-                  <button
-                    className="hw-btn terracotta"
-                    onClick={() => {
-                      const promptText =
-                        geminiPreset === 'custom' && geminiCustomQuery
-                          ? geminiCustomQuery
-                          : geminiPreset === 'stitch'
-                            ? "Can I swap rice vinegar for mirin in the salmon glaze, and what's a good glaze ratio?"
-                            : geminiPreset === 'recipe'
-                              ? `Walk me through cooking ${d.recipe_name || state.backlog[0]?.recipe_or_item_name || 'Crispy Miso Salmon Rice Bowls'} step by step.`
-                              : geminiPreset === 'backlog'
-                                ? `We have ${state.backlog.map((b) => b.recipe_or_item_name).join(', ')} in our fridge backlog. Give us a 20-minute dinner idea.`
-                                : 'Explain why caramelizing sugar turns brown in a kid-friendly way for Wesley.';
-                      launchGeminiOnCozyla(promptText);
-                    }}
-                  >
-                    <GeminiSparkIcon size={15} white />
-                    <span>OPEN GEMINI APP</span>
-                  </button>
-                </div>
-              </div>
+                <input
+                  className="ceramic-well"
+                  style={{ flex: 1, minWidth: 220, padding: '9px 14px', fontSize: '0.88rem' }}
+                  placeholder="Type or dictate a question for Gemini…"
+                  value={geminiCustomQuery}
+                  onChange={(e) => setGeminiCustomQuery(e.target.value)}
+                />
+                <button type="button" className="hw-btn" onClick={startGeminiDictation}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
+                    mic
+                  </span>
+                  <span>{geminiListening ? 'LISTENING…' : 'ASK BY VOICE'}</span>
+                </button>
+                <button type="submit" className="hw-btn terracotta">
+                  <GeminiSparkIcon size={15} white />
+                  <span>OPEN GEMINI APP</span>
+                </button>
+              </form>
             </div>
           </div>
         )}
