@@ -233,8 +233,7 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 13px;
-  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
   flex-shrink: 0;
 }
 

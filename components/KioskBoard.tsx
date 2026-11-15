@@ -546,97 +546,61 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
       <div className="hearth-glow-bottom" />
 
       <main className="hearth-shell">
-        {/* ── 1. Top Navigation & Family Presence Bar (Shown in Bento & Timeline Modes; hidden in Ambient for clean Stitch layout) ── */}
+        {/* ── 1. Top Navigation Header (Aligned with Stitch Chore Board View) ── */}
         {mode !== 'ambient' && (
           <header className="hearth-topbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <button
-                className="hw-btn"
+                type="button"
                 onClick={() => setMode('ambient')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '7px 14px',
+                  borderRadius: 12,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  boxShadow: '0 1px 2px rgba(40, 25, 15, 0.04)',
+                  cursor: 'pointer',
+                  color: 'var(--text)',
+                }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 17 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
                   arrow_back
                 </span>
-                <span>RETURN TO AMBIENT</span>
-              </button>
-
-              <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
-
-              <button
-                className="hw-btn"
-                onClick={() => setMode(mode === 'timeline' ? 'bento' : 'timeline')}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--emerald)' }}>
-                  {mode === 'timeline' ? 'close_fullscreen' : 'grid_view'}
+                <span
+                  className="font-mono"
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  RETURN TO AMBIENT
                 </span>
-                <span>{mode === 'timeline' ? 'TIMELINE EXPANDED' : 'BENTO OVERVIEW'}</span>
               </button>
+
+              <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
             </div>
 
-            {/* Center Glance Clock + Weather */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: '2.55rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
+            {/* Right Glance Clock + Date */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span style={{ fontSize: '2.65rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
                   {clockDigits}
                 </span>
-                <span className="font-mono" style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--muted)' }}>
+                <span
+                  className="font-mono"
+                  style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}
+                >
                   {clockAmPm}
                 </span>
               </div>
-              <div style={{ textAlign: 'right', lineHeight: 1.25 }}>
-                <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>{fmtDay(state.date)}</div>
-                <div className="font-mono" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>
-                  {weather
-                    ? `OUTDOOR ${weather.current.temp}°F (${weather.current.label.toUpperCase()}) • H ${weather.today.hi}° L ${weather.today.lo}°`
-                    : 'KITCHEN HEARTH • ONLINE'}
-                </div>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text)' }}>
+                {fmtDay(state.date)}
               </div>
-            </div>
-
-            {/* Right Family Presence Pods + Voice */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <div className="presence-pod">
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--terracotta)' }} />
-                <span>
-                  <strong style={{ color: 'var(--text)' }}>Daniela:</strong>{' '}
-                  {d.chef === 'daniela' ? 'Chef Tonight' : d.unavailable.includes('daniela') ? 'Out Tonight' : 'Home'}
-                </span>
-              </div>
-              <div className="presence-pod">
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cobalt)' }} />
-                <span>
-                  <strong style={{ color: 'var(--text)' }}>Wesley:</strong> {doneChores}/{state.chores.length} Done
-                </span>
-              </div>
-              <div className="presence-pod">
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: state.lateTonight.length ? 'var(--amber)' : 'var(--sage)',
-                  }}
-                />
-                <span>
-                  <strong style={{ color: 'var(--text)' }}>Warren:</strong>{' '}
-                  {d.chef === 'warren'
-                    ? 'Chef Tonight'
-                    : state.lateTonight[0]
-                      ? `Late until ${fmtTime(state.lateTonight[0].until)}`
-                      : 'Home'}
-                </span>
-              </div>
-
-              <button
-                className="gemini-spark-btn"
-                onClick={() => openGeminiOverlay()}
-                title="Engage Gemini Voice Overlay"
-              >
-                <span className="gemini-badge-square" style={{ width: 26, height: 26, borderRadius: 8 }}>
-                  <GeminiSparkIcon size={15} white />
-                </span>
-                <span>Gemini Voice</span>
-              </button>
             </div>
           </header>
         )}
