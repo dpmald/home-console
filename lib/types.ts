@@ -32,6 +32,8 @@ export interface Chore {
   chore_title: string;
   emoji: string | null;
   chore_date: string;
+  category?: 'allowance' | 'pay_per_chore';
+  reward_cents?: number;
   completed: boolean;
   completed_at: string | null;
   verified_in_greenlight: boolean;

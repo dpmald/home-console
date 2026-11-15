@@ -126,6 +126,27 @@ export function launchGeminiOnCozyla(prompt?: string) {
 }
 
 /**
+ * Launches the Greenlight Android app (`me.greenlight`) on the Cozyla 24" console
+ * via Fully Kiosk or Android Intent URI fallback.
+ */
+export function launchGreenlightOnCozyla() {
+  if (typeof window === 'undefined') return;
+  try {
+    if (window.fully?.startApplication) {
+      window.fully.startApplication('me.greenlight');
+      return;
+    }
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      const fallback = encodeURIComponent('https://greenlight.com');
+      window.location.href = `intent:#Intent;package=me.greenlight;S.browser_fallback_url=${fallback};end`;
+      return;
+    }
+    window.open('https://greenlight.com', '_blank', 'noopener,noreferrer');
+  } catch {}
+}
+
+/**
  * Cozyla Calendar+ 24" + Fully Kiosk Browser lifecycle hook.
  */
 export function useCozylaKiosk(onWakeRefresh: () => void) {

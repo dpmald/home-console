@@ -45,6 +45,9 @@ create table if not exists public.wesley_chore_templates (
   chore_title  text not null unique,
   emoji        text,
   days_of_week smallint[] not null default '{0,1,2,3,4,5,6}', -- 0 = Sunday
+  category     text not null default 'allowance'
+                 check (category in ('allowance', 'pay_per_chore')),
+  reward_cents int not null default 0,
   sort_order   int not null default 0,
   active       boolean not null default true
 );
@@ -54,6 +57,9 @@ create table if not exists public.wesley_chores (
   chore_title            text not null,
   emoji                  text,
   chore_date             date not null,
+  category               text not null default 'allowance'
+                           check (category in ('allowance', 'pay_per_chore')),
+  reward_cents           int not null default 0,
   sort_order             int not null default 0,
   completed              boolean not null default false,
   completed_at           timestamptz,

@@ -165,14 +165,27 @@ export async function addBacklogItem(input: {
 
 // ───────────────────────────── Chores ─────────────────────────────
 export async function ensureChoresForDate(date: string) {
-  const templates = unwrap<{ chore_title: string; emoji: string | null; days_of_week: number[]; sort_order: number }[]>(
-    await db().from('wesley_chore_templates').select('*').eq('active', true),
-    'chore templates',
-  );
+  const templates = unwrap<
+    {
+      chore_title: string;
+      emoji: string | null;
+      days_of_week: number[];
+      category?: 'allowance' | 'pay_per_chore';
+      reward_cents?: number;
+      sort_order: number;
+    }[]
+  >(await db().from('wesley_chore_templates').select('*').eq('active', true), 'chore templates');
   const dow = dowOf(date);
   const rows = templates
     .filter((t) => t.days_of_week.includes(dow))
-    .map((t) => ({ chore_title: t.chore_title, emoji: t.emoji, sort_order: t.sort_order, chore_date: date }));
+    .map((t) => ({
+      chore_title: t.chore_title,
+      emoji: t.emoji,
+      category: t.category ?? 'allowance',
+      reward_cents: t.reward_cents ?? 0,
+      sort_order: t.sort_order,
+      chore_date: date,
+    }));
   if (rows.length) {
     unwrap(
       await db().from('wesley_chores').upsert(rows, { onConflict: 'chore_date,chore_title', ignoreDuplicates: true }),

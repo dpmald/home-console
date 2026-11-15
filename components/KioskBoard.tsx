@@ -6,6 +6,7 @@ import { daysBetween, fmtDay, fmtShortDate, fmtTime, isAllDay } from '@/lib/time
 import {
   isFullyKiosk,
   launchGeminiOnCozyla,
+  launchGreenlightOnCozyla,
   speakOnCozyla,
   useCozylaKiosk,
   wakeCozylaScreen,
@@ -499,8 +500,16 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const d = state.dinner;
   const doneChores = state.chores.filter((c) => c.completed).length;
   const chorePct = state.chores.length > 0 ? Math.round((doneChores / state.chores.length) * 100) : 0;
-  const allowanceEarned = (doneChores * 5).toFixed(2);
-  const allowanceTotal = (state.chores.length * 5).toFixed(2);
+  const allowanceChores = state.chores.filter((c) => (c.reward_cents ?? 0) === 0);
+  const allowanceDone = allowanceChores.filter((c) => c.completed).length;
+  const bonusEarnedCents = state.chores
+    .filter((c) => c.completed && (c.reward_cents ?? 0) > 0)
+    .reduce((sum, c) => sum + (c.reward_cents ?? 0), 0);
+  const bonusTotalCents = state.chores
+    .filter((c) => (c.reward_cents ?? 0) > 0)
+    .reduce((sum, c) => sum + (c.reward_cents ?? 0), 0);
+  const allowanceEarned = (bonusEarnedCents / 100).toFixed(2);
+  const allowanceTotal = (bonusTotalCents / 100).toFixed(2);
   const pendingOrders = state.orders.filter((o) => o.status === 'pending');
   const nextUnassigned = state.events.find(
     (e) => (e.logistics_type === 'pickup' || e.logistics_type === 'appointment') && e.assigned_parent === 'unassigned',
@@ -1641,8 +1650,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         </span>
                       </div>
                     </div>
-                    <span
+                    <button
+                      type="button"
                       className="ceramic-well font-mono"
+                      onClick={() => launchGreenlightOnCozyla()}
+                      title="Open Greenlight App"
                       style={{
                         padding: '4px 11px',
                         borderRadius: 999,
@@ -1651,16 +1663,17 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 5,
+                        cursor: 'pointer',
                       }}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--cobalt)' }}>
                         credit_card
                       </span>
                       Greenlight
-                    </span>
+                    </button>
                   </div>
 
-                  {/* Weekly Allowance Progress Card */}
+                  {/* Weekly Allowance & Pay-per-chore Progress Card */}
                   <div
                     className="ceramic-well"
                     style={{ margin: '10px 0', padding: '12px 14px', borderRadius: 18 }}
@@ -1683,12 +1696,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--amber)' }}>
                             account_balance_wallet
                           </span>
-                          Today&apos;s Allowance Progress
+                          Allowance ({allowanceDone}/{allowanceChores.length}) • Pay Per Chore
                         </span>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
-                          <span style={{ fontSize: '1.75rem', fontWeight: 800 }}>${allowanceEarned}</span>
+                          <span style={{ fontSize: '1.75rem', fontWeight: 800 }}>+${allowanceEarned}</span>
                           <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--muted)' }}>
-                            of ${allowanceTotal} Today
+                            of ${allowanceTotal} Bonus Today
                           </span>
                         </div>
                       </div>
@@ -1809,13 +1822,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             padding: '2px 8px',
                             borderRadius: 6,
-                            background: c.completed ? '#edf7f2' : '#f4f7ff',
-                            color: c.completed ? 'var(--emerald)' : 'var(--cobalt)',
+                            background: c.completed ? '#edf7f2' : (c.reward_cents ?? 0) > 0 ? '#ecfdf5' : '#f4f7ff',
+                            color: c.completed ? 'var(--emerald)' : (c.reward_cents ?? 0) > 0 ? '#047857' : 'var(--cobalt)',
                             fontSize: '0.72rem',
                             fontWeight: 700,
                           }}
                         >
-                          +$5.00
+                          {(c.reward_cents ?? 0) > 0
+                            ? `+$${((c.reward_cents ?? 0) / 100).toFixed(2)}`
+                            : 'Allowance'}
                         </span>
                       </div>
                     ))}

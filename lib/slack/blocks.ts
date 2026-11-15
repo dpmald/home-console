@@ -197,12 +197,32 @@ export function cartBlocks(p: CartProposal): Block[] {
 
 // ──────────────────────────── Greenlight ────────────────────────────
 export function greenlightBlocks(g: GreenlightSummary): Block[] {
+  const allChores = g.days.flatMap((d) => d.chores);
+  const allowanceChores = allChores.filter((c) => (c.reward_cents ?? 0) === 0);
+  const allowanceDone = allowanceChores.filter((c) => c.completed).length;
+  const bonusCents = allChores
+    .filter((c) => c.completed && (c.reward_cents ?? 0) > 0)
+    .reduce((sum, c) => sum + (c.reward_cents ?? 0), 0);
+  const bonusTotalCents = allChores
+    .filter((c) => (c.reward_cents ?? 0) > 0)
+    .reduce((sum, c) => sum + (c.reward_cents ?? 0), 0);
+
   const blocks: Block[] = [
     header(`💰 Wesley's chores — ${fmtShortDate(g.start)} to ${fmtShortDate(g.end)}`),
-    md(`*${g.done}/${g.total}* chores checked off on the kitchen board this week.`),
+    md(
+      `*Allowance:* ${allowanceDone}/${allowanceChores.length} done   ·   *Pay per chore:* $${(bonusCents / 100).toFixed(2)} of $${(
+        bonusTotalCents / 100
+      ).toFixed(2)} earned`,
+    ),
   ];
   const lines = g.days.map(
-    (d) => `*${fmtShortDate(d.date)}*  ${d.chores.map((c) => `${c.completed ? '✅' : '⬜'} ${esc(c.chore_title)}`).join('   ')}`,
+    (d) =>
+      `*${fmtShortDate(d.date)}*  ${d.chores
+        .map((c) => {
+          const tag = (c.reward_cents ?? 0) > 0 ? ` ($${((c.reward_cents ?? 0) / 100).toFixed(2)})` : '';
+          return `${c.completed ? '✅' : '⬜'} ${esc(c.chore_title)}${tag}`;
+        })
+        .join('   ')}`,
   );
   if (lines.length) blocks.push(md(lines.join('\n')));
   blocks.push(ctx('Check these off in the Greenlight app before the allowance payout, then tap below.'));
