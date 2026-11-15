@@ -14,7 +14,6 @@ import {
 import type { BacklogLocation, KioskAction, KitchenState } from '@/lib/types';
 import type { Weather } from '@/lib/weather';
 import type { SpotifyNowPlaying } from '@/lib/spotify';
-import { VoiceOrb } from './VoiceOrb';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Timer {
@@ -204,7 +203,7 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
 export function KioskBoard({ initial, initialWeather }: { initial: KitchenState; initialWeather: Weather | null }) {
   const [state, setState] = useState<KitchenState>(initial);
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
-  const [mode, setMode] = useState<ViewMode>('bento');
+  const [mode, setMode] = useState<ViewMode>('ambient');
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
   const [now, setNow] = useState<Date>(() => new Date());
   const [timers, setTimers] = useState<Timer[]>([]);
@@ -232,6 +231,29 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     setGeminiOpen(true);
   }, []);
 
+  const applyVoiceCommandIfTimer = useCallback((text: string) => {
+    const lower = text.toLowerCase();
+    if (/\b(cancel|clear|stop|delete)\b.*\btimer/.test(lower)) {
+      setTimers([]);
+      return true;
+    }
+    const m = lower.match(/(\d+)\s*(?:-\s*)?(minute|minutes|min|mins|second|seconds|sec|secs)\b(?:\s+([a-z0-9 ]+?))?\s*(?:timer)?/);
+    if (lower.includes('timer') && m) {
+      const n = parseInt(m[1], 10);
+      const unit = m[2].startsWith('sec') ? 1 : 60;
+      const secs = Math.max(1, n * unit);
+      const rawLabel = m[3]?.replace(/\b(for|timer|a|the)\b/g, '').trim();
+      const label = rawLabel
+        ? `${rawLabel.charAt(0).toUpperCase()}${rawLabel.slice(1)} Timer`
+        : `${n} ${unit === 60 ? 'Min' : 'Sec'} Timer`;
+      const id = `${Date.now()}`;
+      firedTimers.current.delete(id);
+      setTimers([{ id, label, initialSecs: secs, endsAt: Date.now() + secs * 1000 }]);
+      return true;
+    }
+    return false;
+  }, []);
+
   const startGeminiDictation = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
@@ -247,6 +269,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
         const transcript = ev.results?.[0]?.[0]?.transcript;
         if (transcript) {
           setGeminiCustomQuery(transcript);
+          applyVoiceCommandIfTimer(transcript);
           setGeminiStampedAt(
             new Date().toLocaleTimeString('en-US', {
               hour: '2-digit',
@@ -263,7 +286,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     } catch {
       setGeminiListening(false);
     }
-  }, []);
+  }, [applyVoiceCommandIfTimer]);
 
   const refresh = useCallback(async () => {
     try {
@@ -592,14 +615,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
               </span>
               <span>Gemini Voice</span>
             </button>
-
-            <VoiceOrb
-              onStartTimer={startTimer}
-              onCancelTimers={() => setTimers([])}
-              onPlayNpr={playNpr}
-              onStopNpr={stopNpr}
-              onServerToolDone={refresh}
-            />
           </div>
         </header>
 
@@ -1027,113 +1042,115 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 </div>
               </div>
 
-              {/* Card 2: Physical Rotary Kitchen Timer Widget (From Stitch Screen 1) */}
-              <div
-                className="ceramic-card"
-                style={{
-                  padding: '20px 24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 18,
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span
-                      style={{
-                        width: 9,
-                        height: 9,
-                        borderRadius: '50%',
-                        background: timerRunning ? 'var(--terracotta)' : 'var(--muted)',
-                      }}
-                    />
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
-                    >
-                      TIMER 01 // {timerRunning ? 'ACTIVE' : 'STANDBY'}
-                    </span>
-                  </div>
-                  <div style={{ margin: '6px 0 12px' }}>
-                    <div style={{ fontSize: '1.18rem', fontWeight: 800 }}>
-                      {activeTimer?.label || 'Kitchen Simmer Timer'}
-                    </div>
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                      Tap PAUSE / RESUME or +1 MIN • Voice: &ldquo;Set a 10m timer&rdquo;
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="hw-btn terracotta" onClick={toggleActiveTimer}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                        {timerRunning ? 'pause' : 'play_arrow'}
-                      </span>
-                      <span>{timerRunning ? 'PAUSE' : 'START'}</span>
-                    </button>
-                    <button className="hw-btn" onClick={bumpTimerMinute}>
-                      +1 MIN
-                    </button>
-                    <button className="hw-btn" onClick={() => startTimer(300, '5 Min Timer')}>
-                      5M
-                    </button>
-                    <button className="hw-btn" onClick={resetActiveTimer}>
-                      RESET
-                    </button>
-                  </div>
-                </div>
-
-                {/* Circular SVG Rotary Gauge Dial */}
+              {/* Card 2: Physical Rotary Kitchen Timer Widget (Conditional on an active voice-triggered timer) */}
+              {activeTimer && (
                 <div
+                  className="ceramic-card"
                   style={{
-                    position: 'relative',
-                    width: 132,
-                    height: 132,
-                    borderRadius: '50%',
-                    background: 'var(--surface-tint)',
-                    border: '1px solid var(--border)',
-                    boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    flexShrink: 0,
+                    padding: '20px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 18,
                   }}
                 >
-                  <svg style={{ width: 118, height: 118, transform: 'rotate(-90deg)' }} viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="41" fill="none" stroke="var(--border)" strokeWidth="7" />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="41"
-                      fill="none"
-                      stroke="var(--terracotta)"
-                      strokeWidth="7"
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={timerDashOffset}
-                      style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-                    />
-                  </svg>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
+                        style={{
+                          width: 9,
+                          height: 9,
+                          borderRadius: '50%',
+                          background: timerRunning ? 'var(--terracotta)' : 'var(--muted)',
+                        }}
+                      />
+                      <span
+                        className="font-mono"
+                        style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
+                      >
+                        TIMER 01 // {timerRunning ? 'ACTIVE' : 'PAUSED'}
+                      </span>
+                    </div>
+                    <div style={{ margin: '6px 0 12px' }}>
+                      <div style={{ fontSize: '1.18rem', fontWeight: 800 }}>
+                        {activeTimer.label}
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                        Triggered by voice • Tap PAUSE / +1 MIN or CLEAR
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="hw-btn terracotta" onClick={toggleActiveTimer}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                          {timerRunning ? 'pause' : 'play_arrow'}
+                        </span>
+                        <span>{timerRunning ? 'PAUSE' : 'RESUME'}</span>
+                      </button>
+                      <button className="hw-btn" onClick={bumpTimerMinute}>
+                        +1 MIN
+                      </button>
+                      <button className="hw-btn" onClick={resetActiveTimer}>
+                        RESET
+                      </button>
+                      <button className="hw-btn" onClick={() => setTimers([])}>
+                        CLEAR
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Circular SVG Rotary Gauge Dial */}
                   <div
                     style={{
-                      position: 'absolute',
-                      inset: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      position: 'relative',
+                      width: 132,
+                      height: 132,
+                      borderRadius: '50%',
+                      background: 'var(--surface-tint)',
+                      border: '1px solid var(--border)',
+                      boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      flexShrink: 0,
                     }}
                   >
-                    <span style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
-                      {timerMM}:{timerSS}
-                    </span>
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.1em' }}
+                    <svg style={{ width: 118, height: 118, transform: 'rotate(-90deg)' }} viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="41" fill="none" stroke="var(--border)" strokeWidth="7" />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="41"
+                        fill="none"
+                        stroke="var(--terracotta)"
+                        strokeWidth="7"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={timerDashOffset}
+                        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                      />
+                    </svg>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
                     >
-                      REMAINING
-                    </span>
+                      <span style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
+                        {timerMM}:{timerSS}
+                      </span>
+                      <span
+                        className="font-mono"
+                        style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.1em' }}
+                      >
+                        REMAINING
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -2209,6 +2226,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
                 onSubmit={(e) => {
                   e.preventDefault();
+                  if (geminiCustomQuery && applyVoiceCommandIfTimer(geminiCustomQuery)) {
+                    setGeminiOpen(false);
+                    return;
+                  }
                   launchGeminiOnCozyla(geminiCustomQuery || undefined);
                 }}
               >
