@@ -37,6 +37,7 @@ create table if not exists public.dinner_schedule (
   claimed_via       text,
   updated_at        timestamptz not null default now()
 );
+create index if not exists dinner_schedule_linked_backlog_idx on public.dinner_schedule (linked_backlog_id);
 
 -- ── Wesley's chores ──────────────────────────────────────────────────
 create table if not exists public.wesley_chore_templates (
@@ -145,16 +146,11 @@ begin
   return null;
 end;
 $$;
+revoke execute on function public.broadcast_kitchen_change() from public, anon, authenticated;
 
-do $$
-declare t text;
-begin
-  foreach t in array array['fridge_backlog','dinner_schedule','wesley_chores',
-                           'family_logistics','grocery_items','cart_proposals']
-  loop
-    execute format('drop trigger if exists kitchen_broadcast on public.%I', t);
-    execute format(
-      'create trigger kitchen_broadcast after insert or update or delete on public.%I
-         for each statement execute function public.broadcast_kitchen_change()', t);
-  end loop;
-end $$;
+create or replace trigger kitchen_broadcast after insert or update or delete on public.fridge_backlog for each statement execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.dinner_schedule for each statement execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.wesley_chores for each statement execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.family_logistics for each statement execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.grocery_items for each statement execute function public.broadcast_kitchen_change();
+create or replace trigger kitchen_broadcast after insert or update or delete on public.cart_proposals for each statement execute function public.broadcast_kitchen_change();
