@@ -534,632 +534,492 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
       <div className="hearth-glow-bottom" />
 
       <main className="hearth-shell">
-        {/* ── 1. Top Navigation & Family Presence Bar (Shown in Bento & Timeline Modes; slim in Ambient) ── */}
-        <header className="hearth-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button
-              className={`hw-btn ${mode === 'ambient' ? 'terracotta' : ''}`}
-              onClick={() => setMode(mode === 'ambient' ? 'bento' : 'ambient')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>
-                {mode === 'ambient' ? 'grid_view' : 'arrow_back'}
-              </span>
-              <span>{mode === 'ambient' ? 'OPEN COMMAND BENTO' : 'RETURN TO AMBIENT'}</span>
-            </button>
+        {/* ── 1. Top Navigation & Family Presence Bar (Shown in Bento & Timeline Modes; hidden in Ambient for clean Stitch layout) ── */}
+        {mode !== 'ambient' && (
+          <header className="hearth-topbar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                className="hw-btn"
+                onClick={() => setMode('ambient')}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 17 }}>
+                  arrow_back
+                </span>
+                <span>RETURN TO AMBIENT</span>
+              </button>
 
-            <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
+              <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
 
-            <button
-              className="hw-btn"
-              onClick={() => setMode(mode === 'timeline' ? 'bento' : 'timeline')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--emerald)' }}>
-                {mode === 'timeline' ? 'close_fullscreen' : 'grid_view'}
-              </span>
-              <span>{mode === 'timeline' ? 'TIMELINE EXPANDED' : 'BENTO OVERVIEW'}</span>
-            </button>
-          </div>
-
-          {/* Center Glance Clock + Weather */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontSize: '2.55rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {clockDigits}
-              </span>
-              <span className="font-mono" style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--muted)' }}>
-                {clockAmPm}
-              </span>
+              <button
+                className="hw-btn"
+                onClick={() => setMode(mode === 'timeline' ? 'bento' : 'timeline')}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--emerald)' }}>
+                  {mode === 'timeline' ? 'close_fullscreen' : 'grid_view'}
+                </span>
+                <span>{mode === 'timeline' ? 'TIMELINE EXPANDED' : 'BENTO OVERVIEW'}</span>
+              </button>
             </div>
-            <div style={{ textAlign: 'right', lineHeight: 1.25 }}>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>{fmtDay(state.date)}</div>
-              <div className="font-mono" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>
-                {weather
-                  ? `OUTDOOR ${weather.current.temp}°F (${weather.current.label.toUpperCase()}) • H ${weather.today.hi}° L ${weather.today.lo}°`
-                  : 'KITCHEN HEARTH • ONLINE'}
+
+            {/* Center Glance Clock + Weather */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: '2.55rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                  {clockDigits}
+                </span>
+                <span className="font-mono" style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--muted)' }}>
+                  {clockAmPm}
+                </span>
+              </div>
+              <div style={{ textAlign: 'right', lineHeight: 1.25 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>{fmtDay(state.date)}</div>
+                <div className="font-mono" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>
+                  {weather
+                    ? `OUTDOOR ${weather.current.temp}°F (${weather.current.label.toUpperCase()}) • H ${weather.today.hi}° L ${weather.today.lo}°`
+                    : 'KITCHEN HEARTH • ONLINE'}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Family Presence Pods + Voice */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div className="presence-pod">
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--terracotta)' }} />
-              <span>
-                <strong style={{ color: 'var(--text)' }}>Daniela:</strong>{' '}
-                {d.chef === 'daniela' ? 'Chef Tonight' : d.unavailable.includes('daniela') ? 'Out Tonight' : 'Home'}
-              </span>
-            </div>
-            <div className="presence-pod">
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cobalt)' }} />
-              <span>
-                <strong style={{ color: 'var(--text)' }}>Wesley:</strong> {doneChores}/{state.chores.length} Done
-              </span>
-            </div>
-            <div className="presence-pod">
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: state.lateTonight.length ? 'var(--amber)' : 'var(--sage)',
-                }}
-              />
-              <span>
-                <strong style={{ color: 'var(--text)' }}>Warren:</strong>{' '}
-                {d.chef === 'warren'
-                  ? 'Chef Tonight'
-                  : state.lateTonight[0]
-                    ? `Late until ${fmtTime(state.lateTonight[0].until)}`
-                    : 'Home'}
-              </span>
-            </div>
+            {/* Right Family Presence Pods + Voice */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div className="presence-pod">
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--terracotta)' }} />
+                <span>
+                  <strong style={{ color: 'var(--text)' }}>Daniela:</strong>{' '}
+                  {d.chef === 'daniela' ? 'Chef Tonight' : d.unavailable.includes('daniela') ? 'Out Tonight' : 'Home'}
+                </span>
+              </div>
+              <div className="presence-pod">
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cobalt)' }} />
+                <span>
+                  <strong style={{ color: 'var(--text)' }}>Wesley:</strong> {doneChores}/{state.chores.length} Done
+                </span>
+              </div>
+              <div className="presence-pod">
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: state.lateTonight.length ? 'var(--amber)' : 'var(--sage)',
+                  }}
+                />
+                <span>
+                  <strong style={{ color: 'var(--text)' }}>Warren:</strong>{' '}
+                  {d.chef === 'warren'
+                    ? 'Chef Tonight'
+                    : state.lateTonight[0]
+                      ? `Late until ${fmtTime(state.lateTonight[0].until)}`
+                      : 'Home'}
+                </span>
+              </div>
 
-            <button
-              className="gemini-spark-btn"
-              onClick={() => openGeminiOverlay()}
-              title="Engage Gemini Voice Overlay"
-            >
-              <span className="gemini-badge-square" style={{ width: 26, height: 26, borderRadius: 8 }}>
-                <GeminiSparkIcon size={15} white />
-              </span>
-              <span>Gemini Voice</span>
-            </button>
-          </div>
-        </header>
+              <button
+                className="gemini-spark-btn"
+                onClick={() => openGeminiOverlay()}
+                title="Engage Gemini Voice Overlay"
+              >
+                <span className="gemini-badge-square" style={{ width: 26, height: 26, borderRadius: 8 }}>
+                  <GeminiSparkIcon size={15} white />
+                </span>
+                <span>Gemini Voice</span>
+              </button>
+            </div>
+          </header>
+        )}
 
         {/* ════════════════════════════════════════════════════════════════════
-            VIEW 1: 10-FOOT AMBIENT STANDBY HEARTH VIEW (Stitch Screen 1 & 2)
+            VIEW 1: CLEAN 10-FOOT AMBIENT STANDBY HEARTH VIEW (Matches Stitch Ambient Design)
             ════════════════════════════════════════════════════════════════════ */}
         {mode === 'ambient' && (
           <div
             style={{
               flex: 1,
               minHeight: 0,
-              display: 'grid',
-              gridTemplateColumns: '7fr 5fr',
-              gap: 20,
-              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-end',
+              paddingBottom: 8,
             }}
           >
-            {/* Left Primary Glanceable Column: Giant 116px Hero Clock + Next Logistics Callout + Presence */}
             <div
-              className="ceramic-card"
               style={{
-                padding: '26px 32px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden',
+                display: 'grid',
+                gridTemplateColumns: '55fr 45fr',
+                gap: 24,
+                minHeight: 430,
+                maxHeight: 500,
+                height: '62vh',
               }}
             >
+              {/* Left Primary Glanceable Card: Clean Giant Clock + Date + Outdoor Temp */}
               <div
-                className="font-mono"
+                className="ceramic-card"
                 style={{
+                  padding: '44px 48px',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '0.75rem',
-                  color: 'var(--muted)',
-                  paddingBottom: 12,
-                  borderBottom: '1px solid var(--border-subtle)',
-                  fontWeight: 600,
-                  letterSpacing: '0.08em',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  background:
+                    'radial-gradient(circle at 86% 16%, rgba(217, 78, 52, 0.085), transparent 54%), var(--surface)',
                 }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--terracotta)' }} />
-                  HEARTH // COZYLA 24&quot; AMBIENT DISPLAY
-                </span>
-                <span>SLACK + SUPABASE REALTIME SYNC</span>
-              </div>
-
-              {/* Giant 10-Foot Glanceable Clock */}
-              <div style={{ margin: 'auto 0', padding: '12px 0' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-                  <span
-                    style={{
-                      fontSize: 'clamp(76px, 7.6vw, 118px)',
-                      fontWeight: 800,
-                      letterSpacing: '-0.04em',
-                      lineHeight: 0.95,
-                    }}
-                  >
-                    {clockDigits}
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ marginTop: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
                     <span
-                      className="font-mono"
-                      style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
-                    >
-                      {clockAmPm}
-                    </span>
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.1em' }}
-                    >
-                      LOCAL • HOME
-                    </span>
-                  </div>
-                </div>
-
-                {/* Date & Weather Glances */}
-                <div
-                  style={{
-                    marginTop: 18,
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: 14,
-                    fontSize: '1.2rem',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>{fmtDay(state.date)}</span>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span className="material-symbols-outlined" style={{ color: 'var(--amber)', fontSize: 22 }}>
-                      sunny
-                    </span>
-                    {weather ? `Outdoor ${weather.current.temp}°F (${weather.current.label})` : 'Weather Ready'}
-                  </span>
-                  {weather && (
-                    <>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '1.02rem' }}>
-                        Tomorrow {weather.tomorrow.hi}°/{weather.tomorrow.lo}° {weather.tomorrow.label}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Clickable Next Schedule / Pickup Banner */}
-                <div
-                  onClick={() => setMode('timeline')}
-                  className="ceramic-well"
-                  style={{
-                    marginTop: 22,
-                    padding: '14px 18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div
                       style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 12,
-                        background: 'rgba(43, 89, 255, 0.1)',
-                        border: '1px solid rgba(43, 89, 255, 0.25)',
-                        color: 'var(--cobalt)',
-                        display: 'grid',
-                        placeItems: 'center',
+                        fontSize: 'clamp(96px, 9.2vw, 138px)',
+                        fontWeight: 800,
+                        letterSpacing: '-0.045em',
+                        lineHeight: 0.9,
                       }}
                     >
-                      <span className="material-symbols-outlined">calendar_clock</span>
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span
-                          className="font-mono"
-                          style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--cobalt)', letterSpacing: '0.06em' }}
-                        >
-                          SCHEDULE &amp; LOGISTICS
-                        </span>
-                        {nextUnassigned && (
-                          <span
-                            className="font-mono"
-                            style={{
-                              fontSize: '0.66rem',
-                              fontWeight: 700,
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              background: '#fef3c7',
-                              color: '#b45309',
-                            }}
-                          >
-                            DRIVER NEEDED
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 700, marginTop: 2 }}>
-                        {nextUnassigned
-                          ? `${fmtTime(nextUnassigned.start_time)} • ${nextUnassigned.title}`
-                          : state.events[0]
-                            ? `${fmtTime(state.events[0].start_time)} • ${state.events[0].title}`
-                            : 'No events scheduled today'}
-                      </div>
+                      {clockDigits}
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: '1.6rem',
+                          fontWeight: 700,
+                          color: 'var(--terracotta)',
+                          letterSpacing: '0.04em',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {clockAmPm}
+                      </span>
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          color: 'var(--muted)',
+                          letterSpacing: '0.08em',
+                        }}
+                      >
+                        EST • HOME
+                      </span>
                     </div>
                   </div>
+
+                  {/* Clean Single-Line Date & Weather Glance */}
                   <div
-                    className="font-mono"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', fontWeight: 700, color: 'var(--cobalt)' }}
+                    style={{
+                      marginTop: 22,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 14,
+                      fontSize: '1.25rem',
+                      fontWeight: 600,
+                    }}
                   >
-                    <span>View Family Schedule</span>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      arrow_forward
+                    <span>{fmtDay(state.date)}</span>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <span className="material-symbols-outlined" style={{ color: 'var(--amber)', fontSize: 22 }}>
+                        sunny
+                      </span>
+                      <span>
+                        {weather ? `Outdoor ${weather.current.temp}°F` : 'Outdoor —°F'}
+                      </span>
                     </span>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
                   </div>
                 </div>
+              </div>
 
-                {/* Stitch "Gemini Voice" Ambient Spark Bar — Opens the Stitch Gemini Voice Overlay */}
+              {/* Right Stack: [MENU // TONIGHT] Card + Conditional Rotary Timer Card */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minHeight: 0 }}>
+                {/* Card 1: [MENU // TONIGHT] */}
                 <div
-                  onClick={() => openGeminiOverlay()}
-                  className="ceramic-well"
+                  className="ceramic-card"
                   style={{
-                    marginTop: 14,
-                    padding: '13px 18px',
+                    padding: '24px 28px',
+                    flex: activeTimer ? '0 0 auto' : 1,
                     display: 'flex',
-                    alignItems: 'center',
+                    flexDirection: 'column',
                     justifyContent: 'space-between',
-                    gap: 14,
-                    cursor: 'pointer',
-                    background: 'linear-gradient(135deg, var(--surface) 0%, var(--surface-well) 100%)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 13, minWidth: 0 }}>
-                    <div className="gemini-badge-square" style={{ width: 40, height: 40, borderRadius: 12 }}>
-                      <GeminiSparkIcon size={21} white />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: '1.02rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
-                          Gemini Voice
+                  <div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: 'var(--terracotta)',
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          [MENU // TONIGHT]
                         </span>
                         <span
                           className="font-mono"
                           style={{
-                            fontSize: '0.66rem',
+                            fontSize: '0.68rem',
                             fontWeight: 700,
+                            padding: '3px 10px',
+                            borderRadius: 6,
+                            background: '#fdeee9',
                             color: 'var(--terracotta)',
-                            letterSpacing: '0.06em',
+                            letterSpacing: '0.04em',
                           }}
                         >
-                          ON-BOARD ASSISTANT
+                          {d.status === 'unclaimed'
+                            ? 'UNCLAIMED'
+                            : d.chef === 'takeout'
+                              ? 'TAKEOUT'
+                              : isParent(d.chef)
+                                ? `${NAMES[d.chef].toUpperCase()} LEAD`
+                                : 'PLANNED'}
                         </span>
                       </div>
-                      <div
-                        style={{
-                          fontSize: '0.84rem',
-                          color: 'var(--text-secondary)',
-                          marginTop: 2,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {geminiCustomQuery
-                          ? `“${geminiCustomQuery}”`
-                          : 'Tap to ask Gemini by voice or launch the on-board Gemini app'}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <GeminiEqualizerPill active={geminiListening} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Lower Presence & Audio Status Shelf */}
-              <div
-                style={{
-                  paddingTop: 14,
-                  borderTop: '1px solid var(--border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                    At Hearth:
-                  </span>
-                  <span className="presence-pod">
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--sage)' }} />
-                    <strong style={{ color: 'var(--text)' }}>Daniela</strong>
-                    <span>{d.chef === 'daniela' ? 'Chef' : 'Home'}</span>
-                  </span>
-                  <span className="presence-pod">
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cobalt)' }} />
-                    <strong style={{ color: 'var(--text)' }}>Wesley</strong>
-                    <span style={{ color: 'var(--cobalt)' }}>Chores {doneChores}/{state.chores.length}</span>
-                  </span>
-                  <span className="presence-pod">
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)' }} />
-                    <strong style={{ color: 'var(--text)' }}>Warren</strong>
-                    <span>{d.chef === 'warren' ? 'Chef' : 'Synced'}</span>
-                  </span>
-                </div>
-
-                <button
-                  className="hw-btn pill"
-                  onClick={nprPlaying ? stopNpr : playNpr}
-                  style={{ fontSize: '0.72rem' }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
-                    graphic_eq
-                  </span>
-                  <span>{audioStatusLabel}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Right Bento Stack: Tonight's Dinner Decision Card + Physical Rotary Timer Widget */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0 }}>
-              {/* Card 1: Tonight's Dinner Decision Hub (Matches Stitch Screen 1 & 2) */}
-              <div
-                className="ceramic-card"
-                style={{
-                  padding: '22px 24px',
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minHeight: 0,
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span
-                        className="font-mono"
-                        style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
-                      >
-                        {d.status === 'unclaimed' ? '[ DINNER // ACTION NEEDED ]' : '[ MENU // TONIGHT ]'}
-                      </span>
                       <span
                         className="font-mono"
                         style={{
                           fontSize: '0.7rem',
-                          fontWeight: 700,
-                          padding: '2px 10px',
-                          borderRadius: 999,
-                          background: d.status === 'unclaimed' ? '#fef3c7' : '#fdeee9',
-                          color: d.status === 'unclaimed' ? '#b45309' : 'var(--terracotta)',
+                          fontWeight: 600,
+                          color: 'var(--muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
                         }}
                       >
-                        {d.status === 'unclaimed'
-                          ? 'NEEDS COOK CLAIM'
-                          : d.chef === 'takeout'
-                            ? 'TAKEOUT / FEND'
-                            : isParent(d.chef)
-                              ? `${NAMES[d.chef].toUpperCase()} LEAD`
-                              : 'PLANNED'}
-                      </span>
-                    </div>
-                    {d.status !== 'unclaimed' && (
-                      <button className="hw-btn" style={{ padding: '4px 10px', fontSize: '0.68rem' }} onClick={() => act({ type: 'unclaim_dinner' })}>
-                        RESET
-                      </button>
-                    )}
-                  </div>
-
-                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-                    {d.status === 'unclaimed'
-                      ? "Tonight's Dinner Decision"
-                      : d.recipe_name || `${isParent(d.chef) ? NAMES[d.chef] : 'Family'} is cooking tonight`}
-                  </h2>
-                  <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                    {d.status === 'unclaimed'
-                      ? `No cook selected yet. ${state.backlog.length} fridge backlog kits ready to cook.`
-                      : d.unavailable.length
-                        ? `Not cooking tonight: ${d.unavailable.map((p) => NAMES[p]).join(', ')}`
-                        : 'Synced with Slack #food and the kitchen board.'}
-                  </p>
-
-                  {/* Quick Meal Kit Options from Fridge Backlog */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 12 }}>
-                    {state.backlog.slice(0, 2).map((b) => (
-                      <div
-                        key={b.id}
-                        className="ceramic-well"
-                        style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sage)' }}>
-                            eco
-                          </span>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {b.recipe_or_item_name}
-                            </div>
-                            <div className="font-mono" style={{ fontSize: '0.66rem', color: 'var(--muted)' }}>
-                              {b.key_perishables.join(' • ') || 'In fridge backlog'}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          className="hw-btn emerald"
-                          style={{ padding: '5px 10px', fontSize: '0.68rem' }}
-                          onClick={() => act({ type: 'cook_from_backlog', backlogId: b.id })}
-                        >
-                          SELECT
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 2x2 Chef Assignment Hardware Buttons */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-                  <button
-                    className={`hw-btn ${d.chef === 'daniela' ? 'terracotta' : ''}`}
-                    onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      skillet
-                    </span>
-                    <span>Daniela cooks</span>
-                  </button>
-                  <button
-                    className={`hw-btn ${d.chef === 'warren' ? 'terracotta' : ''}`}
-                    onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      soup_kitchen
-                    </span>
-                    <span>Warren cooks</span>
-                  </button>
-                  <button
-                    className={`hw-btn ${d.chef === 'takeout' ? 'terracotta' : ''}`}
-                    onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      takeout_dining
-                    </span>
-                    <span>Takeout / Order In</span>
-                  </button>
-                  <button
-                    className="hw-btn"
-                    onClick={() =>
-                      d.status === 'planned'
-                        ? act({ type: 'dinner_cooked' })
-                        : act({ type: 'not_tonight', parent: 'daniela', unavailable: !d.unavailable.includes('daniela') })
-                    }
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      {d.status === 'planned' ? 'check_circle' : 'block'}
-                    </span>
-                    <span>{d.status === 'planned' ? 'Mark Cooked ✓' : 'Daniela: Not Tonight'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Card 2: Physical Rotary Kitchen Timer Widget (Conditional on an active voice-triggered timer) */}
-              {activeTimer && (
-                <div
-                  className="ceramic-card"
-                  style={{
-                    padding: '20px 24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 18,
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span
-                        style={{
-                          width: 9,
-                          height: 9,
-                          borderRadius: '50%',
-                          background: timerRunning ? 'var(--terracotta)' : 'var(--muted)',
-                        }}
-                      />
-                      <span
-                        className="font-mono"
-                        style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
-                      >
-                        TIMER 01 // {timerRunning ? 'ACTIVE' : 'PAUSED'}
-                      </span>
-                    </div>
-                    <div style={{ margin: '6px 0 12px' }}>
-                      <div style={{ fontSize: '1.18rem', fontWeight: 800 }}>
-                        {activeTimer.label}
-                      </div>
-                      <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                        Triggered by voice • Tap PAUSE / +1 MIN or CLEAR
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <button className="hw-btn terracotta" onClick={toggleActiveTimer}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                          {timerRunning ? 'pause' : 'play_arrow'}
+                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
+                          skillet
                         </span>
-                        <span>{timerRunning ? 'PAUSE' : 'RESUME'}</span>
-                      </button>
-                      <button className="hw-btn" onClick={bumpTimerMinute}>
-                        +1 MIN
-                      </button>
-                      <button className="hw-btn" onClick={resetActiveTimer}>
-                        RESET
-                      </button>
-                      <button className="hw-btn" onClick={() => setTimers([])}>
-                        CLEAR
-                      </button>
+                        6:30 PM PREP
+                      </span>
                     </div>
-                  </div>
 
-                  {/* Circular SVG Rotary Gauge Dial */}
-                  <div
-                    style={{
-                      position: 'relative',
-                      width: 132,
-                      height: 132,
-                      borderRadius: '50%',
-                      background: 'var(--surface-tint)',
-                      border: '1px solid var(--border)',
-                      boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <svg style={{ width: 118, height: 118, transform: 'rotate(-90deg)' }} viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="41" fill="none" stroke="var(--border)" strokeWidth="7" />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="41"
-                        fill="none"
-                        stroke="var(--terracotta)"
-                        strokeWidth="7"
-                        strokeLinecap="round"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={timerDashOffset}
-                        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-                      />
-                    </svg>
-                    <div
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+                      {d.status === 'unclaimed'
+                        ? "Tonight's Dinner Unclaimed"
+                        : d.recipe_name || `${isParent(d.chef) ? NAMES[d.chef] : 'Family'}'s Dinner`}
+                    </h2>
+
+                    <p
                       style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        fontSize: '0.88rem',
+                        color: 'var(--text-secondary)',
+                        marginTop: 8,
+                        lineHeight: 1.55,
                       }}
                     >
-                      <span style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
-                        {timerMM}:{timerSS}
+                      {d.status === 'unclaimed'
+                        ? 'No cook selected yet. Tap a chef below or claim dinner in Slack #food.'
+                        : state.backlog.find((b) => b.id === d.linked_backlog_id)?.key_perishables.join(', ') ||
+                          'All fresh ingredients prepped on station.'}
+                    </p>
+                  </div>
+
+                  {/* Clean Bottom Footer inside [MENU // TONIGHT] Card */}
+                  <div
+                    style={{
+                      marginTop: 18,
+                      paddingTop: 14,
+                      borderTop: '1px solid var(--border-subtle)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div
+                      className="font-mono"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: 'var(--muted)',
+                      }}
+                    >
+                      <span style={{ color: 'var(--emerald)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                          eco
+                        </span>
+                        {d.status === 'unclaimed' ? `${state.backlog.length} Kits Ready` : '4 Servings'}
                       </span>
-                      <span
-                        className="font-mono"
-                        style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.1em' }}
-                      >
-                        REMAINING
-                      </span>
+                      <span>•</span>
+                      <span>Prep: 20 min</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {d.status === 'unclaimed' ? (
+                        <>
+                          <button
+                            className="hw-btn"
+                            style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                            onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
+                          >
+                            DANIELA
+                          </button>
+                          <button
+                            className="hw-btn"
+                            style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                            onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
+                          >
+                            WARREN
+                          </button>
+                          <button
+                            className="hw-btn"
+                            style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                            onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
+                          >
+                            TAKEOUT
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="hw-btn"
+                            style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                            onClick={() => act({ type: 'dinner_cooked' })}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                              menu_book
+                            </span>
+                            <span>MARK COOKED</span>
+                          </button>
+                          <button
+                            className="hw-btn"
+                            style={{ padding: '6px 10px', fontSize: '0.7rem' }}
+                            onClick={() => act({ type: 'unclaim_dinner' })}
+                          >
+                            RESET
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-              )}
+
+                {/* Card 2: Physical Rotary Kitchen Timer Widget (Conditional on an active voice-triggered timer) */}
+                {activeTimer && (
+                  <div
+                    className="ceramic-card"
+                    style={{
+                      padding: '22px 28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 18,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            width: 9,
+                            height: 9,
+                            borderRadius: '50%',
+                            background: timerRunning ? 'var(--terracotta)' : 'var(--muted)',
+                          }}
+                        />
+                        <span
+                          className="font-mono"
+                          style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
+                        >
+                          TIMER 01 // {timerRunning ? 'ACTIVE' : 'PAUSED'}
+                        </span>
+                      </div>
+                      <div style={{ margin: '6px 0 14px' }}>
+                        <div style={{ fontSize: '1.22rem', fontWeight: 800 }}>
+                          {activeTimer.label}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                          Stove Station • Voice Timer
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="hw-btn terracotta" onClick={toggleActiveTimer}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                            {timerRunning ? 'pause' : 'play_arrow'}
+                          </span>
+                          <span>{timerRunning ? 'PAUSE' : 'RESUME'}</span>
+                        </button>
+                        <button className="hw-btn" onClick={bumpTimerMinute}>
+                          +1 MIN
+                        </button>
+                        <button className="hw-btn" onClick={resetActiveTimer}>
+                          RESET
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Circular SVG Rotary Gauge Dial */}
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: 132,
+                        height: 132,
+                        borderRadius: '50%',
+                        background: 'var(--surface-tint)',
+                        border: '1px solid var(--border)',
+                        boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg style={{ width: 118, height: 118, transform: 'rotate(-90deg)' }} viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="41" fill="none" stroke="var(--border)" strokeWidth="7" />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="41"
+                          fill="none"
+                          stroke="var(--terracotta)"
+                          strokeWidth="7"
+                          strokeLinecap="round"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={timerDashOffset}
+                          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                        />
+                      </svg>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <span style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
+                          {timerMM}:{timerSS}
+                        </span>
+                        <span
+                          className="font-mono"
+                          style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.1em' }}
+                        >
+                          REMAINING
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -2008,80 +1868,163 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
           </div>
         )}
 
-        {/* ── Bottom Hardware Navigation Dock (Matches Stitch Screens 1–4) ── */}
-        <footer className="hearth-dock">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              className={`dock-tab ${mode === 'ambient' ? 'active' : ''}`}
-              onClick={() => setMode('ambient')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'ambient' ? '#fff' : 'var(--terracotta)' }}>
-                restaurant
-              </span>
-              <span>Dinner &amp; Timer Hub</span>
-            </button>
+        {/* ── Bottom Hardware Navigation Dock (Clean Stitch bar in Ambient; full dock in Bento/Timeline) ── */}
+        <footer
+          className="hearth-dock"
+          style={
+            mode === 'ambient'
+              ? {
+                  borderTop: '1px solid var(--border-subtle)',
+                  paddingTop: 18,
+                  marginTop: 18,
+                  justifyContent: 'flex-end',
+                  gap: 10,
+                }
+              : undefined
+          }
+        >
+          {mode === 'ambient' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <button
+                className="hw-btn pill font-mono"
+                onClick={() => setMode('ambient')}
+                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
+                  restaurant
+                </span>
+                <span>[ DINNER HUB ]</span>
+              </button>
 
-            <button
-              className={`dock-tab ${mode === 'bento' ? 'active' : ''}`}
-              onClick={() => setMode('bento')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'bento' ? '#fff' : 'var(--cobalt)' }}>
-                checklist
-              </span>
-              <span>Chores &amp; Schedule ({doneChores}/{state.chores.length})</span>
-            </button>
+              <button
+                className="hw-btn pill font-mono"
+                onClick={() => setMode('bento')}
+                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--cobalt)' }}>
+                  checklist
+                </span>
+                <span>[ CHORE BOARD ]</span>
+              </button>
 
-            <button
-              className={`dock-tab ${mode === 'timeline' ? 'active' : ''}`}
-              onClick={() => setMode('timeline')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'timeline' ? '#fff' : 'var(--emerald)' }}>
-                calendar_month
-              </span>
-              <span>Master Timeline ({state.events.length})</span>
-            </button>
+              <button
+                className="hw-btn pill font-mono"
+                onClick={() => openGeminiOverlay()}
+                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
+                title="Engage Gemini Voice"
+              >
+                <GeminiSparkIcon size={14} />
+                <span>[ GEMINI ]</span>
+              </button>
 
-            <button
-              className="dock-tab"
-              onClick={nprPlaying ? stopNpr : playNpr}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
-                radio
-              </span>
-              <span>{nprPlaying ? 'Stop NPR Live' : 'NPR Live Radio'}</span>
-            </button>
+              <ThemeToggle defaultTheme="light" />
 
-            <button
-              className="dock-tab"
-              onClick={() => actSpotify(spotify.playing ? 'pause' : 'play')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--cobalt)' }}>
-                graphic_eq
-              </span>
-              <span>
-                {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify Connect'}
-              </span>
-            </button>
-          </div>
+              <a
+                href="/guide"
+                className="hw-btn pill font-mono"
+                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
+                  menu_book
+                </span>
+                <span>MANUAL</span>
+              </a>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <ThemeToggle defaultTheme="light" />
-            <a href="/guide" className="hw-btn">
-              <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
-                menu_book
-              </span>
-              <span>MANUAL</span>
-            </a>
-            <button
-              className="hw-btn"
-              onClick={() => setMode(mode === 'ambient' ? 'bento' : 'ambient')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                power_settings_new
-              </span>
-              <span>{mode === 'ambient' ? 'WAKE' : 'STANDBY'}</span>
-            </button>
-          </div>
+              <button
+                className="hw-btn pill font-mono"
+                onClick={() => {
+                  try {
+                    window.fully?.turnScreenOff?.(true);
+                  } catch {}
+                }}
+                style={{
+                  fontSize: '0.72rem',
+                  letterSpacing: '0.03em',
+                  background: 'var(--surface-well)',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                  power_settings_new
+                </span>
+                <span>SLEEP DISP</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  className="dock-tab"
+                  onClick={() => setMode('ambient')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
+                    restaurant
+                  </span>
+                  <span>Dinner &amp; Timer Hub</span>
+                </button>
+
+                <button
+                  className={`dock-tab ${mode === 'bento' ? 'active' : ''}`}
+                  onClick={() => setMode('bento')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'bento' ? '#fff' : 'var(--cobalt)' }}>
+                    checklist
+                  </span>
+                  <span>Chores &amp; Schedule ({doneChores}/{state.chores.length})</span>
+                </button>
+
+                <button
+                  className={`dock-tab ${mode === 'timeline' ? 'active' : ''}`}
+                  onClick={() => setMode('timeline')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'timeline' ? '#fff' : 'var(--emerald)' }}>
+                    calendar_month
+                  </span>
+                  <span>Master Timeline ({state.events.length})</span>
+                </button>
+
+                <button
+                  className="dock-tab"
+                  onClick={nprPlaying ? stopNpr : playNpr}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
+                    radio
+                  </span>
+                  <span>{nprPlaying ? 'Stop NPR Live' : 'NPR Live Radio'}</span>
+                </button>
+
+                <button
+                  className="dock-tab"
+                  onClick={() => actSpotify(spotify.playing ? 'pause' : 'play')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--cobalt)' }}>
+                    graphic_eq
+                  </span>
+                  <span>
+                    {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify Connect'}
+                  </span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ThemeToggle defaultTheme="light" />
+                <a href="/guide" className="hw-btn">
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
+                    menu_book
+                  </span>
+                  <span>MANUAL</span>
+                </a>
+                <button
+                  className="hw-btn"
+                  onClick={() => setMode('ambient')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                    power_settings_new
+                  </span>
+                  <span>STANDBY</span>
+                </button>
+              </div>
+            </>
+          )}
         </footer>
 
         {/* ════════════════════════════════════════════════════════════════════
