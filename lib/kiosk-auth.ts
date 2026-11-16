@@ -1,11 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { hasBearer, safeEqual } from './auth';
+import { kioskCookieName } from './kiosk-cookie';
 
 /** Server-side defense for privileged device routes, independent of middleware. */
 export function requireKioskRequest(req: NextRequest, mutation = false): Response | null {
   const token = process.env.KIOSK_ACCESS_TOKEN;
   if (!token) return Response.json({ error: 'Device access is not configured.' }, { status: 503 });
-  const cookie = req.cookies.get('kiosk_key')?.value;
+  const cookie = req.cookies.get(kioskCookieName())?.value;
   if (!(cookie && safeEqual(cookie, token)) && !hasBearer(req, token)) {
     return Response.json({ error: 'Unlock this device to access groceries and voice.' }, { status: 401 });
   }

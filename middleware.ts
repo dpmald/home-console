@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-const COOKIE = 'kiosk_key';
+import { kioskCookieName } from './lib/kiosk-cookie';
 
 export function middleware(req: NextRequest) {
+  const COOKIE = kioskCookieName();
   const token = process.env.KIOSK_ACCESS_TOKEN;
   if (!token && (req.nextUrl.pathname.startsWith('/api/groceries') || req.nextUrl.pathname.startsWith('/api/voice'))) {
     return NextResponse.json({ error: 'Device access is not configured.' }, { status: 503 });

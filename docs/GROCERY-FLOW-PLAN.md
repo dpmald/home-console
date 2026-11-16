@@ -37,7 +37,7 @@ voice model. The physical Cozyla microphone is still a separate acceptance test.
 | 5. Connect voice | Mount Kitchen voice within grocery panel, multi-item save, quantity preservation, success only after persistence, cleanup on stop | Implemented; actual microphone/provider check pending |
 | 6. Handle failures | Fail-closed device authentication, same-origin writes, streamed request limits, save errors, same-tab recovery of uncertain submissions | Done; focused checks passed |
 | 7. Test the complete flow | Actual Next voice API -> synthetic persistence -> MCP prepare/complete/replay -> display API; browser save/reload/edit/cancel | Passed locally |
-| 8. Share for review | Feature branch plus draft PR, reviewer commands and screenshot | Prepared for handoff |
+| 8. Share for review | Feature branch plus draft PR, reviewer commands and screenshot | Committed locally; publication blocked by GitHub write access |
 | 9. Production activation | Review migrations and live schema, private-refresh compatibility, permanent MCP host/key, attach connector to Claude v2 | Pending; no production work performed |
 | 10. Device acceptance | Verify HTTPS microphone permission, far-field speech, spoken quantities and failure handling on Cozyla | Pending |
 | 11. Delivery today | Persistent checkout screen, verified quote/slot provider, exact approval and order confirmation | Design only; separate phase |
@@ -74,6 +74,8 @@ npm run dev:grocery-ui
 Open the local-only sign-in URL printed by the launcher, on port 3004. This is a
 separate preview from Warren's existing private-data preview on port 3001.
 The banner identifies synthetic persisted groceries and demo dashboard cards.
+The synthetic preview uses its own cookie name so it can coexist with the private
+preview on the same localhost hostname.
 The launcher blanks integration settings, including calendar URLs/tokens, Supabase,
 Slack, OpenAI, Gemini and Spotify credentials. Calendar CLI write-back is also
 disabled in this development mode. Browser audio/assets can still use the network.
@@ -88,7 +90,7 @@ npm run build:grocery-check                  # with this worktree's dev server s
 
 Verified in this implementation:
 
-- 25 focused tests passed: MCP/auth/validation, dedicated DB isolation, environment
+- 26 focused tests passed: MCP/auth/validation, dedicated DB isolation, environment
   coverage, streaming limits, migration mapping, uncertain-save recovery and voice inputs.
 - Database checks passed: atomic batch/replay, quantities, stale edits/cancellation,
   result projection, grants, connector/lease regressions and fresh canonical migrations.
@@ -130,6 +132,13 @@ request/receipt relationships or overwrite local test work. Treat this as a
 reviewed follow-up before deploying the grocery schema to production.
 
 ## Daniela's review and rollout sequence
+
+Publication was attempted on November 16: terminal Git has no saved push login,
+and the connected GitHub app rejected object creation with HTTP 403, "Resource not
+accessible by integration". No remote branch or PR was created. The local commit
+and a verified Git bundle are available; a write-enabled connection or ordinary
+Git sign-in is needed to publish. This is an authentication blocker, not an
+application-test failure.
 
 1. Check out `codex/grocery-flow`; run the synthetic setup/preview above. Do not
    import production credentials. Keep your existing working copy separate.

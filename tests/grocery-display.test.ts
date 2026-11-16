@@ -43,6 +43,17 @@ test('streaming body limit cancels oversized chunked input before reading all of
   await assert.rejects(readBoundedBody(req,24),RequestBodyError);
   assert.equal(cancelled,true);
 });
+test('synthetic preview uses a distinct localhost cookie from the private preview', () => {
+  const previousMode=process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT,previousKey=process.env.KIOSK_ACCESS_TOKEN;
+  try {
+    process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT='1';process.env.KIOSK_ACCESS_TOKEN='synthetic-device';
+    assert.equal(requireKioskRequest(new NextRequest('http://localhost:3004/api/groceries',{headers:{cookie:'kiosk_key=synthetic-device'}}))?.status,401);
+    assert.equal(requireKioskRequest(new NextRequest('http://localhost:3004/api/groceries',{headers:{cookie:'grocery_dev_kiosk_key=synthetic-device; kiosk_key=private-preview'}})),null);
+  } finally {
+    if(previousMode===undefined)delete process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT;else process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT=previousMode;
+    if(previousKey===undefined)delete process.env.KIOSK_ACCESS_TOKEN;else process.env.KIOSK_ACCESS_TOKEN=previousKey;
+  }
+});
 test('synthetic launcher clears all application settings including calendar and case variants', () => {
   const root=path.resolve('.');
   const names=[...readFileSync('.env.example','utf8').matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map(m=>m[1]);
