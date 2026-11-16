@@ -63,6 +63,7 @@ export async function updateGoogleCalendarEventDescription(
   description: string,
   calendarId: string = FAMILY_CALENDAR_ID,
 ): Promise<boolean> {
+  if (process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1') return false;
   const rawId = externalEventId
     .replace(/^(gcal|ics):/, '')
     .replace(/@google\.com$/, '')
@@ -176,6 +177,7 @@ function normalizeExternalEventId(rawUid: string): string {
 }
 
 export async function syncIcsCalendarsIfConfigured(): Promise<void> {
+  if (process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1') return;
   const rawUrls = process.env.GOOGLE_CALENDAR_ICS_URLS;
   if (!rawUrls) return;
   if (Date.now() - lastSyncAt < SYNC_TTL_MS) return;

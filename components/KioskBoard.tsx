@@ -24,6 +24,8 @@ import type { BacklogLocation, KioskAction, KitchenState } from '@/lib/types';
 import { NYC_LAT, NYC_LON, parseOpenMeteoResponse, type Weather } from '@/lib/weather';
 import type { SpotifyNowPlaying } from '@/lib/spotify';
 import { ThemeToggle } from './ThemeToggle';
+import { GroceryRequestsPanel } from './GroceryRequestsPanel';
+import { VoiceOrb } from './VoiceOrb';
 
 interface Timer {
   id: string;
@@ -370,7 +372,7 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
   }
 }
 
-export function KioskBoard({ initial, initialWeather }: { initial: KitchenState; initialWeather: Weather | null }) {
+export function KioskBoard({ initial, initialWeather, groceryDevelopment = false }: { initial: KitchenState; initialWeather: Weather | null; groceryDevelopment?: boolean }) {
   const [state, setState] = useState<KitchenState>(initial);
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
   const [mode, setMode] = useState<ViewMode>('ambient');
@@ -381,7 +383,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const [spotify, setSpotify] = useState<SpotifyNowPlaying>({ configured: false, playing: false });
   const [newBacklog, setNewBacklog] = useState('');
   const [newBacklogLoc, setNewBacklogLoc] = useState<BacklogLocation>('fridge');
-  const [newGrocery, setNewGrocery] = useState('');
+  const [groceryOpen, setGroceryOpen] = useState(false);
+  const [groceryRefresh, setGroceryRefresh] = useState(0);
   const [geminiOpen, setGeminiOpen] = useState(false);
   const [geminiCustomQuery, setGeminiCustomQuery] = useState('');
   const [geminiListening, setGeminiListening] = useState(false);
@@ -963,6 +966,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
 
   return (
     <div className="hearth-canvas">
+      {groceryDevelopment && <div style={{ position: 'fixed', top: 6, left: '50%', transform: 'translateX(-50%)', zIndex: 250, padding: '6px 14px', borderRadius: 20, background: '#fff3c4', color: '#533d00', fontSize: 13 }}>
+        Development · Synthetic groceries persist · Other cards are demo data · External voice disabled
+      </div>}
+      {groceryOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(25,25,20,.45)', display: 'grid', placeItems: 'center' }}>
+        <GroceryRequestsPanel onClose={() => setGroceryOpen(false)} onChanged={() => { void refreshKitchen(); }} refreshKey={groceryRefresh}
+          toolbar={<VoiceOrb onStartTimer={startTimer} onCancelTimers={() => setTimers([])} onPlayNpr={playNpr} onStopNpr={stopNpr}
+            onServerToolDone={() => { setGroceryRefresh(n => n + 1); void refreshKitchen(); }} />} />
+      </div>}
       {/* Ambient dot-pattern & warm terracotta/cobalt glow */}
       <div className="hearth-bg-dots" />
       <div className="hearth-glow-top" />
@@ -4965,34 +4976,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--muted)' }}>
                         local_shipping
                       </span>
-                      Pantry Cart Staging ({state.groceries.length})
+                      Household grocery requests
                     </span>
                   </div>
 
-                  <form
-                    style={{ display: 'flex', gap: 8 }}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!newGrocery.trim()) return;
-                      act({ type: 'add_grocery', name: newGrocery });
-                      setNewGrocery('');
-                    }}
-                  >
-                    <input
-                      className="ceramic-well"
-                      style={{ flex: 1, padding: '11px 16px', fontSize: '0.94rem' }}
-                      placeholder={
-                        state.groceries.length
-                          ? `In cart: ${state.groceries.map((g) => g.name).join(', ')} — add more…`
-                          : 'Add item to Saturday grocery cart…'
-                      }
-                      value={newGrocery}
-                      onChange={(e) => setNewGrocery(e.target.value)}
-                    />
-                    <button className="hw-btn" type="submit" style={{ padding: '11px 18px', fontSize: '0.86rem' }}>
-                      + ADD
-                    </button>
-                  </form>
+                  <button className="hw-btn" type="button" style={{ minHeight: 56, padding: '11px 18px', fontSize: '0.94rem' }} onClick={() => setGroceryOpen(true)}>
+                    Open Saturday’s list
+                  </button>
                 </div>
               </div>
             ) : (
@@ -5148,6 +5138,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
           }
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button className="dock-tab" type="button" style={{ minHeight: 56 }} onClick={() => setGroceryOpen(true)}>
+              <span className="material-symbols-outlined" aria-hidden="true">shopping_basket</span> Groceries
+            </button>
             <button
               className={`dock-tab ${mode === 'ambient' ? 'active' : ''}`}
               onClick={() => setMode('ambient')}

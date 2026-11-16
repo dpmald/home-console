@@ -80,7 +80,7 @@ export async function executeVoiceTool(name: string, args: Record<string, any>):
 
     case 'add_grocery_item': {
       const g = await addGrocery(String(args.name), args.quantity ? String(args.quantity) : null, 'voice');
-      return ok({ ok: true, added: g.name, note: 'Will be included in the next Saturday order proposal.' });
+      return ok({ ok: true, added: g.name, note: "Added to Saturday's list. Checkout remains manual." });
     }
 
     case 'set_chore_done': {

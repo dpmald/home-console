@@ -21,5 +21,5 @@ export default async function HomePage() {
     weather = await getWeather();
   } catch {}
 
-  return <KioskBoard initial={state} initialWeather={weather} />;
+  return <KioskBoard initial={state} initialWeather={weather} groceryDevelopment={process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1'} />;
 }

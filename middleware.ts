@@ -4,6 +4,9 @@ const COOKIE = 'kiosk_key';
 
 export function middleware(req: NextRequest) {
   const token = process.env.KIOSK_ACCESS_TOKEN;
+  if (!token && (req.nextUrl.pathname.startsWith('/api/groceries') || req.nextUrl.pathname.startsWith('/api/voice'))) {
+    return NextResponse.json({ error: 'Device access is not configured.' }, { status: 503 });
+  }
   if (!token) return NextResponse.next();
 
   const { pathname, searchParams } = req.nextUrl;
@@ -39,5 +42,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/guide', '/api/kiosk/:path*', '/api/dinner-tips', '/api/voice/:path*', '/api/weather', '/api/spotify/:path*'],
+  matcher: ['/', '/guide', '/api/kiosk/:path*', '/api/groceries', '/api/dinner-tips', '/api/voice/:path*', '/api/weather', '/api/spotify/:path*'],
 };

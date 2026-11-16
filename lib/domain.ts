@@ -347,7 +347,7 @@ export function computeConflicts(events: LogisticsEvent[]): Conflict[] {
 // ──────────────────────────── Groceries ────────────────────────────
 export async function listGroceries(): Promise<GroceryItem[]> {
   return unwrap(
-    await db().from('grocery_items').select('*').eq('status', 'needed').order('created_at'),
+    await db().from('grocery_items').select('*').in('status', ['needed', 'needs_attention']).order('created_at'),
     'list groceries',
   );
 }
@@ -363,6 +363,17 @@ export async function addGrocery(name: string, quantity: string | null, addedBy:
 
 export async function setGroceryStatus(id: string, status: GroceryItem['status']) {
   unwrap(await db().from('grocery_items').update({ status }).eq('id', id), 'grocery status');
+}
+
+/** Household request snapshots and cart receipts; never an external order. */
+export async function listGroceryAgentRequests(runId: string) {
+  const { groceryAgentRpc } = await import('./grocery-agent-store');
+  return groceryAgentRpc('grocery_agent_list_pending', { p_run_id: runId });
+}
+
+export async function recordGroceryAgentProgress(operation: Record<string, unknown>) {
+  const { groceryAgentRpc } = await import('./grocery-agent-store');
+  return groceryAgentRpc('grocery_agent_progress', { p_operation: operation });
 }
 
 // ──────────────────────────── Aggregate ────────────────────────────

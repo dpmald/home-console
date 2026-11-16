@@ -2,6 +2,11 @@
 
 Unified **24" Cozyla wall console** + **Slack-first home organization** for **Daniela, Warren, and Wesley**.
 
+For the grocery-request feature, start with [the implementation plan and verification](docs/GROCERY-FLOW-PLAN.md)
+and [isolated local development](docs/LOCAL-DEVELOPMENT.md). These document the touchscreen/voice
+request list, Claude MCP contract, synthetic preview and production rollout prerequisites.
+The original hosted setup below does not activate the new grocery RPCs by itself.
+
 ---
 
 ## Architecture Overview

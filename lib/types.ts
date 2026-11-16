@@ -55,8 +55,10 @@ export interface GroceryItem {
   id: string;
   name: string;
   quantity: string | null;
-  status: 'needed' | 'ordered' | 'got';
+  status: 'needed' | 'ordered' | 'got' | 'in_cart' | 'needs_attention' | 'cancelled';
   added_by: string | null;
+  revision?: number;
+  notes?: string | null;
 }
 
 export interface Conflict {
