@@ -25,8 +25,159 @@ interface Timer {
   pausedRemaining?: number;
 }
 
-type ViewMode = 'ambient' | 'bento' | 'timeline';
+type ViewMode = 'ambient' | 'dinner' | 'bento' | 'timeline';
 type MemberFilter = 'all' | 'daniela' | 'warren' | 'wesley';
+
+interface RecipeStep {
+  stage: string;
+  instruction: string;
+  nextPreview: string;
+  defaultTimerSecs: number;
+}
+
+const DEFAULT_RECIPE_STEPS: RecipeStep[] = [
+  {
+    stage: 'PREP & SCORE',
+    instruction: 'Pat 4 wild salmon fillets dry with paper towels and lightly score skin at 1-inch intervals so the glaze caramelizes evenly.',
+    nextPreview: 'Whisk sweet miso-mirin glaze (3m)',
+    defaultTimerSecs: 180,
+  },
+  {
+    stage: 'GLAZE WHISK',
+    instruction: 'Whisk 2 tbsp white miso, 1 tbsp mirin, 1 tsp soy sauce, and 1/2 tsp grated ginger in a small bowl until glossy and smooth.',
+    nextPreview: 'Broil glazed salmon fillets on High (6m)',
+    defaultTimerSecs: 180,
+  },
+  {
+    stage: 'BROILING',
+    instruction: 'Brush wild salmon fillets with sweet miso-mirin glaze and broil on High for 6 minutes until caramelized blisters form.',
+    nextPreview: 'Plate over warm steamed jasmine rice (4m)',
+    defaultTimerSecs: 342,
+  },
+  {
+    stage: 'RICE & SEAR',
+    instruction: 'Fluff warm steamed jasmine rice from the Zojirushi into 4 wide ceramic bowls and drizzle lightly with toasted sesame oil.',
+    nextPreview: 'Garnish with scallions & sesame seeds (2m)',
+    defaultTimerSecs: 240,
+  },
+  {
+    stage: 'GARNISH & SERVE',
+    instruction: 'Top each bowl with a blistered miso salmon fillet, sliced scallions, and toasted white sesame seeds. Serve immediately.',
+    nextPreview: 'Complete & mark dinner cooked',
+    defaultTimerSecs: 120,
+  },
+];
+
+interface UnstructuredMealTip {
+  icon: string;
+  title: string;
+  detail: string;
+  tag: string;
+  isKidPick?: boolean;
+}
+
+const CHARCUTERIE_IMAGE_URL =
+  'https://lh3.googleusercontent.com/aida/ALJJyrDkXsWWUygnUBaIy8vBt1Yh8LX65EDDZ9IZu2XKcERGw84lZdwj0ivw4vq2e4U2JaygGhWFPT8VNzDvIKSMvA5NfFchFizGbYbhDV0aDNbXMEGSWb5X-VcJ-APPeCzaH5HuUhYqWAiVXPq-jnbgJBM7JpRmqBA5dG_O6Zb7fzhyU4rnUPgCEc-Z3fy03kq77BfuE3ckYQz9AOKxW5Zvq0fmmcCqGNgQastPsHV0Ph1Q';
+
+const STRUCTURED_RECIPE_TITLES = new Set([
+  'crispy miso salmon rice bowls',
+  'crispy black bean tacos',
+  'lemon ricotta orecchiette',
+  'sheet-pan harissa chicken',
+]);
+
+function getUnstructuredMealDetails(rawTitle: string | null | undefined): {
+  mealTitle: string;
+  imageUrl: string;
+  imageAlt: string;
+  sectionHeading: string;
+  tips: UnstructuredMealTip[];
+} {
+  const mealTitle = rawTitle?.trim() || 'Charcuterie Board';
+  const lower = mealTitle.toLowerCase();
+
+  if (lower.includes('charcuterie') || lower.includes('cheese') || lower.includes('board') || !rawTitle?.trim()) {
+    return {
+      mealTitle,
+      imageUrl: CHARCUTERIE_IMAGE_URL,
+      imageAlt: 'Artisanal Charcuterie Board',
+      sectionHeading: 'Assembly Tips & Recommendations',
+      tips: [
+        {
+          icon: 'thermostat',
+          title: 'Cheese Temperature & Slicing',
+          detail: 'Let brie rest at room temp ~20m; slice sharp cheddar into wedges',
+          tag: 'Cheese Tip',
+        },
+        {
+          icon: 'layers',
+          title: 'Meat Staging & Volume',
+          detail: 'Fold prosciutto ribbons loosely & rosette salami for easy grabbing',
+          tag: 'Meat Staging',
+        },
+        {
+          icon: 'auto_awesome',
+          title: 'Sweet & Savory Balance',
+          detail: 'Center wildflower honey & mustard; pair grapes & figs near sharp cheeses',
+          tag: 'Flavor Balance',
+        },
+        {
+          icon: 'scatter_plot',
+          title: 'Texture & Crunch',
+          detail: 'Nestle sourdough crisps & Marcona almonds in dry pockets',
+          tag: 'Crunch & Texture',
+        },
+        {
+          icon: 'child_care',
+          title: 'Kid-Friendly Staging',
+          detail: 'Set mild Colby sticks & apple slices on dedicated corner for Wesley',
+          tag: 'Wesley Pick',
+          isKidPick: true,
+        },
+      ],
+    };
+  }
+
+  return {
+    mealTitle,
+    imageUrl: CHARCUTERIE_IMAGE_URL,
+    imageAlt: mealTitle,
+    sectionHeading: 'Assembly Tips & Recommendations',
+    tips: [
+      {
+        icon: 'thermostat',
+        title: 'Prep & Temperature Staging',
+        detail: `Pull core ingredients for ${mealTitle} 15–20m ahead for even cooking & plating`,
+        tag: 'Prep Tip',
+      },
+      {
+        icon: 'layers',
+        title: 'Plating & Station Flow',
+        detail: 'Stage warm serving bowls and platters near the main prep counter',
+        tag: 'Station Flow',
+      },
+      {
+        icon: 'auto_awesome',
+        title: 'Bright Finishing Touches',
+        detail: 'Finish with a squeeze of citrus, flaky sea salt, or fresh herbs right before serving',
+        tag: 'Flavor Balance',
+      },
+      {
+        icon: 'scatter_plot',
+        title: 'Side & Texture Pairing',
+        detail: 'Add a crisp green salad or toasted sourdough on the side for contrast',
+        tag: 'Crunch & Texture',
+      },
+      {
+        icon: 'child_care',
+        title: 'Kid-Friendly Staging',
+        detail: `Portion a milder plate of ${mealTitle} with sliced fruit on the side for Wesley`,
+        tag: 'Wesley Pick',
+        isKidPick: true,
+      },
+    ],
+  };
+}
 
 const NPR_URL = process.env.NEXT_PUBLIC_NPR_STREAM_URL || 'https://npr-ice.streamguys1.com/live.mp3';
 
@@ -111,11 +262,13 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
           chef: a.chef,
           status: 'planned',
           recipe_name:
-            a.chef === 'takeout'
-              ? 'Takeout / Order In'
-              : cur.dinner.chef === 'takeout'
-                ? null
-                : cur.dinner.recipe_name,
+            a.recipeName !== undefined
+              ? a.recipeName
+              : a.chef === 'takeout'
+                ? 'Takeout / Order In'
+                : cur.dinner.chef === 'takeout'
+                  ? null
+                  : cur.dinner.recipe_name,
           linked_backlog_id: a.chef === 'takeout' ? null : cur.dinner.linked_backlog_id,
           unavailable: cur.dinner.unavailable.filter((p) => p !== a.chef),
           claimed_via: 'kiosk',
@@ -217,8 +370,43 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const [geminiCustomQuery, setGeminiCustomQuery] = useState('');
   const [geminiListening, setGeminiListening] = useState(false);
   const [geminiStampedAt, setGeminiStampedAt] = useState('');
+  const [recipeStepIdx, setRecipeStepIdx] = useState(2); // Default Step 3 of 5 — BROILING
+  const [broilSeconds, setBroilSeconds] = useState(342); // Default 05:42
+  const [broilRunning, setBroilRunning] = useState(false);
+  const [ttsSpeaking, setTtsSpeaking] = useState(false);
+  const [dinnerRecipeMode, setDinnerRecipeMode] = useState<'auto' | 'structured' | 'tips'>('auto');
+  const [pendingChef, setPendingChef] = useState<'daniela' | 'warren' | null>(null);
+  const [captureMealInput, setCaptureMealInput] = useState('');
+  const [captureListening, setCaptureListening] = useState(false);
+  const [liveDinnerTips, setLiveDinnerTips] = useState<{
+    mealTitle: string;
+    imageUrl: string;
+    imageAlt: string;
+    sectionHeading: string;
+    tips: UnstructuredMealTip[];
+  } | null>(null);
+  const [liveStructuredRecipe, setLiveStructuredRecipe] = useState<{
+    mealTitle: string;
+    prepTime: string;
+    cookTime: string;
+    method: string;
+    servings: string;
+    steps: RecipeStep[];
+    ingredients: { name: string; amount: string; prep: string }[];
+    stationNotes: { icon: string; title: string; detail: string }[];
+  } | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nprRef = useRef<HTMLAudioElement | null>(null);
   const firedTimers = useRef<Set<string>>(new Set());
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMsg(null);
+    }, 2600);
+  }, []);
 
   const openGeminiOverlay = useCallback(() => {
     setGeminiStampedAt(
@@ -379,7 +567,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     } catch {}
   }, []);
 
-  // 1 Hz Clock + Rotary Timer tick
+  // 1 Hz Clock + Rotary Timer tick + Dinner Hub Broiler Timer tick
   useEffect(() => {
     const id = setInterval(() => {
       const t = new Date();
@@ -395,9 +583,17 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
         }
         return cur;
       });
+      setBroilSeconds((s) => {
+        if (!broilRunning) return s;
+        if (s > 1) return s - 1;
+        setBroilRunning(false);
+        chime();
+        showToast('🔔 Salmon Broil Complete! Check caramelized blisters.');
+        return 0;
+      });
     }, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [broilRunning, showToast]);
 
   // Supabase Realtime broadcast subscription + fallback poll
   useEffect(() => {
@@ -506,10 +702,184 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     );
   };
 
+  const activeRecipeSteps =
+    liveStructuredRecipe &&
+    d.recipe_name &&
+    liveStructuredRecipe.mealTitle.toLowerCase() === d.recipe_name.trim().toLowerCase() &&
+    liveStructuredRecipe.steps.length > 0
+      ? liveStructuredRecipe.steps
+      : DEFAULT_RECIPE_STEPS;
+  const currentStep = activeRecipeSteps[recipeStepIdx % activeRecipeSteps.length] ?? DEFAULT_RECIPE_STEPS[2];
+  const fmtBroilTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const rem = secs % 60;
+    return `${String(mins).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+  };
+
+  const toggleBroilTimer = () => {
+    setBroilRunning((running) => {
+      const next = !running;
+      showToast(next ? 'Broiler timer running' : `Timer paused at ${fmtBroilTime(broilSeconds)}`);
+      return next;
+    });
+  };
+
+  const adjustBroilTimer = (deltaSecs: number) => {
+    setBroilSeconds((s) => {
+      const updated = Math.max(0, s + deltaSecs);
+      showToast(`Added +1m (Timer: ${fmtBroilTime(updated)})`);
+      return updated;
+    });
+  };
+
+  const toggleReadStepAloud = () => {
+    if (ttsSpeaking) {
+      setTtsSpeaking(false);
+      try {
+        window.speechSynthesis?.cancel();
+      } catch {}
+      return;
+    }
+    setTtsSpeaking(true);
+    showToast('Playing voice assist via Kitchen Hub speaker...');
+    if (isFullyKiosk()) {
+      speakOnCozyla(currentStep.instruction);
+    } else {
+      try {
+        const u = new SpeechSynthesisUtterance(currentStep.instruction);
+        u.onend = () => setTtsSpeaking(false);
+        window.speechSynthesis?.speak(u);
+      } catch {}
+    }
+    setTimeout(() => {
+      setTtsSpeaking(false);
+    }, 4000);
+  };
+
+  const advanceRecipeStep = () => {
+    const nextIdx = (recipeStepIdx + 1) % activeRecipeSteps.length;
+    setRecipeStepIdx(nextIdx);
+    const nextStep = activeRecipeSteps[nextIdx];
+    setBroilSeconds(nextStep.defaultTimerSecs);
+    showToast(`Advancing to Step ${nextIdx + 1}: ${nextStep.stage}`);
+  };
+
+  const prevRecipeStep = () => {
+    const prevIdx = (recipeStepIdx - 1 + activeRecipeSteps.length) % activeRecipeSteps.length;
+    setRecipeStepIdx(prevIdx);
+    const prevStep = activeRecipeSteps[prevIdx];
+    setBroilSeconds(prevStep.defaultTimerSecs);
+    showToast(`Viewing Step ${prevIdx + 1}: ${prevStep.stage}`);
+  };
+
+  const selectFastRecipe = (recipeName: string, backlogId?: string) => {
+    setPendingChef(null);
+    setDinnerRecipeMode('structured');
+    setRecipeStepIdx(0);
+    if (backlogId) {
+      act({ type: 'cook_from_backlog', backlogId });
+    } else {
+      act({ type: 'claim_dinner', chef: 'daniela', recipeName });
+    }
+    showToast(`Selected: ${recipeName}! Setting up recipe...`);
+  };
+
+  const startCaptureMealDictation = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      showToast('Voice dictation not available in this browser — type or tap a chip below');
+      return;
+    }
+    try {
+      const rec = new SR();
+      rec.lang = 'en-US';
+      rec.interimResults = false;
+      setCaptureListening(true);
+      rec.onresult = (ev: any) => {
+        const transcript = ev.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setCaptureMealInput(transcript);
+        }
+      };
+      rec.onend = () => setCaptureListening(false);
+      rec.onerror = () => setCaptureListening(false);
+      rec.start();
+    } catch {
+      setCaptureListening(false);
+    }
+  };
+
+  const confirmCapturedDinner = (chef: 'daniela' | 'warren', needRecipe: boolean, customMeal?: string) => {
+    const chosenMeal =
+      (customMeal ?? captureMealInput).trim() ||
+      (needRecipe ? 'Crispy Miso Salmon Rice Bowls' : 'Charcuterie Board');
+    setDinnerRecipeMode(needRecipe ? 'structured' : 'tips');
+    if (needRecipe) setRecipeStepIdx(0);
+    setPendingChef(null);
+    setCaptureMealInput('');
+    act({ type: 'claim_dinner', chef, recipeName: chosenMeal });
+    showToast(
+      needRecipe
+        ? `${NAMES[chef]} is cooking ${chosenMeal} — generating step-by-step recipe!`
+        : `${NAMES[chef]} is making ${chosenMeal} — loading Gemini tips & photo!`,
+    );
+  };
+
   // Time formatting
   const rawTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   const [clockDigits, clockAmPm] = rawTime.split(' ');
   const d = state.dinner;
+  const autoHasStructuredRecipe =
+    Boolean(d.linked_backlog_id) ||
+    Boolean(d.recipe_name && STRUCTURED_RECIPE_TITLES.has(d.recipe_name.toLowerCase().trim()));
+  const isStructuredRecipeView =
+    dinnerRecipeMode === 'structured'
+      ? true
+      : dinnerRecipeMode === 'tips'
+        ? false
+        : autoHasStructuredRecipe;
+  const isCapturingMeal =
+    pendingChef !== null ||
+    (d.status !== 'unclaimed' && isParent(d.chef) && !d.recipe_name?.trim() && !d.linked_backlog_id);
+  const activeCaptureChef: 'daniela' | 'warren' =
+    pendingChef ?? (isParent(d.chef) ? d.chef : 'daniela');
+  const fallbackUnstructured = getUnstructuredMealDetails(d.recipe_name);
+  const activeMealTitle = d.recipe_name?.trim() || 'Charcuterie Board';
+
+  useEffect(() => {
+    if (d.status === 'unclaimed' || isCapturingMeal) return;
+    let cancelled = false;
+    fetch(`/api/dinner-tips?meal=${encodeURIComponent(activeMealTitle)}&mode=tips`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data && Array.isArray(data.tips) && data.tips.length > 0) {
+          setLiveDinnerTips(data);
+        }
+      })
+      .catch(() => {});
+
+    if (isStructuredRecipeView) {
+      fetch(`/api/dinner-tips?meal=${encodeURIComponent(activeMealTitle)}&mode=recipe`, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!cancelled && data && Array.isArray(data.steps) && data.steps.length > 0) {
+            setLiveStructuredRecipe(data);
+            setBroilSeconds(data.steps[0]?.defaultTimerSecs ?? 342);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [d.status, activeMealTitle, isStructuredRecipeView, isCapturingMeal]);
+
+  const unstructuredDetails =
+    liveDinnerTips && liveDinnerTips.mealTitle.toLowerCase() === activeMealTitle.toLowerCase()
+      ? liveDinnerTips
+      : fallbackUnstructured;
+  const claimedChefName = isParent(d.chef) ? NAMES[d.chef] : d.chef === 'takeout' ? 'Takeout' : 'Daniela';
+  const claimedChefEmoji = d.chef === 'warren' ? '👨‍🍳' : d.chef === 'takeout' ? '🥡' : '🙋‍♀️';
   const doneChores = state.chores.filter((c) => c.completed).length;
   const chorePct = state.chores.length > 0 ? Math.round((doneChores / state.chores.length) * 100) : 0;
   const allowanceChores = state.chores.filter((c) => (c.reward_cents ?? 0) === 0);
@@ -884,7 +1254,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         <button
                           className="hw-btn"
                           style={{ padding: '9px 12px', fontSize: '0.78rem' }}
-                          onClick={() => act({ type: 'claim_dinner', chef: 'daniela' })}
+                          onClick={() => {
+                            setCaptureMealInput('');
+                            setPendingChef('daniela');
+                            setMode('dinner');
+                          }}
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--emerald)' }}>
                             skillet
@@ -894,7 +1268,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         <button
                           className="hw-btn"
                           style={{ padding: '9px 12px', fontSize: '0.78rem' }}
-                          onClick={() => act({ type: 'claim_dinner', chef: 'warren' })}
+                          onClick={() => {
+                            setCaptureMealInput('');
+                            setPendingChef('warren');
+                            setMode('dinner');
+                          }}
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--amber)' }}>
                             soup_kitchen
@@ -1039,7 +1417,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           <button
                             className="hw-btn"
                             style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                            onClick={() => act({ type: 'dinner_cooked' })}
+                            onClick={() => setMode('dinner')}
                           >
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
                               menu_book
@@ -1308,9 +1686,2466 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
         )}
 
         {/* ════════════════════════════════════════════════════════════════════
-            VIEW 2: BENTO OVERVIEW & EXPANDED TIMELINE (Stitch Screens 3 & 4)
+            VIEW 2: DINNER HUB — PLANNED DINNER (HAPPY PATH) & UNDECIDED DINNER
             ════════════════════════════════════════════════════════════════════ */}
-        {mode !== 'ambient' && (
+        {mode === 'dinner' && (
+          <div
+            id="bentoMainGrid"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              gap: 16,
+              paddingTop: 4,
+              overflow: 'hidden',
+            }}
+          >
+            {/* LEFT MAIN CANVAS (~79% width): Planned Cooking Guide OR Undecided Dinner Decision */}
+            <section
+              className="ceramic-card"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                borderRadius: 18,
+                padding: '20px 24px',
+                border: '1px solid #e7e3da',
+                background: 'var(--surface)',
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              {/* Subtle top-right radial glow */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: -64,
+                  right: -64,
+                  width: 224,
+                  height: 224,
+                  borderRadius: '50%',
+                  background: 'rgba(255, 218, 210, 0.35)',
+                  filter: 'blur(40px)',
+                  pointerEvents: 'none',
+                }}
+              />
+
+              {isCapturingMeal ? (
+                /* ── CAPTURE FLOW: WHAT IS BEING COOKED & IS A RECIPE NEEDED? ── */
+                <>
+                  {/* Top Banner: Chef Selected — What's on the Menu? */}
+                  <div
+                    style={{
+                      borderRadius: 16,
+                      padding: '20px 24px',
+                      background: 'linear-gradient(135deg, #fffaf5 0%, #fbfaf7 100%)',
+                      border: '2px solid #fed7aa',
+                      boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 16,
+                          background: '#ffdad2',
+                          border: '1px solid #fed7aa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 26,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span>{activeCaptureChef === 'warren' ? '👨‍🍳' : '🙋‍♀️'}</span>
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            className="font-mono"
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              background: '#ffdad2',
+                              color: '#891d00',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                            }}
+                          >
+                            STEP 1 OF 2 • SET TONIGHT&apos;S MENU
+                          </span>
+                        </div>
+                        <h1
+                          style={{
+                            fontSize: 'clamp(1.55rem, 2vw, 1.85rem)',
+                            fontWeight: 800,
+                            color: '#1b1c1a',
+                            letterSpacing: '-0.025em',
+                            marginTop: 4,
+                          }}
+                        >
+                          {NAMES[activeCaptureChef]} is cooking tonight — what&apos;s on the menu?
+                        </h1>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingChef(null);
+                        setCaptureMealInput('');
+                        if (d.status !== 'unclaimed' && !d.recipe_name?.trim()) {
+                          act({ type: 'unclaim_dinner' });
+                        }
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '10px 16px',
+                        borderRadius: 12,
+                        background: '#ffffff',
+                        color: '#59413b',
+                        border: '1px solid #e5e1d8',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#8d716a' }}>
+                        arrow_back
+                      </span>
+                      <span>Change Cook</span>
+                    </button>
+                  </div>
+
+                  {/* Middle Card: Dish Name Input + Voice Dictation + Quick Chips */}
+                  <div
+                    style={{
+                      padding: '18px 22px',
+                      borderRadius: 16,
+                      background: '#fbfaf7',
+                      border: '1px solid #eae6de',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 14,
+                      marginTop: 12,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          color: '#59413b',
+                          letterSpacing: '0.06em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                          restaurant_menu
+                        </span>
+                        WHAT ARE YOU MAKING? (TYPE, SPEAK, OR TAP A QUICK PICK)
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <input
+                        type="text"
+                        value={captureMealInput}
+                        onChange={(e) => setCaptureMealInput(e.target.value)}
+                        placeholder="e.g. Charcuterie Board, Crispy Miso Salmon Rice Bowls, Lemon Pasta…"
+                        style={{
+                          flex: 1,
+                          padding: '14px 18px',
+                          borderRadius: 12,
+                          background: '#ffffff',
+                          border: '1.5px solid #d5cfc4',
+                          fontSize: '1.15rem',
+                          fontWeight: 600,
+                          color: '#1b1c1a',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={startCaptureMealDictation}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '0 20px',
+                          borderRadius: 12,
+                          background: captureListening ? '#e85a36' : '#edf2fe',
+                          color: captureListening ? '#ffffff' : '#2b59ff',
+                          border: `1px solid ${captureListening ? '#e85a36' : '#d2dbe8'}`,
+                          fontSize: '0.98rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                          {captureListening ? 'graphic_eq' : 'mic'}
+                        </span>
+                        <span>{captureListening ? 'Listening…' : 'Speak Dish'}</span>
+                      </button>
+                    </div>
+
+                    {/* Quick-Tap Dish Chips */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: '#8d716a' }}>
+                        QUICK PICKS:
+                      </span>
+                      {[
+                        ...state.backlog.map((b) => b.recipe_or_item_name),
+                        'Charcuterie Board',
+                        'Crispy Miso Salmon Rice Bowls',
+                        'Lemon Ricotta Orecchiette',
+                        'Crispy Black Bean Tacos',
+                        'Sheet-Pan Harissa Chicken',
+                        'Homemade Pizza Night',
+                      ]
+                        .filter((v, i, arr) => arr.indexOf(v) === i)
+                        .slice(0, 6)
+                        .map((chip) => {
+                          const selected = captureMealInput.trim().toLowerCase() === chip.toLowerCase();
+                          return (
+                            <button
+                              key={chip}
+                              type="button"
+                              onClick={() => setCaptureMealInput(chip)}
+                              style={{
+                                padding: '6px 13px',
+                                borderRadius: 999,
+                                background: selected ? '#ab2f0d' : '#ffffff',
+                                color: selected ? '#ffffff' : '#1b1c1a',
+                                border: `1px solid ${selected ? '#ab2f0d' : '#e5e1d8'}`,
+                                fontSize: '0.84rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {chip}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Bottom 2-Col Decision: Need a Structured Recipe vs. No Recipe Needed (Just Tips & Photo) */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 16,
+                      flex: 1,
+                      minHeight: 0,
+                      paddingTop: 12,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {/* Option 1: Need a Structured Step-by-Step Recipe */}
+                    <div
+                      style={{
+                        borderRadius: 16,
+                        padding: 22,
+                        background: 'linear-gradient(135deg, #fffaf5 0%, #ffffff 100%)',
+                        border: '2px solid #fed7aa',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: 14,
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 12,
+                              background: '#ffdad2',
+                              color: '#ab2f0d',
+                              display: 'grid',
+                              placeItems: 'center',
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 24 }}>
+                              menu_book
+                            </span>
+                          </div>
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              padding: '4px 10px',
+                              borderRadius: 999,
+                              background: '#ffdad2',
+                              color: '#891d00',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                            }}
+                          >
+                            FULL COOKING GUIDE
+                          </span>
+                        </div>
+
+                        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1b1c1a', marginTop: 14 }}>
+                          Need a Recipe (Step-by-Step)
+                        </h2>
+                        <p style={{ fontSize: '0.94rem', color: '#59413b', marginTop: 6, lineHeight: 1.5 }}>
+                          Builds an interactive 5-step cooking canvas with step timers, read-aloud voice assist, key
+                          ingredient prep, and station notes.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => confirmCapturedDinner(activeCaptureChef, true)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 10,
+                          padding: '15px 20px',
+                          borderRadius: 12,
+                          background: '#ab2f0d',
+                          color: '#ffffff',
+                          fontSize: '1.05rem',
+                          fontWeight: 800,
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                          skillet
+                        </span>
+                        <span>
+                          Open Step-by-Step Recipe
+                          {captureMealInput.trim() ? ` for “${captureMealInput.trim()}”` : ''}
+                        </span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                          arrow_forward
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Option 2: No Structured Recipe Needed — Gemini Assembly Tips & Representative Photo */}
+                    <div
+                      style={{
+                        borderRadius: 16,
+                        padding: 22,
+                        background: 'linear-gradient(135deg, #f4f7ff 0%, #ffffff 100%)',
+                        border: '2px solid #d2dbe8',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: 14,
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 12,
+                              background: '#edf2fe',
+                              color: '#2b59ff',
+                              display: 'grid',
+                              placeItems: 'center',
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 24 }}>
+                              tips_and_updates
+                            </span>
+                          </div>
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              padding: '4px 10px',
+                              borderRadius: 999,
+                              background: '#edf2fe',
+                              color: '#2b59ff',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                            }}
+                          >
+                            GEMINI TIPS &amp; PHOTO
+                          </span>
+                        </div>
+
+                        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1b1c1a', marginTop: 14 }}>
+                          No Recipe Needed (Tips &amp; Photo)
+                        </h2>
+                        <p style={{ fontSize: '0.94rem', color: '#59413b', marginTop: 6, lineHeight: 1.5 }}>
+                          Ideal for boards, assemblies, or dishes you know by heart. Displays a representative photo
+                          alongside 5 Gemini staging &amp; kid-friendly tips.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => confirmCapturedDinner(activeCaptureChef, false)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 10,
+                          padding: '15px 20px',
+                          borderRadius: 12,
+                          background: '#2b59ff',
+                          color: '#ffffff',
+                          fontSize: '1.05rem',
+                          fontWeight: 800,
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                          auto_awesome
+                        </span>
+                        <span>
+                          Show Gemini Tips &amp; Photo
+                          {captureMealInput.trim() ? ` for “${captureMealInput.trim()}”` : ''}
+                        </span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                          arrow_forward
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : d.status !== 'unclaimed' && isStructuredRecipeView ? (
+                /* ── STATE A: PLANNED DINNER HAPPY PATH (Structured Cooking & Recipe Focus) ── */
+                <>
+                  {/* Top Recipe Header */}
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                      borderBottom: '1px solid #f0ede6',
+                      paddingBottom: 14,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          className="font-mono"
+                          style={{
+                            padding: '2px 10px',
+                            borderRadius: 6,
+                            background: '#ffdad2',
+                            color: '#891d00',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                          }}
+                        >
+                          TONIGHT&apos;S DINNER • 6:30 PM
+                        </span>
+                        <span className="font-mono" style={{ fontSize: 12, color: '#59413b' }}>
+                          • {liveStructuredRecipe?.servings || '4 Servings'}
+                        </span>
+                        <span className="font-mono" style={{ fontSize: 12, color: '#59413b' }}>
+                          • Owner: {isParent(d.chef) ? NAMES[d.chef] : d.chef === 'takeout' ? 'Takeout' : 'Daniela'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDinnerRecipeMode('tips');
+                            showToast('Switched to Gemini Assembly Tips & Photo view');
+                          }}
+                          className="font-mono"
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            background: '#fffaf5',
+                            border: '1px solid #fed7aa',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#ab2f0d',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Tips &amp; Photo View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCaptureMealInput(d.recipe_name || '');
+                            setPendingChef(isParent(d.chef) ? d.chef : 'daniela');
+                          }}
+                          className="font-mono"
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            background: '#f7f6f2',
+                            border: '1px solid #eae6de',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#59413b',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Edit Dish
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPendingChef(null);
+                            setDinnerRecipeMode('auto');
+                            act({ type: 'unclaim_dinner' });
+                            showToast('Dinner reset to undecided');
+                          }}
+                          className="font-mono"
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            background: '#f7f6f2',
+                            border: '1px solid #eae6de',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#8d716a',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        paddingTop: 2,
+                      }}
+                    >
+                      <h1
+                        style={{
+                          fontSize: 'clamp(1.5rem, 2vw, 1.875rem)',
+                          fontWeight: 800,
+                          color: 'var(--text)',
+                          letterSpacing: '-0.025em',
+                        }}
+                      >
+                        {d.recipe_name || 'Crispy Miso Salmon Rice Bowls'}
+                      </h1>
+
+                      <div
+                        className="font-mono"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          fontSize: 12,
+                          color: '#59413b',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: '#f7f6f2',
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #eae6de',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#e85a36' }}>
+                            timer
+                          </span>
+                          Prep: <strong>{liveStructuredRecipe?.prepTime || '20 min'}</strong>
+                        </span>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: '#f7f6f2',
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #eae6de',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#ab2f0d' }}>
+                            skillet
+                          </span>
+                          Cook: <strong>{liveStructuredRecipe?.cookTime || '18 min'}</strong>
+                        </span>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: '#f7f6f2',
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #eae6de',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#d97706' }}>
+                            local_fire_department
+                          </span>
+                          {liveStructuredRecipe?.method || 'Stovetop + Broiler'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Active Cooking Step Hero Box */}
+                  <div
+                    style={{
+                      borderRadius: 16,
+                      padding: '20px 24px',
+                      background: '#fffaf5',
+                      border: '2px solid #fed7aa',
+                      boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
+                      margin: '12px 0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      flexShrink: 0,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingBottom: 8,
+                        borderBottom: '1px solid #fde8d0',
+                      }}
+                    >
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: '#e85a36',
+                            boxShadow: '0 0 0 4px rgba(232, 90, 54, 0.2)',
+                          }}
+                        />
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 900,
+                            textTransform: 'uppercase',
+                            color: '#ab2f0d',
+                            letterSpacing: '0.06em',
+                          }}
+                        >
+                          STEP {(recipeStepIdx % activeRecipeSteps.length) + 1} OF {activeRecipeSteps.length} —{' '}
+                          {currentStep.stage}
+                        </span>
+                      </div>
+                      <span className="font-mono" style={{ fontSize: 12, fontWeight: 600, color: '#8d716a' }}>
+                        Next: {currentStep.nextPreview}
+                      </span>
+                    </div>
+
+                    <p
+                      style={{
+                        fontSize: 'clamp(1.25rem, 1.55vw, 1.5rem)',
+                        fontWeight: 700,
+                        color: '#1b1c1a',
+                        lineHeight: 1.55,
+                        padding: '12px 0',
+                      }}
+                    >
+                      {currentStep.instruction}
+                    </p>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        paddingTop: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={toggleReadStepAloud}
+                          className="font-mono"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '10px 16px',
+                            borderRadius: 12,
+                            background: '#ffffff',
+                            color: '#1b1c1a',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            border: '1px solid #fed7aa',
+                            boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#e85a36' }}>
+                            {ttsSpeaking ? 'graphic_eq' : 'volume_up'}
+                          </span>
+                          <span>
+                            {ttsSpeaking
+                              ? `Speaking Step ${(recipeStepIdx % activeRecipeSteps.length) + 1}...`
+                              : 'Read Step Aloud 🔊'}
+                          </span>
+                        </button>
+
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '6px 14px',
+                            borderRadius: 12,
+                            background: '#ffedd5',
+                            border: '1px solid #fed7aa',
+                            color: '#ab2f0d',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#e85a36' }}>
+                            local_fire_department
+                          </span>
+                          <span
+                            className="font-mono"
+                            style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em' }}
+                          >
+                            {fmtBroilTime(broilSeconds)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => adjustBroilTimer(60)}
+                            className="font-mono"
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: 8,
+                              background: '#ffffff',
+                              color: '#ab2f0d',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              border: '1px solid #fed7aa',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            +1m
+                          </button>
+                          <button
+                            type="button"
+                            onClick={toggleBroilTimer}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 8,
+                              background: '#e85a36',
+                              color: '#ffffff',
+                              border: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                              {broilRunning ? 'pause' : 'play_arrow'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={prevRecipeStep}
+                          className="font-mono"
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            background: '#ffffff',
+                            color: '#8d716a',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            border: '1px solid #e5e1d8',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ← Prev Step
+                        </button>
+                        <button
+                          type="button"
+                          onClick={advanceRecipeStep}
+                          className="font-mono"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '10px 20px',
+                            borderRadius: 12,
+                            background: '#ab2f0d',
+                            color: '#ffffff',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span>Next Step ({((recipeStepIdx + 1) % activeRecipeSteps.length) + 1})</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                            arrow_forward
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom 2-Column Grid: Key Ingredients & Prep + Station Notes & Equipment */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 16,
+                      flex: 1,
+                      minHeight: 0,
+                      paddingTop: 4,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {/* Left: KEY INGREDIENTS & PREP */}
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 12,
+                        background: '#fbfaf7',
+                        border: '1px solid #eae6de',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                        overflowY: 'auto',
+                        minHeight: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingBottom: 8,
+                          borderBottom: '1px solid #eae6de',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            color: '#59413b',
+                            letterSpacing: '0.06em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                            grocery
+                          </span>
+                          KEY INGREDIENTS &amp; PREP
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+                        {(
+                          liveStructuredRecipe?.ingredients || [
+                            {
+                              name: 'Wild Salmon Fillets',
+                              amount: '4 × 6 oz',
+                              prep: 'Skin-on, patted dry, flesh scored lightly at 1-inch intervals',
+                            },
+                            {
+                              name: 'Sweet Miso Glaze',
+                              amount: 'Whisked & Ready',
+                              prep: '2 tbsp white miso + 1 tbsp mirin + 1 tsp soy sauce + 1/2 tsp grated ginger',
+                            },
+                            {
+                              name: 'Steamed Jasmine Rice',
+                              amount: '3 cups cooked',
+                              prep: 'Zojirushi keep-warm mode • Fluffed with paddle and vented',
+                            },
+                          ]
+                        ).map((ing) => (
+                          <div
+                            key={ing.name}
+                            style={{
+                              padding: 10,
+                              borderRadius: 8,
+                              background: '#ffffff',
+                              border: '1px solid #e5e1d8',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 4,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                              <span style={{ fontWeight: 700, color: '#1b1c1a', fontSize: 14 }}>{ing.name}</span>
+                              <span
+                                className="font-mono"
+                                style={{
+                                  fontWeight: 700,
+                                  color: '#ab2f0d',
+                                  background: '#fffaf5',
+                                  border: '1px solid #fed7aa',
+                                  padding: '2px 8px',
+                                  borderRadius: 4,
+                                  fontSize: 11,
+                                }}
+                              >
+                                {ing.amount}
+                              </span>
+                            </div>
+                            <p className="font-mono" style={{ fontSize: 11, color: '#59413b' }}>
+                              {ing.prep}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right: STATION NOTES & EQUIPMENT */}
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 12,
+                        background: '#fbfaf7',
+                        border: '1px solid #eae6de',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                        overflowY: 'auto',
+                        minHeight: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingBottom: 8,
+                          borderBottom: '1px solid #eae6de',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            color: '#59413b',
+                            letterSpacing: '0.06em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2b59ff' }}>
+                            countertops
+                          </span>
+                          STATION NOTES &amp; EQUIPMENT
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+                        {(
+                          liveStructuredRecipe?.stationNotes || [
+                            {
+                              icon: 'oven_gen',
+                              title: 'Broiler Rack Position',
+                              detail: 'Set to top position (4 inches from heat element)',
+                            },
+                            {
+                              icon: 'skillet',
+                              title: 'Cast Iron Sizzling Pan',
+                              detail: 'Preheated with light sesame oil',
+                            },
+                            {
+                              icon: 'lunch_dining',
+                              title: 'Garnish Station Staged',
+                              detail: 'Toasted white sesame seeds & sliced scallions',
+                            },
+                          ]
+                        ).map((note, idx) => {
+                          const iconColors = ['#2b59ff', '#e85a36', '#006a46'];
+                          const detailColors = ['#59413b', '#e85a36', '#006a46'];
+                          return (
+                            <div
+                              key={note.title}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 10,
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                                background: '#ffffff',
+                                border: '1px solid #e5e1d8',
+                              }}
+                            >
+                              <span
+                                className="material-symbols-outlined"
+                                style={{ fontSize: 18, color: iconColors[idx % iconColors.length] }}
+                              >
+                                {note.icon || 'countertops'}
+                              </span>
+                              <div style={{ minWidth: 0 }}>
+                                <p style={{ fontWeight: 700, color: '#1b1c1a' }}>{note.title}</p>
+                                <p
+                                  className="font-mono"
+                                  style={{ fontSize: 11, color: detailColors[idx % detailColors.length] }}
+                                >
+                                  {note.detail}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : d.status !== 'unclaimed' ? (
+                /* ── STATE B: CLAIMED DINNER — NO STRUCTURED RECIPE (Photo + Gemini Assembly Tips & Recommendations) ── */
+                <>
+                  {/* Top Decision Claimed Banner */}
+                  <div
+                    style={{
+                      borderRadius: 16,
+                      padding: '20px 24px',
+                      background: 'linear-gradient(135deg, #fffaf5 0%, #fbfaf7 100%)',
+                      border: '2px solid #fed7aa',
+                      boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 16,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 16,
+                            background: '#ffdad2',
+                            border: '1px solid #fed7aa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 24,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span>{claimedChefEmoji}</span>
+                        </div>
+                        <div>
+                          <h1
+                            style={{
+                              fontSize: 'clamp(1.6rem, 2.1vw, 1.875rem)',
+                              fontWeight: 800,
+                              color: '#1b1c1a',
+                              letterSpacing: '-0.025em',
+                            }}
+                          >
+                            {claimedChefName} is making {unstructuredDetails.mealTitle}
+                          </h1>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDinnerRecipeMode('structured');
+                            showToast('Switched to Step-by-Step Cooking Guide');
+                          }}
+                          className="font-mono"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            background: '#fffaf5',
+                            color: '#ab2f0d',
+                            border: '1px solid #fed7aa',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                            menu_book
+                          </span>
+                          <span>Step-by-Step Guide</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCaptureMealInput(d.recipe_name || '');
+                            setPendingChef(isParent(d.chef) ? d.chef : 'daniela');
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            background: '#f7f6f2',
+                            color: '#59413b',
+                            border: '1px solid #eae6de',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#8d716a' }}>
+                            edit
+                          </span>
+                          <span>Edit Dish</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPendingChef(null);
+                            setDinnerRecipeMode('auto');
+                            act({ type: 'unclaim_dinner' });
+                            showToast('Reopening claim dinner options...');
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            background: '#ffffff',
+                            color: '#59413b',
+                            border: '1px solid #e5e1d8',
+                            boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
+                            fontSize: 14,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#8d716a' }}>
+                            sync_alt
+                          </span>
+                          <span>Change Cook / Plan</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Content Split: Left 7 Cols (Representative Photo) + Right 5 Cols (Gemini Assembly Tips & Recommendations) */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '7fr 5fr',
+                      gap: 16,
+                      flex: 1,
+                      minHeight: 0,
+                      paddingTop: 12,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {/* Left 7 Cols: Rich Photo Presentation */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                        minHeight: 0,
+                        height: '100%',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          flex: 1,
+                          borderRadius: 16,
+                          overflow: 'hidden',
+                          border: '1px solid #fed7aa',
+                          background: '#faf9f5',
+                          minHeight: 220,
+                        }}
+                      >
+                        <img
+                          src={unstructuredDetails.imageUrl}
+                          alt={unstructuredDetails.imageAlt}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            borderRadius: 16,
+                            display: 'block',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right 5 Cols: Assembly Tips & Recommendations */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        overflow: 'hidden',
+                        minHeight: 0,
+                        height: '100%',
+                      }}
+                    >
+                      <div
+                        className="ceramic-card"
+                        style={{
+                          borderRadius: 16,
+                          padding: 16,
+                          border: '1px solid #e7e3da',
+                          background: '#faf9f5',
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          minHeight: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingBottom: 10,
+                            borderBottom: '1px solid #e5e1d8',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#e85a36' }}>
+                              tips_and_updates
+                            </span>
+                            <h3
+                              className="font-mono"
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 800,
+                                color: '#1b1c1a',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.06em',
+                              }}
+                            >
+                              {unstructuredDetails.sectionHeading}
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* 5 Gemini Recommendation Cards */}
+                        <div
+                          style={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-around',
+                            gap: 8,
+                            paddingTop: 10,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {unstructuredDetails.tips.map((tip) => (
+                            <div
+                              key={tip.title}
+                              style={{
+                                padding: 10,
+                                borderRadius: 12,
+                                background: tip.isKidPick ? '#fffcf5' : '#ffffff',
+                                border: `1px solid ${tip.isKidPick ? '#fed7aa' : '#e5e1d8'}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 10,
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                <span
+                                  className="material-symbols-outlined"
+                                  style={{ fontSize: 18, color: tip.isKidPick ? '#ab2f0d' : '#e85a36' }}
+                                >
+                                  {tip.icon}
+                                </span>
+                                <div style={{ minWidth: 0 }}>
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: '#1b1c1a',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {tip.title}
+                                  </div>
+                                  <div
+                                    className="font-mono"
+                                    style={{
+                                      fontSize: 10,
+                                      color: tip.isKidPick ? '#ab2f0d' : '#59413b',
+                                      fontWeight: tip.isKidPick ? 600 : 400,
+                                    }}
+                                  >
+                                    {tip.detail}
+                                  </div>
+                                </div>
+                              </div>
+                              <span
+                                className="font-mono"
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: tip.isKidPick ? '#ab2f0d' : '#8d716a',
+                                  background: tip.isKidPick ? '#ffdad2' : '#f4f2ec',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {tip.tag}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* ── STATE C: UNDECIDED DINNER ("Nobody has claimed dinner tonight") ── */
+                <>
+                  {/* Top Decision Alert Banner */}
+                  <div
+                    style={{
+                      borderRadius: 16,
+                      padding: 22,
+                      background: 'linear-gradient(135deg, #fffaf5 0%, #fbfaf7 100%)',
+                      border: '2px solid #fed7aa',
+                      boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 18,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    <div>
+                      <h1
+                        style={{
+                          fontSize: 'clamp(1.6rem, 2.1vw, 1.875rem)',
+                          fontWeight: 800,
+                          color: '#1b1c1a',
+                          letterSpacing: '-0.025em',
+                        }}
+                      >
+                        Nobody has claimed dinner tonight
+                      </h1>
+                      <p style={{ fontSize: '0.96rem', fontWeight: 500, color: '#57534e', paddingTop: 4 }}>
+                        Select an option below to set the plan, or choose from ready-to-cook pantry ideas.
+                      </p>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: 12,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCaptureMealInput('');
+                          setPendingChef('daniela');
+                          showToast('Daniela is cooking — enter what is on the menu!');
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 10,
+                          padding: '14px 16px',
+                          borderRadius: 12,
+                          background: '#ffffff',
+                          color: '#1b1c1a',
+                          fontSize: '1.05rem',
+                          fontWeight: 700,
+                          border: '1px solid #edd5c3',
+                          boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ fontSize: 22 }}>🙋‍♀️</span>
+                        <span>Daniela&apos;s cooking</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCaptureMealInput('');
+                          setPendingChef('warren');
+                          showToast('Warren is cooking — enter what is on the menu!');
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 10,
+                          padding: '14px 16px',
+                          borderRadius: 12,
+                          background: '#ffffff',
+                          color: '#1b1c1a',
+                          fontSize: '1.05rem',
+                          fontWeight: 700,
+                          border: '1px solid #edd5c3',
+                          boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ fontSize: 22 }}>👨‍🍳</span>
+                        <span>Warren&apos;s cooking</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          showToast('Opening Takeout order options...');
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 10,
+                          padding: '14px 16px',
+                          borderRadius: 12,
+                          background: '#edf2fe',
+                          color: '#2b59ff',
+                          fontSize: '1.05rem',
+                          fontWeight: 700,
+                          border: '1px solid #d2dbe8',
+                          boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ fontSize: 22 }}>🥡</span>
+                        <span>Takeout / Delivery</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          showToast('Night set to Leftovers & Fend for yourself');
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 10,
+                          padding: '14px 16px',
+                          borderRadius: 12,
+                          background: '#f7f6f2',
+                          color: '#59413b',
+                          fontSize: '1.05rem',
+                          fontWeight: 700,
+                          border: '1px solid #eae6de',
+                          boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ fontSize: 22 }}>🥣</span>
+                        <span>Leftovers / Fend</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Main Content Split: Left 7 Cols (Fast Recipes) + Right 5 Cols (Gemini Voice & Delivery Re-Order) */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '7fr 5fr',
+                      gap: 16,
+                      flex: 1,
+                      minHeight: 0,
+                      paddingTop: 12,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {/* Left 7 Cols: Fast Recipes from Pantry & Fridge */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        overflow: 'hidden',
+                        minHeight: 0,
+                        background: '#fbfaf7',
+                        padding: 18,
+                        borderRadius: 12,
+                        border: '1px solid #eae6de',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingBottom: 8,
+                          borderBottom: '1px solid #eae6de',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          className="font-mono"
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            color: '#59413b',
+                            letterSpacing: '0.06em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                            kitchen
+                          </span>
+                          FAST RECIPES FROM PANTRY &amp; FRIDGE
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          minHeight: 0,
+                        }}
+                      >
+                        {/* Recipe Card 1 */}
+                        <div
+                          style={{
+                            flex: 1,
+                            padding: '14px 18px',
+                            borderRadius: 12,
+                            background: '#ffffff',
+                            border: '1px solid #e5e1d8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 16,
+                          }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 4 }}>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  padding: '2px 10px',
+                                  borderRadius: 999,
+                                  color: '#ab2f0d',
+                                  background: '#fffaf5',
+                                  border: '1px solid #fed7aa',
+                                }}
+                              >
+                                15 min
+                              </span>
+                            </div>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1c1917', lineHeight: 1.25 }}>
+                              {state.backlog[0]?.recipe_or_item_name || 'Crispy Black Bean Tacos'}
+                            </h3>
+                            <p style={{ fontSize: '0.92rem', color: '#57534e', marginTop: 3 }}>
+                              {state.backlog[0]?.key_perishables.length
+                                ? `Pantry ready • ${state.backlog[0].key_perishables.join(' & ')}`
+                                : 'Pantry ready • Fresh cilantro & lime in crisper drawer'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selectFastRecipe(
+                                state.backlog[0]?.recipe_or_item_name || 'Crispy Black Bean Tacos',
+                                state.backlog[0]?.id,
+                              )
+                            }
+                            style={{
+                              flexShrink: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '12px 18px',
+                              borderRadius: 10,
+                              background: '#ab2f0d',
+                              color: '#ffffff',
+                              fontSize: '0.95rem',
+                              fontWeight: 700,
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span>Cook Tonight</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                              arrow_forward
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Recipe Card 2 */}
+                        <div
+                          style={{
+                            flex: 1,
+                            padding: '14px 18px',
+                            borderRadius: 12,
+                            background: '#fffcf5',
+                            border: '1px solid #fed7aa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 16,
+                          }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 4 }}>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  padding: '2px 10px',
+                                  borderRadius: 999,
+                                  color: '#006a46',
+                                  background: '#edf7f2',
+                                  border: '1px solid #bbf7d0',
+                                }}
+                              >
+                                20 min
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  padding: '2px 10px',
+                                  borderRadius: 999,
+                                  color: '#d97706',
+                                  background: '#ffedd5',
+                                }}
+                              >
+                                Expires Soon
+                              </span>
+                            </div>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1c1917', lineHeight: 1.25 }}>
+                              {state.backlog[1]?.recipe_or_item_name || 'Lemon Ricotta Orecchiette'}
+                            </h3>
+                            <p style={{ fontSize: '0.92rem', color: '#57534e', marginTop: 3 }}>
+                              {state.backlog[1]?.key_perishables.length
+                                ? `Shift from Wed? ${state.backlog[1].key_perishables.join(' • ')}`
+                                : 'Shift from Wed? Fresh ricotta expires tomorrow'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selectFastRecipe(
+                                state.backlog[1]?.recipe_or_item_name || 'Lemon Ricotta Orecchiette',
+                                state.backlog[1]?.id,
+                              )
+                            }
+                            style={{
+                              flexShrink: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '12px 18px',
+                              borderRadius: 10,
+                              background: '#ab2f0d',
+                              color: '#ffffff',
+                              fontSize: '0.95rem',
+                              fontWeight: 700,
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span>Cook Tonight</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                              arrow_forward
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Recipe Card 3 */}
+                        <div
+                          style={{
+                            flex: 1,
+                            padding: '14px 18px',
+                            borderRadius: 12,
+                            background: '#ffffff',
+                            border: '1px solid #e5e1d8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 16,
+                          }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 4 }}>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  padding: '2px 10px',
+                                  borderRadius: 999,
+                                  color: '#ab2f0d',
+                                  background: '#fffaf5',
+                                  border: '1px solid #fed7aa',
+                                }}
+                              >
+                                25 min
+                              </span>
+                            </div>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1c1917', lineHeight: 1.25 }}>
+                              {state.backlog[2]?.recipe_or_item_name || 'Sheet-Pan Harissa Chicken'}
+                            </h3>
+                            <p style={{ fontSize: '0.92rem', color: '#57534e', marginTop: 3 }}>
+                              {state.backlog[2]?.key_perishables.length
+                                ? state.backlog[2].key_perishables.join(' • ')
+                                : 'Thawed chicken thighs • Bell peppers • Greek yogurt dip'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selectFastRecipe(
+                                state.backlog[2]?.recipe_or_item_name || 'Sheet-Pan Harissa Chicken',
+                                state.backlog[2]?.id,
+                              )
+                            }
+                            style={{
+                              flexShrink: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '12px 18px',
+                              borderRadius: 10,
+                              background: '#ab2f0d',
+                              color: '#ffffff',
+                              fontSize: '0.95rem',
+                              fontWeight: 700,
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span>Cook Tonight</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                              arrow_forward
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right 5 Cols: Ask Gemini Voice + Delivery Re-Order */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        minHeight: 0,
+                      }}
+                    >
+                      {/* Ask Gemini Voice Card */}
+                      <div
+                        style={{
+                          padding: 16,
+                          borderRadius: 12,
+                          background: 'linear-gradient(135deg, #f4f7ff 0%, rgba(237, 242, 254, 0.55) 100%)',
+                          border: '1px solid #d2dbe8',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 12,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2b59ff' }}>
+                            auto_awesome
+                          </span>
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              color: '#2b59ff',
+                              letterSpacing: '0.06em',
+                            }}
+                          >
+                            Ask Gemini Voice
+                          </span>
+                        </div>
+
+                        <p
+                          style={{
+                            fontSize: '1.05rem',
+                            fontWeight: 500,
+                            lineHeight: 1.5,
+                            color: '#1b1c1a',
+                            background: 'rgba(255, 255, 255, 0.85)',
+                            padding: '14px 16px',
+                            borderRadius: 8,
+                            border: '1px solid #d2dbe8',
+                          }}
+                        >
+                          &ldquo;Suggest a 20-min dinner using wild salmon and jasmine rice&rdquo;
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGeminiCustomQuery('Suggest a 20-min dinner using wild salmon and jasmine rice');
+                            openGeminiOverlay();
+                            showToast('Gemini listening... Ask your dinner question!');
+                          }}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            padding: '12px 16px',
+                            borderRadius: 8,
+                            background: '#2b59ff',
+                            color: '#ffffff',
+                            fontSize: '1.05rem',
+                            fontWeight: 700,
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                            graphic_eq
+                          </span>
+                          <span>Tap to Ask Gemini</span>
+                        </button>
+                      </div>
+
+                      {/* Delivery Re-Order Card */}
+                      <div
+                        style={{
+                          padding: 16,
+                          borderRadius: 12,
+                          background: '#fbfaf7',
+                          border: '1px solid #eae6de',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          flex: 1,
+                          minHeight: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingBottom: 8,
+                            borderBottom: '1px solid #eae6de',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              color: '#59413b',
+                              letterSpacing: '0.06em',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2b59ff' }}>
+                              local_mall
+                            </span>
+                            DELIVERY RE-ORDER
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: 8,
+                            minHeight: 0,
+                          }}
+                        >
+                          {[
+                            { name: 'Sweetgreen', sub: 'Harvest Bowls', eta: '22 min' },
+                            { name: 'Thai Basil', sub: 'Pad See Ew & Curry', eta: '28 min' },
+                            { name: 'Pizzeria Delfina', sub: 'Margherita & Kale', eta: '35 min' },
+                          ].map((spot) => (
+                            <button
+                              key={spot.name}
+                              type="button"
+                              onClick={() => {
+                                showToast(`Ordering ${spot.name} (${spot.sub})...`);
+                              }}
+                              style={{
+                                flex: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '10px 16px',
+                                borderRadius: 8,
+                                background: '#ffffff',
+                                border: '1px solid #e5e1d8',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '1.15rem', fontWeight: 700, color: '#1c1917' }}>
+                                  {spot.name}
+                                </span>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 500, color: '#78716c', marginTop: 2 }}>
+                                  {spot.sub}
+                                </span>
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: '0.92rem',
+                                  fontWeight: 700,
+                                  padding: '6px 12px',
+                                  borderRadius: 8,
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {spot.eta}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* RIGHT RAIL (~21% width, w-56): Compressed Bento Navigation Rail */}
+            <aside
+              id="ultraSlimRightRail"
+              style={{
+                width: 224,
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                minHeight: 0,
+              }}
+            >
+              {/* Bento Card 1: UPCOMING */}
+              <button
+                type="button"
+                onClick={() => showToast('Opening Upcoming Dinners schedule')}
+                className="ceramic-card"
+                style={{
+                  borderRadius: 16,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  flex: 1,
+                  border: '1px solid #edd5c3',
+                  background: 'linear-gradient(135deg, #fffcf5 0%, #fffaf5 100%)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: 'rgba(255, 218, 210, 0.35)',
+                        border: '1px solid #fed7aa',
+                        color: '#ab2f0d',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        calendar_month
+                      </span>
+                    </div>
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: '#891d00',
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Upcoming
+                    </span>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                    arrow_forward
+                  </span>
+                </div>
+
+                <div style={{ padding: '8px 0', minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 800,
+                      color: '#1b1c1a',
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.2,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    Wed: Warren Cooking
+                  </div>
+                  <div
+                    className="font-mono"
+                    style={{
+                      fontSize: 12,
+                      color: '#59413b',
+                      paddingTop: 4,
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {state.backlog[0]?.recipe_or_item_name || 'Lemon Ricotta Orecchiette'}
+                  </div>
+                </div>
+
+                <div
+                  className="font-mono"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: 8,
+                    borderTop: '1px solid #f5e6c8',
+                    width: '100%',
+                    fontSize: 10,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: '#ab2f0d',
+                      background: '#ffdad2',
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                    }}
+                  >
+                    3 SCHEDULED
+                  </span>
+                  <span style={{ color: '#8d716a', fontWeight: 600 }}>Oct 25–27</span>
+                </div>
+              </button>
+
+              {/* Bento Card 2: TAKEOUT */}
+              <button
+                type="button"
+                onClick={() => showToast('Opening Takeout & Backups drawer')}
+                className="ceramic-card"
+                style={{
+                  borderRadius: 16,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  flex: 1,
+                  border: '1px solid #d2dbe8',
+                  background: 'linear-gradient(135deg, rgba(244, 247, 255, 0.5) 0%, rgba(237, 242, 254, 0.35) 100%)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: '#edf2fe',
+                        border: '1px solid #d2dbe8',
+                        color: '#2b59ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        takeout_dining
+                      </span>
+                    </div>
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: '#2b59ff',
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Takeout
+                    </span>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2b59ff' }}>
+                    arrow_forward
+                  </span>
+                </div>
+
+                <div style={{ padding: '8px 0', minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 800,
+                      color: '#1b1c1a',
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.2,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    3 Go-To Spots
+                  </div>
+                  <div
+                    className="font-mono"
+                    style={{
+                      fontSize: 12,
+                      color: '#59413b',
+                      paddingTop: 4,
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    18–30m avg delivery
+                  </div>
+                </div>
+
+                <div
+                  className="font-mono"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: 8,
+                    borderTop: '1px solid #d2dbe8',
+                    width: '100%',
+                    fontSize: 10,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: '#2b59ff',
+                      background: '#edf2fe',
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                    }}
+                  >
+                    FAVORITES READY
+                  </span>
+                  <span style={{ color: '#8d716a', fontWeight: 600 }}>~18–30m</span>
+                </div>
+              </button>
+
+              {/* Bento Card 3: MEAL PLAN */}
+              <button
+                type="button"
+                onClick={() => showToast('Opening Meal Planner & Assignment')}
+                className="ceramic-card"
+                style={{
+                  borderRadius: 16,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  flex: 1,
+                  border: '1px solid #bbf7d0',
+                  background: 'linear-gradient(135deg, #ffffff 0%, rgba(237, 247, 242, 0.25) 100%)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: '#edf7f2',
+                        border: '1px solid #bbf7d0',
+                        color: '#006a46',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        edit_calendar
+                      </span>
+                    </div>
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: '#006a46',
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Meal Plan
+                    </span>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#006a46' }}>
+                    arrow_forward
+                  </span>
+                </div>
+
+                <div style={{ padding: '8px 0', minWidth: 0 }}>
+                  {d.status !== 'unclaimed' ? (
+                    <>
+                      <div
+                        className="font-mono"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          background: '#edf7f2',
+                          border: '1px solid #bbf7d0',
+                          color: '#006a46',
+                          fontSize: 13,
+                          fontWeight: 800,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#006a46' }}>
+                          check_circle
+                        </span>
+                        Tonight Claimed
+                      </div>
+                      <div
+                        className="font-mono"
+                        style={{
+                          fontSize: 12,
+                          color: '#59413b',
+                          paddingTop: 6,
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {claimedChefName}:{' '}
+                        {d.recipe_name || (isStructuredRecipeView ? 'Crispy Miso Salmon Rice Bowls' : 'Charcuterie Board')}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="font-mono"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          background: '#fdf2f2',
+                          border: '1px solid #fbd5d5',
+                          color: '#ab2f0d',
+                          fontSize: 13,
+                          fontWeight: 800,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: '#ab2f0d',
+                          }}
+                        />
+                        1 Night Unclaimed
+                      </div>
+                      <div
+                        className="font-mono"
+                        style={{
+                          fontSize: 12,
+                          color: '#59413b',
+                          paddingTop: 6,
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        6 of 7 days planned
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div
+                  className="font-mono"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: 8,
+                    borderTop: '1px solid #bbf7d0',
+                    width: '100%',
+                    fontSize: 10,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: '#006a46',
+                      background: '#edf7f2',
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                    }}
+                  >
+                    {d.status !== 'unclaimed' ? '7/7 DAYS' : '6/7 DAYS'}
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: d.status !== 'unclaimed' ? '#006a46' : '#ab2f0d',
+                      background: d.status !== 'unclaimed' ? '#edf7f2' : '#ffdad2',
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {d.status !== 'unclaimed' ? 'ALL SET' : '1 NEEDED'}
+                  </span>
+                </div>
+              </button>
+            </aside>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════════
+            VIEW 3: BENTO OVERVIEW & EXPANDED TIMELINE (Stitch Screens 3 & 4)
+            ════════════════════════════════════════════════════════════════════ */}
+        {(mode === 'bento' || mode === 'timeline') && (
           <div
             style={{
               flex: 1,
@@ -2055,7 +4890,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       {state.backlog.length} kits in fridge backlog
                     </div>
                   </div>
-                  <button className="hw-btn" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setMode('ambient')}>
+                  <button className="hw-btn" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setMode('dinner')}>
                     <span>EXPAND DINNER</span>
                     <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
                       chevron_left
@@ -2170,7 +5005,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <button
                 className="hw-btn pill font-mono"
-                onClick={() => setMode('ambient')}
+                onClick={() => setMode('dinner')}
                 style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
@@ -2236,13 +5071,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <button
-                  className="dock-tab"
-                  onClick={() => setMode('ambient')}
+                  className={`dock-tab ${mode === 'dinner' ? 'active' : ''}`}
+                  onClick={() => setMode('dinner')}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'dinner' ? '#fff' : 'var(--terracotta)' }}>
                     restaurant
                   </span>
-                  <span>Dinner &amp; Timer Hub</span>
+                  <span>Dinner Hub</span>
                 </button>
 
                 <button
@@ -2493,6 +5328,36 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 </button>
               </form>
             </div>
+          </div>
+        )}
+
+        {/* Notification Banner Toast */}
+        {toastMsg && (
+          <div
+            id="toast"
+            className="font-mono"
+            style={{
+              position: 'fixed',
+              bottom: 96,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '10px 20px',
+              borderRadius: 9999,
+              background: '#1b1c1a',
+              color: '#ffffff',
+              fontSize: 12,
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              pointerEvents: 'none',
+              zIndex: 50,
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 17, color: '#8ef7c2' }}>
+              check_circle
+            </span>
+            <span>{toastMsg}</span>
           </div>
         )}
       </main>

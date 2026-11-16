@@ -47,7 +47,7 @@ export async function claimDinner(
   const cur = await getDinner(date);
   const patch: Partial<DinnerRow> = { chef, status: 'planned', claimed_via: via };
   if (chef === 'takeout') {
-    patch.recipe_name = 'Takeout / fend for yourselves';
+    patch.recipe_name = recipeName?.trim() || 'Takeout / fend for yourselves';
     patch.linked_backlog_id = null;
   } else {
     if (recipeName) {

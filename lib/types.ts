@@ -113,7 +113,7 @@ export interface KitchenState {
 }
 
 export type KioskAction =
-  | { type: 'claim_dinner'; chef: 'daniela' | 'warren' | 'takeout' }
+  | { type: 'claim_dinner'; chef: 'daniela' | 'warren' | 'takeout'; recipeName?: string | null }
   | { type: 'unclaim_dinner' }
   | { type: 'not_tonight'; parent: Parent; unavailable: boolean }
   | { type: 'cook_from_backlog'; backlogId: string }

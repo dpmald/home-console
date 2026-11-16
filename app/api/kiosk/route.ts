@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   switch (a.type) {
     case 'claim_dinner':
-      await claimDinner(date, a.chef, 'kiosk');
+      await claimDinner(date, a.chef, 'kiosk', a.recipeName);
       touchedSlack = true;
       break;
     case 'unclaim_dinner':
