@@ -702,6 +702,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     );
   };
 
+  const d = state.dinner;
   const activeRecipeSteps =
     liveStructuredRecipe &&
     d.recipe_name &&
@@ -828,7 +829,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   // Time formatting
   const rawTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   const [clockDigits, clockAmPm] = rawTime.split(' ');
-  const d = state.dinner;
   const autoHasStructuredRecipe =
     Boolean(d.linked_backlog_id) ||
     Boolean(d.recipe_name && STRUCTURED_RECIPE_TITLES.has(d.recipe_name.toLowerCase().trim()));
