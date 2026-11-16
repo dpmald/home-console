@@ -11,6 +11,7 @@ interface RawEvent {
   external_event_id: string;
   source_calendar: SourceCalendar;
   title: string;
+  description?: string | null;
   start_time: string;
   end_time: string;
   logistics_type?: LogisticsType;
@@ -19,7 +20,11 @@ interface RawEvent {
 
 function classify(title: string, startIso: string, endIso: string): LogisticsType {
   const t = title.toLowerCase();
-  if (/\b(pick\s*up|drop\s*off|carpool|bus|aftercare|camp|school\s*run|wesley\s*from|wesley\s*to)\b/.test(t)) {
+  if (
+    /\b(pick\s*up|pickup|drop\s*off|dropoff|carpool|bus|aftercare|camp|school\s*run|wesley\s*from|wesley\s*to|lachlan\s*from|lachlan\s*to|goddard\s*early\s*closure)\b/.test(
+      t,
+    )
+  ) {
     return 'pickup';
   }
   if (/\b(dentist|doctor|dr\.?\b|orthodont|pediatric|vet\b|checkup|appt|appointment|physical|therapy|eye\s*exam|haircut|mri|radiology|ultrasound|x-ray)\b/.test(t)) {
@@ -36,9 +41,8 @@ function defaultAssignee(type: LogisticsType, src: SourceCalendar, title: string
   const t = title.toLowerCase();
   if (/\bdaniela\b/.test(t) && !/\bwarren\b/.test(t)) return 'daniela';
   if (/\bwarren\b/.test(t) && !/\bdaniela\b/.test(t)) return 'warren';
-  // Pickups are shared problems until someone claims them; late-office belongs to the calendar owner.
-  if (type === 'pickup') return 'unassigned';
-  if (type === 'appointment' && /\bwesley\b/.test(t)) return 'unassigned';
+  // Pickups and Family Calendar items are shared until someone claims them; personal calendars belong to the calendar owner.
+  if (type === 'pickup' || src === 'family_google') return 'unassigned';
   return ownerOfCalendar(src) ?? 'unassigned';
 }
 
@@ -53,10 +57,17 @@ export async function POST(req: NextRequest) {
 
   const ids = incoming.map((e) => e.external_event_id).filter(Boolean);
   const existing = ids.length
-    ? unwrap<{ external_event_id: string; assigned_parent: Assignee; logistics_type: LogisticsType }[]>(
+    ? unwrap<
+        {
+          external_event_id: string;
+          assigned_parent: Assignee;
+          logistics_type: LogisticsType;
+          description: string | null;
+        }[]
+      >(
         await db()
           .from('family_logistics')
-          .select('external_event_id, assigned_parent, logistics_type')
+          .select('external_event_id, assigned_parent, logistics_type, description')
           .in('external_event_id', ids),
         'existing events',
       )
@@ -75,6 +86,7 @@ export async function POST(req: NextRequest) {
         external_event_id: e.external_event_id,
         source_calendar: e.source_calendar,
         title: e.title,
+        description: prev?.description ?? e.description ?? null,
         start_time: e.start_time,
         end_time: e.end_time,
         logistics_type: type,

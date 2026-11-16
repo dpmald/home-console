@@ -3,7 +3,7 @@ export type Chef = Parent | 'takeout' | 'unclaimed';
 export type DinnerStatus = 'unclaimed' | 'planned' | 'cooked';
 export type BacklogStatus = 'in_fridge' | 'cooked' | 'discarded';
 export type BacklogLocation = 'fridge' | 'pantry' | 'freezer';
-export type SourceCalendar = 'warren_outlook' | 'daniela_google' | 'manual';
+export type SourceCalendar = 'warren_outlook' | 'daniela_google' | 'family_google' | 'manual';
 export type LogisticsType = 'pickup' | 'appointment' | 'late_office' | 'general';
 export type Assignee = Parent | 'unassigned';
 
@@ -48,6 +48,7 @@ export interface LogisticsEvent {
   end_time: string;
   logistics_type: LogisticsType;
   assigned_parent: Assignee;
+  description?: string | null;
 }
 
 export interface GroceryItem {

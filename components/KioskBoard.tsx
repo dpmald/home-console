@@ -1,7 +1,15 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserSupabase } from '@/lib/supabase/browser';
-import { NAMES, PARENTS, SOURCE_LABEL, isParent } from '@/lib/family';
+import {
+  NAMES,
+  PARENTS,
+  SOURCE_LABEL,
+  formatClaimedDescription,
+  isClaimableLogistics,
+  isParent,
+  isSchoolLogisticsEvent,
+} from '@/lib/family';
 import { daysBetween, fmtDay, fmtEventTime, fmtShortDate, fmtTime, isAllDay } from '@/lib/time';
 import {
   isFullyKiosk,
@@ -26,7 +34,7 @@ interface Timer {
 }
 
 type ViewMode = 'ambient' | 'dinner' | 'bento' | 'timeline';
-type MemberFilter = 'all' | 'daniela' | 'warren' | 'wesley';
+type MemberFilter = 'all' | 'school' | 'daniela' | 'warren' | 'wesley' | 'lachlan';
 
 interface RecipeStep {
   stage: string;
@@ -338,7 +346,15 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
     case 'assign_logistics':
       return {
         ...cur,
-        events: cur.events.map((e) => (e.id === a.id ? { ...e, assigned_parent: a.parent } : e)),
+        events: cur.events.map((e) =>
+          e.id === a.id
+            ? {
+                ...e,
+                assigned_parent: a.parent,
+                description: formatClaimedDescription(e.description, e.title, a.parent),
+              }
+            : e,
+        ),
         conflicts: cur.conflicts.filter((c) => c.eventId !== a.id || a.parent === 'unassigned'),
       };
     case 'add_grocery':
@@ -894,11 +910,16 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
   const allowanceTotal = (bonusTotalCents / 100).toFixed(2);
   const pendingOrders = state.orders.filter((o) => o.status === 'pending');
   const nextUnassigned = state.events.find(
-    (e) => (e.logistics_type === 'pickup' || e.logistics_type === 'appointment') && e.assigned_parent === 'unassigned',
+    (e) => isClaimableLogistics(e) && e.assigned_parent === 'unassigned',
   );
   const filteredEvents = state.events.filter((ev) => {
     if (memberFilter === 'all') return true;
-    if (memberFilter === 'wesley') return ev.logistics_type === 'pickup' || ev.logistics_type === 'appointment' || ev.title.toLowerCase().includes('wesley');
+    if (memberFilter === 'school') return isSchoolLogisticsEvent(ev);
+    if (memberFilter === 'wesley') return ev.title.toLowerCase().includes('wesley');
+    if (memberFilter === 'lachlan') {
+      const t = ev.title.toLowerCase();
+      return t.includes('lachlan') || t.includes('goddard');
+    }
     return ev.assigned_parent === memberFilter || ev.source_calendar.startsWith(memberFilter);
   });
 
@@ -1125,7 +1146,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                     fontWeight: 700,
                                     padding: '2px 8px',
                                     borderRadius: 6,
-                                    background: '#fdeee9',
+                                    background: 'var(--warm-badge-bg)',
                                     color: 'var(--terracotta)',
                                   }}
                                 >
@@ -1332,7 +1353,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                 fontWeight: 700,
                                 padding: '3px 10px',
                                 borderRadius: 6,
-                                background: '#fdeee9',
+                                background: 'var(--warm-badge-bg)',
                                 color: 'var(--terracotta)',
                                 letterSpacing: '0.04em',
                               }}
@@ -1712,7 +1733,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 justifyContent: 'space-between',
                 borderRadius: 18,
                 padding: '20px 24px',
-                border: '1px solid #e7e3da',
+                border: '1px solid var(--border)',
                 background: 'var(--surface)',
                 overflow: 'hidden',
                 position: 'relative',
@@ -1727,7 +1748,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   width: 224,
                   height: 224,
                   borderRadius: '50%',
-                  background: 'rgba(255, 218, 210, 0.35)',
+                  background: 'var(--warm-glow)',
                   filter: 'blur(40px)',
                   pointerEvents: 'none',
                 }}
@@ -1741,8 +1762,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     style={{
                       borderRadius: 16,
                       padding: '20px 24px',
-                      background: 'linear-gradient(135deg, #fffaf5 0%, #fbfaf7 100%)',
-                      border: '2px solid #fed7aa',
+                      background: 'var(--warm-banner-bg)',
+                      border: '2px solid var(--warm-border)',
                       boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
                       flexShrink: 0,
                       display: 'flex',
@@ -1759,8 +1780,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           width: 52,
                           height: 52,
                           borderRadius: 16,
-                          background: '#ffdad2',
-                          border: '1px solid #fed7aa',
+                          background: 'var(--warm-badge-bg)',
+                          border: '1px solid var(--warm-border)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1777,8 +1798,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             style={{
                               padding: '2px 8px',
                               borderRadius: 6,
-                              background: '#ffdad2',
-                              color: '#891d00',
+                              background: 'var(--warm-badge-bg)',
+                              color: 'var(--warm-badge-text)',
                               fontSize: 11,
                               fontWeight: 700,
                               textTransform: 'uppercase',
@@ -1792,7 +1813,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             fontSize: 'clamp(1.55rem, 2vw, 1.85rem)',
                             fontWeight: 800,
-                            color: '#1b1c1a',
+                            color: 'var(--text)',
                             letterSpacing: '-0.025em',
                             marginTop: 4,
                           }}
@@ -1817,15 +1838,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         gap: 8,
                         padding: '10px 16px',
                         borderRadius: 12,
-                        background: '#ffffff',
-                        color: '#59413b',
-                        border: '1px solid #e5e1d8',
+                        background: 'var(--surface)',
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border)',
                         fontSize: 14,
                         fontWeight: 700,
                         cursor: 'pointer',
                       }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#8d716a' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--muted)' }}>
                         arrow_back
                       </span>
                       <span>Change Cook</span>
@@ -1837,8 +1858,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     style={{
                       padding: '18px 22px',
                       borderRadius: 16,
-                      background: '#fbfaf7',
-                      border: '1px solid #eae6de',
+                      background: 'var(--surface-tint)',
+                      border: '1px solid var(--border)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 14,
@@ -1854,14 +1875,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           fontSize: 12,
                           fontWeight: 700,
                           textTransform: 'uppercase',
-                          color: '#59413b',
+                          color: 'var(--text-secondary)',
                           letterSpacing: '0.06em',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 6,
                         }}
                       >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--clay)' }}>
                           restaurant_menu
                         </span>
                         WHAT ARE YOU MAKING? (TYPE, SPEAK, OR TAP A QUICK PICK)
@@ -1878,11 +1899,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           flex: 1,
                           padding: '14px 18px',
                           borderRadius: 12,
-                          background: '#ffffff',
-                          border: '1.5px solid #d5cfc4',
+                          background: 'var(--surface)',
+                          border: '1.5px solid var(--border)',
                           fontSize: '1.15rem',
                           fontWeight: 600,
-                          color: '#1b1c1a',
+                          color: 'var(--text)',
                         }}
                       />
                       <button
@@ -1894,9 +1915,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 8,
                           padding: '0 20px',
                           borderRadius: 12,
-                          background: captureListening ? '#e85a36' : '#edf2fe',
-                          color: captureListening ? '#ffffff' : '#2b59ff',
-                          border: `1px solid ${captureListening ? '#e85a36' : '#d2dbe8'}`,
+                          background: captureListening ? 'var(--terracotta)' : 'var(--cobalt-surface)',
+                          color: captureListening ? '#ffffff' : 'var(--cobalt)',
+                          border: `1px solid ${captureListening ? 'var(--terracotta)' : 'var(--cobalt-border)'}`,
                           fontSize: '0.98rem',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -1912,7 +1933,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
 
                     {/* Quick-Tap Dish Chips */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: '#8d716a' }}>
+                      <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
                         QUICK PICKS:
                       </span>
                       {[
@@ -1936,9 +1957,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               style={{
                                 padding: '6px 13px',
                                 borderRadius: 999,
-                                background: selected ? '#ab2f0d' : '#ffffff',
-                                color: selected ? '#ffffff' : '#1b1c1a',
-                                border: `1px solid ${selected ? '#ab2f0d' : '#e5e1d8'}`,
+                                background: selected ? '#ab2f0d' : 'var(--surface)',
+                                color: selected ? '#ffffff' : 'var(--text)',
+                                border: `1px solid ${selected ? '#ab2f0d' : 'var(--border)'}`,
                                 fontSize: '0.84rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
@@ -1969,8 +1990,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         borderRadius: 16,
                         padding: 22,
-                        background: 'linear-gradient(135deg, #fffaf5 0%, #ffffff 100%)',
-                        border: '2px solid #fed7aa',
+                        background: 'var(--warm-card-bg)',
+                        border: '2px solid var(--warm-border)',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
@@ -1984,8 +2005,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               width: 44,
                               height: 44,
                               borderRadius: 12,
-                              background: '#ffdad2',
-                              color: '#ab2f0d',
+                              background: 'var(--warm-badge-bg)',
+                              color: 'var(--clay)',
                               display: 'grid',
                               placeItems: 'center',
                             }}
@@ -2001,8 +2022,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               fontWeight: 800,
                               padding: '4px 10px',
                               borderRadius: 999,
-                              background: '#ffdad2',
-                              color: '#891d00',
+                              background: 'var(--warm-badge-bg)',
+                              color: 'var(--warm-badge-text)',
                               textTransform: 'uppercase',
                               letterSpacing: '0.05em',
                             }}
@@ -2011,10 +2032,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           </span>
                         </div>
 
-                        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1b1c1a', marginTop: 14 }}>
+                        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text)', marginTop: 14 }}>
                           Need a Recipe (Step-by-Step)
                         </h2>
-                        <p style={{ fontSize: '0.94rem', color: '#59413b', marginTop: 6, lineHeight: 1.5 }}>
+                        <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
                           Builds an interactive 5-step cooking canvas with step timers, read-aloud voice assist, key
                           ingredient prep, and station notes.
                         </p>
@@ -2057,8 +2078,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         borderRadius: 16,
                         padding: 22,
-                        background: 'linear-gradient(135deg, #f4f7ff 0%, #ffffff 100%)',
-                        border: '2px solid #d2dbe8',
+                        background: 'var(--cobalt-card-bg)',
+                        border: '2px solid var(--cobalt-border)',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
@@ -2072,8 +2093,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               width: 44,
                               height: 44,
                               borderRadius: 12,
-                              background: '#edf2fe',
-                              color: '#2b59ff',
+                              background: 'var(--cobalt-surface)',
+                              color: 'var(--cobalt)',
                               display: 'grid',
                               placeItems: 'center',
                             }}
@@ -2089,8 +2110,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               fontWeight: 800,
                               padding: '4px 10px',
                               borderRadius: 999,
-                              background: '#edf2fe',
-                              color: '#2b59ff',
+                              background: 'var(--cobalt-surface)',
+                              color: 'var(--cobalt)',
                               textTransform: 'uppercase',
                               letterSpacing: '0.05em',
                             }}
@@ -2099,10 +2120,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           </span>
                         </div>
 
-                        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1b1c1a', marginTop: 14 }}>
+                        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text)', marginTop: 14 }}>
                           No Recipe Needed (Tips &amp; Photo)
                         </h2>
-                        <p style={{ fontSize: '0.94rem', color: '#59413b', marginTop: 6, lineHeight: 1.5 }}>
+                        <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
                           Ideal for boards, assemblies, or dishes you know by heart. Displays a representative photo
                           alongside 5 Gemini staging &amp; kid-friendly tips.
                         </p>
@@ -2151,7 +2172,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 8,
-                      borderBottom: '1px solid #f0ede6',
+                      borderBottom: '1px solid var(--border-subtle)',
                       paddingBottom: 14,
                       position: 'relative',
                       zIndex: 1,
@@ -2164,8 +2185,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             padding: '2px 10px',
                             borderRadius: 6,
-                            background: '#ffdad2',
-                            color: '#891d00',
+                            background: 'var(--warm-badge-bg)',
+                            color: 'var(--warm-badge-text)',
                             fontSize: 11,
                             fontWeight: 700,
                             textTransform: 'uppercase',
@@ -2174,10 +2195,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         >
                           TONIGHT&apos;S DINNER • 6:30 PM
                         </span>
-                        <span className="font-mono" style={{ fontSize: 12, color: '#59413b' }}>
+                        <span className="font-mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                           • {liveStructuredRecipe?.servings || '4 Servings'}
                         </span>
-                        <span className="font-mono" style={{ fontSize: 12, color: '#59413b' }}>
+                        <span className="font-mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                           • Owner: {isParent(d.chef) ? NAMES[d.chef] : d.chef === 'takeout' ? 'Takeout' : 'Daniela'}
                         </span>
                       </div>
@@ -2193,11 +2214,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             padding: '4px 10px',
                             borderRadius: 8,
-                            background: '#fffaf5',
-                            border: '1px solid #fed7aa',
+                            background: 'var(--warm-surface)',
+                            border: '1px solid var(--warm-border)',
                             fontSize: 11,
                             fontWeight: 700,
-                            color: '#ab2f0d',
+                            color: 'var(--clay)',
                             cursor: 'pointer',
                           }}
                         >
@@ -2213,11 +2234,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             padding: '4px 10px',
                             borderRadius: 8,
-                            background: '#f7f6f2',
-                            border: '1px solid #eae6de',
+                            background: 'var(--surface-well)',
+                            border: '1px solid var(--border)',
                             fontSize: 11,
                             fontWeight: 700,
-                            color: '#59413b',
+                            color: 'var(--text-secondary)',
                             cursor: 'pointer',
                           }}
                         >
@@ -2235,11 +2256,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             padding: '4px 10px',
                             borderRadius: 8,
-                            background: '#f7f6f2',
-                            border: '1px solid #eae6de',
+                            background: 'var(--surface-well)',
+                            border: '1px solid var(--border)',
                             fontSize: 11,
                             fontWeight: 700,
-                            color: '#8d716a',
+                            color: 'var(--muted)',
                             cursor: 'pointer',
                           }}
                         >
@@ -2275,7 +2296,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           alignItems: 'center',
                           gap: 12,
                           fontSize: 12,
-                          color: '#59413b',
+                          color: 'var(--text-secondary)',
                           flexShrink: 0,
                         }}
                       >
@@ -2284,13 +2305,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 4,
-                            background: '#f7f6f2',
+                            background: 'var(--surface-well)',
                             padding: '4px 10px',
                             borderRadius: 8,
-                            border: '1px solid #eae6de',
+                            border: '1px solid var(--border)',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#e85a36' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
                             timer
                           </span>
                           Prep: <strong>{liveStructuredRecipe?.prepTime || '20 min'}</strong>
@@ -2300,13 +2321,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 4,
-                            background: '#f7f6f2',
+                            background: 'var(--surface-well)',
                             padding: '4px 10px',
                             borderRadius: 8,
-                            border: '1px solid #eae6de',
+                            border: '1px solid var(--border)',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#ab2f0d' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--clay)' }}>
                             skillet
                           </span>
                           Cook: <strong>{liveStructuredRecipe?.cookTime || '18 min'}</strong>
@@ -2316,13 +2337,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 4,
-                            background: '#f7f6f2',
+                            background: 'var(--surface-well)',
                             padding: '4px 10px',
                             borderRadius: 8,
-                            border: '1px solid #eae6de',
+                            border: '1px solid var(--border)',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#d97706' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--amber)' }}>
                             local_fire_department
                           </span>
                           {liveStructuredRecipe?.method || 'Stovetop + Broiler'}
@@ -2336,8 +2357,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     style={{
                       borderRadius: 16,
                       padding: '20px 24px',
-                      background: '#fffaf5',
-                      border: '2px solid #fed7aa',
+                      background: 'var(--warm-surface)',
+                      border: '2px solid var(--warm-border)',
                       boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
                       margin: '12px 0',
                       display: 'flex',
@@ -2354,7 +2375,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         paddingBottom: 8,
-                        borderBottom: '1px solid #fde8d0',
+                        borderBottom: '1px solid var(--warm-divider)',
                       }}
                     >
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -2363,7 +2384,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             width: 10,
                             height: 10,
                             borderRadius: '50%',
-                            background: '#e85a36',
+                            background: 'var(--terracotta)',
                             boxShadow: '0 0 0 4px rgba(232, 90, 54, 0.2)',
                           }}
                         />
@@ -2373,7 +2394,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             fontSize: 12,
                             fontWeight: 900,
                             textTransform: 'uppercase',
-                            color: '#ab2f0d',
+                            color: 'var(--clay)',
                             letterSpacing: '0.06em',
                           }}
                         >
@@ -2381,7 +2402,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           {currentStep.stage}
                         </span>
                       </div>
-                      <span className="font-mono" style={{ fontSize: 12, fontWeight: 600, color: '#8d716a' }}>
+                      <span className="font-mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
                         Next: {currentStep.nextPreview}
                       </span>
                     </div>
@@ -2390,7 +2411,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         fontSize: 'clamp(1.25rem, 1.55vw, 1.5rem)',
                         fontWeight: 700,
-                        color: '#1b1c1a',
+                        color: 'var(--text)',
                         lineHeight: 1.55,
                         padding: '12px 0',
                       }}
@@ -2419,16 +2440,16 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             gap: 8,
                             padding: '10px 16px',
                             borderRadius: 12,
-                            background: '#ffffff',
-                            color: '#1b1c1a',
+                            background: 'var(--surface)',
+                            color: 'var(--text)',
                             fontSize: 12,
                             fontWeight: 700,
-                            border: '1px solid #fed7aa',
+                            border: '1px solid var(--warm-border)',
                             boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
                             cursor: 'pointer',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#e85a36' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
                             {ttsSpeaking ? 'graphic_eq' : 'volume_up'}
                           </span>
                           <span>
@@ -2445,12 +2466,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             gap: 8,
                             padding: '6px 14px',
                             borderRadius: 12,
-                            background: '#ffedd5',
-                            border: '1px solid #fed7aa',
-                            color: '#ab2f0d',
+                            background: 'var(--warm-pill-bg)',
+                            border: '1px solid var(--warm-border)',
+                            color: 'var(--clay)',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#e85a36' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
                             local_fire_department
                           </span>
                           <span
@@ -2466,11 +2487,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             style={{
                               padding: '2px 8px',
                               borderRadius: 8,
-                              background: '#ffffff',
-                              color: '#ab2f0d',
+                              background: 'var(--surface)',
+                              color: 'var(--clay)',
                               fontSize: 12,
                               fontWeight: 700,
-                              border: '1px solid #fed7aa',
+                              border: '1px solid var(--warm-border)',
                               cursor: 'pointer',
                             }}
                           >
@@ -2507,11 +2528,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             padding: '10px 14px',
                             borderRadius: 12,
-                            background: '#ffffff',
-                            color: '#8d716a',
+                            background: 'var(--surface)',
+                            color: 'var(--muted)',
                             fontSize: 12,
                             fontWeight: 700,
-                            border: '1px solid #e5e1d8',
+                            border: '1px solid var(--border)',
                             cursor: 'pointer',
                           }}
                         >
@@ -2564,8 +2585,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         padding: 16,
                         borderRadius: 12,
-                        background: '#fbfaf7',
-                        border: '1px solid #eae6de',
+                        background: 'var(--surface-tint)',
+                        border: '1px solid var(--border)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 12,
@@ -2579,7 +2600,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           paddingBottom: 8,
-                          borderBottom: '1px solid #eae6de',
+                          borderBottom: '1px solid var(--border)',
                           flexShrink: 0,
                         }}
                       >
@@ -2589,14 +2610,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             fontSize: 12,
                             fontWeight: 700,
                             textTransform: 'uppercase',
-                            color: '#59413b',
+                            color: 'var(--text-secondary)',
                             letterSpacing: '0.06em',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 6,
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--clay)' }}>
                             grocery
                           </span>
                           KEY INGREDIENTS &amp; PREP
@@ -2628,22 +2649,22 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             style={{
                               padding: 10,
                               borderRadius: 8,
-                              background: '#ffffff',
-                              border: '1px solid #e5e1d8',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
                               display: 'flex',
                               flexDirection: 'column',
                               gap: 4,
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                              <span style={{ fontWeight: 700, color: '#1b1c1a', fontSize: 14 }}>{ing.name}</span>
+                              <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14 }}>{ing.name}</span>
                               <span
                                 className="font-mono"
                                 style={{
                                   fontWeight: 700,
-                                  color: '#ab2f0d',
-                                  background: '#fffaf5',
-                                  border: '1px solid #fed7aa',
+                                  color: 'var(--clay)',
+                                  background: 'var(--warm-surface)',
+                                  border: '1px solid var(--warm-border)',
                                   padding: '2px 8px',
                                   borderRadius: 4,
                                   fontSize: 11,
@@ -2652,7 +2673,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                 {ing.amount}
                               </span>
                             </div>
-                            <p className="font-mono" style={{ fontSize: 11, color: '#59413b' }}>
+                            <p className="font-mono" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                               {ing.prep}
                             </p>
                           </div>
@@ -2665,8 +2686,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         padding: 16,
                         borderRadius: 12,
-                        background: '#fbfaf7',
-                        border: '1px solid #eae6de',
+                        background: 'var(--surface-tint)',
+                        border: '1px solid var(--border)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 12,
@@ -2680,7 +2701,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           paddingBottom: 8,
-                          borderBottom: '1px solid #eae6de',
+                          borderBottom: '1px solid var(--border)',
                           flexShrink: 0,
                         }}
                       >
@@ -2690,14 +2711,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             fontSize: 12,
                             fontWeight: 700,
                             textTransform: 'uppercase',
-                            color: '#59413b',
+                            color: 'var(--text-secondary)',
                             letterSpacing: '0.06em',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 6,
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2b59ff' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
                             countertops
                           </span>
                           STATION NOTES &amp; EQUIPMENT
@@ -2724,8 +2745,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             },
                           ]
                         ).map((note, idx) => {
-                          const iconColors = ['#2b59ff', '#e85a36', '#006a46'];
-                          const detailColors = ['#59413b', '#e85a36', '#006a46'];
+                          const iconColors = ['var(--cobalt)', 'var(--terracotta)', 'var(--emerald)'];
+                          const detailColors = ['var(--text-secondary)', 'var(--terracotta)', 'var(--emerald)'];
                           return (
                             <div
                               key={note.title}
@@ -2735,8 +2756,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                 gap: 10,
                                 padding: '8px 10px',
                                 borderRadius: 8,
-                                background: '#ffffff',
-                                border: '1px solid #e5e1d8',
+                                background: 'var(--surface)',
+                                border: '1px solid var(--border)',
                               }}
                             >
                               <span
@@ -2746,7 +2767,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                 {note.icon || 'countertops'}
                               </span>
                               <div style={{ minWidth: 0 }}>
-                                <p style={{ fontWeight: 700, color: '#1b1c1a' }}>{note.title}</p>
+                                <p style={{ fontWeight: 700, color: 'var(--text)' }}>{note.title}</p>
                                 <p
                                   className="font-mono"
                                   style={{ fontSize: 11, color: detailColors[idx % detailColors.length] }}
@@ -2769,8 +2790,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     style={{
                       borderRadius: 16,
                       padding: '20px 24px',
-                      background: 'linear-gradient(135deg, #fffaf5 0%, #fbfaf7 100%)',
-                      border: '2px solid #fed7aa',
+                      background: 'var(--warm-banner-bg)',
+                      border: '2px solid var(--warm-border)',
                       boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
                       flexShrink: 0,
                       display: 'flex',
@@ -2795,8 +2816,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             width: 48,
                             height: 48,
                             borderRadius: 16,
-                            background: '#ffdad2',
-                            border: '1px solid #fed7aa',
+                            background: 'var(--warm-badge-bg)',
+                            border: '1px solid var(--warm-border)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -2811,7 +2832,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             style={{
                               fontSize: 'clamp(1.6rem, 2.1vw, 1.875rem)',
                               fontWeight: 800,
-                              color: '#1b1c1a',
+                              color: 'var(--text)',
                               letterSpacing: '-0.025em',
                             }}
                           >
@@ -2834,9 +2855,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             gap: 6,
                             padding: '10px 14px',
                             borderRadius: 12,
-                            background: '#fffaf5',
-                            color: '#ab2f0d',
-                            border: '1px solid #fed7aa',
+                            background: 'var(--warm-surface)',
+                            color: 'var(--clay)',
+                            border: '1px solid var(--warm-border)',
                             fontSize: 12,
                             fontWeight: 700,
                             cursor: 'pointer',
@@ -2860,15 +2881,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             gap: 6,
                             padding: '10px 14px',
                             borderRadius: 12,
-                            background: '#f7f6f2',
-                            color: '#59413b',
-                            border: '1px solid #eae6de',
+                            background: 'var(--surface-well)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border)',
                             fontSize: 13,
                             fontWeight: 700,
                             cursor: 'pointer',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#8d716a' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--muted)' }}>
                             edit
                           </span>
                           <span>Edit Dish</span>
@@ -2888,16 +2909,16 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             gap: 8,
                             padding: '10px 14px',
                             borderRadius: 12,
-                            background: '#ffffff',
-                            color: '#59413b',
-                            border: '1px solid #e5e1d8',
+                            background: 'var(--surface)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border)',
                             boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
                             fontSize: 14,
                             fontWeight: 700,
                             cursor: 'pointer',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#8d716a' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--muted)' }}>
                             sync_alt
                           </span>
                           <span>Change Cook / Plan</span>
@@ -2936,8 +2957,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           flex: 1,
                           borderRadius: 16,
                           overflow: 'hidden',
-                          border: '1px solid #fed7aa',
-                          background: '#faf9f5',
+                          border: '1px solid var(--warm-border)',
+                          background: 'var(--surface-tint)',
                           minHeight: 220,
                         }}
                       >
@@ -2972,8 +2993,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         style={{
                           borderRadius: 16,
                           padding: 16,
-                          border: '1px solid #e7e3da',
-                          background: '#faf9f5',
+                          border: '1px solid var(--border)',
+                          background: 'var(--surface-tint)',
                           flex: 1,
                           display: 'flex',
                           flexDirection: 'column',
@@ -2986,12 +3007,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             paddingBottom: 10,
-                            borderBottom: '1px solid #e5e1d8',
+                            borderBottom: '1px solid var(--border)',
                             flexShrink: 0,
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#e85a36' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
                               tips_and_updates
                             </span>
                             <h3
@@ -2999,7 +3020,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               style={{
                                 fontSize: 12,
                                 fontWeight: 800,
-                                color: '#1b1c1a',
+                                color: 'var(--text)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.06em',
                               }}
@@ -3027,8 +3048,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               style={{
                                 padding: 10,
                                 borderRadius: 12,
-                                background: tip.isKidPick ? '#fffcf5' : '#ffffff',
-                                border: `1px solid ${tip.isKidPick ? '#fed7aa' : '#e5e1d8'}`,
+                                background: tip.isKidPick ? 'var(--warm-surface-alt)' : 'var(--surface)',
+                                border: `1px solid ${tip.isKidPick ? 'var(--warm-border)' : 'var(--border)'}`,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
@@ -3038,7 +3059,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                                 <span
                                   className="material-symbols-outlined"
-                                  style={{ fontSize: 18, color: tip.isKidPick ? '#ab2f0d' : '#e85a36' }}
+                                  style={{ fontSize: 18, color: tip.isKidPick ? 'var(--clay)' : 'var(--terracotta)' }}
                                 >
                                   {tip.icon}
                                 </span>
@@ -3047,7 +3068,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                     style={{
                                       fontSize: 12,
                                       fontWeight: 700,
-                                      color: '#1b1c1a',
+                                      color: 'var(--text)',
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis',
@@ -3059,7 +3080,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                     className="font-mono"
                                     style={{
                                       fontSize: 10,
-                                      color: tip.isKidPick ? '#ab2f0d' : '#59413b',
+                                      color: tip.isKidPick ? 'var(--clay)' : 'var(--text-secondary)',
                                       fontWeight: tip.isKidPick ? 600 : 400,
                                     }}
                                   >
@@ -3072,8 +3093,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                 style={{
                                   fontSize: 10,
                                   fontWeight: 700,
-                                  color: tip.isKidPick ? '#ab2f0d' : '#8d716a',
-                                  background: tip.isKidPick ? '#ffdad2' : '#f4f2ec',
+                                  color: tip.isKidPick ? 'var(--warm-badge-text)' : 'var(--muted)',
+                                  background: tip.isKidPick ? 'var(--warm-badge-bg)' : 'var(--surface-well)',
                                   padding: '2px 6px',
                                   borderRadius: 4,
                                   flexShrink: 0,
@@ -3096,8 +3117,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     style={{
                       borderRadius: 16,
                       padding: 22,
-                      background: 'linear-gradient(135deg, #fffaf5 0%, #fbfaf7 100%)',
-                      border: '2px solid #fed7aa',
+                      background: 'var(--warm-banner-bg)',
+                      border: '2px solid var(--warm-border)',
                       boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
                       flexShrink: 0,
                       display: 'flex',
@@ -3112,13 +3133,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         style={{
                           fontSize: 'clamp(1.6rem, 2.1vw, 1.875rem)',
                           fontWeight: 800,
-                          color: '#1b1c1a',
+                          color: 'var(--text)',
                           letterSpacing: '-0.025em',
                         }}
                       >
                         Nobody has claimed dinner tonight
                       </h1>
-                      <p style={{ fontSize: '0.96rem', fontWeight: 500, color: '#57534e', paddingTop: 4 }}>
+                      <p style={{ fontSize: '0.96rem', fontWeight: 500, color: 'var(--text-secondary)', paddingTop: 4 }}>
                         Select an option below to set the plan, or choose from ready-to-cook pantry ideas.
                       </p>
                     </div>
@@ -3144,11 +3165,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 10,
                           padding: '14px 16px',
                           borderRadius: 12,
-                          background: '#ffffff',
-                          color: '#1b1c1a',
+                          background: 'var(--surface)',
+                          color: 'var(--text)',
                           fontSize: '1.05rem',
                           fontWeight: 700,
-                          border: '1px solid #edd5c3',
+                          border: '1px solid var(--warm-border-soft)',
                           boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
                           cursor: 'pointer',
                         }}
@@ -3171,11 +3192,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 10,
                           padding: '14px 16px',
                           borderRadius: 12,
-                          background: '#ffffff',
-                          color: '#1b1c1a',
+                          background: 'var(--surface)',
+                          color: 'var(--text)',
                           fontSize: '1.05rem',
                           fontWeight: 700,
-                          border: '1px solid #edd5c3',
+                          border: '1px solid var(--warm-border-soft)',
                           boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
                           cursor: 'pointer',
                         }}
@@ -3196,11 +3217,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 10,
                           padding: '14px 16px',
                           borderRadius: 12,
-                          background: '#edf2fe',
-                          color: '#2b59ff',
+                          background: 'var(--cobalt-surface)',
+                          color: 'var(--cobalt)',
                           fontSize: '1.05rem',
                           fontWeight: 700,
-                          border: '1px solid #d2dbe8',
+                          border: '1px solid var(--cobalt-border)',
                           boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
                           cursor: 'pointer',
                         }}
@@ -3221,11 +3242,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 10,
                           padding: '14px 16px',
                           borderRadius: 12,
-                          background: '#f7f6f2',
-                          color: '#59413b',
+                          background: 'var(--surface-well)',
+                          color: 'var(--text-secondary)',
                           fontSize: '1.05rem',
                           fontWeight: 700,
-                          border: '1px solid #eae6de',
+                          border: '1px solid var(--border)',
                           boxShadow: '0 1px 2px rgba(40,25,15,0.03)',
                           cursor: 'pointer',
                         }}
@@ -3258,10 +3279,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         gap: 10,
                         overflow: 'hidden',
                         minHeight: 0,
-                        background: '#fbfaf7',
+                        background: 'var(--surface-tint)',
                         padding: 18,
                         borderRadius: 12,
-                        border: '1px solid #eae6de',
+                        border: '1px solid var(--border)',
                       }}
                     >
                       <div
@@ -3270,7 +3291,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           paddingBottom: 8,
-                          borderBottom: '1px solid #eae6de',
+                          borderBottom: '1px solid var(--border)',
                           flexShrink: 0,
                         }}
                       >
@@ -3280,14 +3301,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             fontSize: 12,
                             fontWeight: 700,
                             textTransform: 'uppercase',
-                            color: '#59413b',
+                            color: 'var(--text-secondary)',
                             letterSpacing: '0.06em',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 6,
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--clay)' }}>
                             kitchen
                           </span>
                           FAST RECIPES FROM PANTRY &amp; FRIDGE
@@ -3310,8 +3331,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             flex: 1,
                             padding: '14px 18px',
                             borderRadius: 12,
-                            background: '#ffffff',
-                            border: '1px solid #e5e1d8',
+                            background: 'var(--surface)',
+                            border: '1px solid var(--border)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -3326,18 +3347,18 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                   fontWeight: 700,
                                   padding: '2px 10px',
                                   borderRadius: 999,
-                                  color: '#ab2f0d',
-                                  background: '#fffaf5',
-                                  border: '1px solid #fed7aa',
+                                  color: 'var(--clay)',
+                                  background: 'var(--warm-surface)',
+                                  border: '1px solid var(--warm-border)',
                                 }}
                               >
                                 15 min
                               </span>
                             </div>
-                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1c1917', lineHeight: 1.25 }}>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.25 }}>
                               {state.backlog[0]?.recipe_or_item_name || 'Crispy Black Bean Tacos'}
                             </h3>
-                            <p style={{ fontSize: '0.92rem', color: '#57534e', marginTop: 3 }}>
+                            <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', marginTop: 3 }}>
                               {state.backlog[0]?.key_perishables.length
                                 ? `Pantry ready • ${state.backlog[0].key_perishables.join(' & ')}`
                                 : 'Pantry ready • Fresh cilantro & lime in crisper drawer'}
@@ -3379,8 +3400,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             flex: 1,
                             padding: '14px 18px',
                             borderRadius: 12,
-                            background: '#fffcf5',
-                            border: '1px solid #fed7aa',
+                            background: 'var(--warm-surface-alt)',
+                            border: '1px solid var(--warm-border)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -3395,9 +3416,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                   fontWeight: 700,
                                   padding: '2px 10px',
                                   borderRadius: 999,
-                                  color: '#006a46',
-                                  background: '#edf7f2',
-                                  border: '1px solid #bbf7d0',
+                                  color: 'var(--emerald)',
+                                  background: 'var(--emerald-surface)',
+                                  border: '1px solid var(--emerald-border)',
                                 }}
                               >
                                 20 min
@@ -3408,17 +3429,17 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                   fontWeight: 700,
                                   padding: '2px 10px',
                                   borderRadius: 999,
-                                  color: '#d97706',
-                                  background: '#ffedd5',
+                                  color: 'var(--amber)',
+                                  background: 'var(--warm-pill-bg)',
                                 }}
                               >
                                 Expires Soon
                               </span>
                             </div>
-                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1c1917', lineHeight: 1.25 }}>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.25 }}>
                               {state.backlog[1]?.recipe_or_item_name || 'Lemon Ricotta Orecchiette'}
                             </h3>
-                            <p style={{ fontSize: '0.92rem', color: '#57534e', marginTop: 3 }}>
+                            <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', marginTop: 3 }}>
                               {state.backlog[1]?.key_perishables.length
                                 ? `Shift from Wed? ${state.backlog[1].key_perishables.join(' • ')}`
                                 : 'Shift from Wed? Fresh ricotta expires tomorrow'}
@@ -3460,8 +3481,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             flex: 1,
                             padding: '14px 18px',
                             borderRadius: 12,
-                            background: '#ffffff',
-                            border: '1px solid #e5e1d8',
+                            background: 'var(--surface)',
+                            border: '1px solid var(--border)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -3476,18 +3497,18 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                   fontWeight: 700,
                                   padding: '2px 10px',
                                   borderRadius: 999,
-                                  color: '#ab2f0d',
-                                  background: '#fffaf5',
-                                  border: '1px solid #fed7aa',
+                                  color: 'var(--clay)',
+                                  background: 'var(--warm-surface)',
+                                  border: '1px solid var(--warm-border)',
                                 }}
                               >
                                 25 min
                               </span>
                             </div>
-                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1c1917', lineHeight: 1.25 }}>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.25 }}>
                               {state.backlog[2]?.recipe_or_item_name || 'Sheet-Pan Harissa Chicken'}
                             </h3>
-                            <p style={{ fontSize: '0.92rem', color: '#57534e', marginTop: 3 }}>
+                            <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', marginTop: 3 }}>
                               {state.backlog[2]?.key_perishables.length
                                 ? state.backlog[2].key_perishables.join(' • ')
                                 : 'Thawed chicken thighs • Bell peppers • Greek yogurt dip'}
@@ -3540,8 +3561,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         style={{
                           padding: 16,
                           borderRadius: 12,
-                          background: 'linear-gradient(135deg, #f4f7ff 0%, rgba(237, 242, 254, 0.55) 100%)',
-                          border: '1px solid #d2dbe8',
+                          background: 'var(--cobalt-voice-bg)',
+                          border: '1px solid var(--cobalt-border)',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: 12,
@@ -3549,7 +3570,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2b59ff' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--cobalt)' }}>
                             auto_awesome
                           </span>
                           <span
@@ -3558,7 +3579,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               fontSize: 12,
                               fontWeight: 700,
                               textTransform: 'uppercase',
-                              color: '#2b59ff',
+                              color: 'var(--cobalt)',
                               letterSpacing: '0.06em',
                             }}
                           >
@@ -3571,11 +3592,11 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             fontSize: '1.05rem',
                             fontWeight: 500,
                             lineHeight: 1.5,
-                            color: '#1b1c1a',
-                            background: 'rgba(255, 255, 255, 0.85)',
+                            color: 'var(--text)',
+                            background: 'var(--cobalt-quote-bg)',
                             padding: '14px 16px',
                             borderRadius: 8,
-                            border: '1px solid #d2dbe8',
+                            border: '1px solid var(--cobalt-border)',
                           }}
                         >
                           &ldquo;Suggest a 20-min dinner using wild salmon and jasmine rice&rdquo;
@@ -3616,8 +3637,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         style={{
                           padding: 16,
                           borderRadius: 12,
-                          background: '#fbfaf7',
-                          border: '1px solid #eae6de',
+                          background: 'var(--surface-tint)',
+                          border: '1px solid var(--border)',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -3632,7 +3653,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             paddingBottom: 8,
-                            borderBottom: '1px solid #eae6de',
+                            borderBottom: '1px solid var(--border)',
                             flexShrink: 0,
                           }}
                         >
@@ -3642,14 +3663,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               fontSize: 12,
                               fontWeight: 700,
                               textTransform: 'uppercase',
-                              color: '#59413b',
+                              color: 'var(--text-secondary)',
                               letterSpacing: '0.06em',
                               display: 'flex',
                               alignItems: 'center',
                               gap: 6,
                             }}
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2b59ff' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
                               local_mall
                             </span>
                             DELIVERY RE-ORDER
@@ -3684,17 +3705,17 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                 justifyContent: 'space-between',
                                 padding: '10px 16px',
                                 borderRadius: 8,
-                                background: '#ffffff',
-                                border: '1px solid #e5e1d8',
+                                background: 'var(--surface)',
+                                border: '1px solid var(--border)',
                                 textAlign: 'left',
                                 cursor: 'pointer',
                               }}
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                <span style={{ fontSize: '1.15rem', fontWeight: 700, color: '#1c1917' }}>
+                                <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)' }}>
                                   {spot.name}
                                 </span>
-                                <span style={{ fontSize: '0.92rem', fontWeight: 500, color: '#78716c', marginTop: 2 }}>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 500, color: 'var(--muted)', marginTop: 2 }}>
                                   {spot.sub}
                                 </span>
                               </div>
@@ -3704,8 +3725,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                   fontWeight: 700,
                                   padding: '6px 12px',
                                   borderRadius: 8,
-                                  background: '#eff6ff',
-                                  color: '#1d4ed8',
+                                  background: 'var(--cobalt-eta-bg)',
+                                  color: 'var(--cobalt-eta-text)',
                                   flexShrink: 0,
                                 }}
                               >
@@ -3745,8 +3766,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   flex: 1,
-                  border: '1px solid #edd5c3',
-                  background: 'linear-gradient(135deg, #fffcf5 0%, #fffaf5 100%)',
+                  border: '1px solid var(--warm-border-soft)',
+                  background: 'var(--warm-bento-bg)',
                   textAlign: 'left',
                   cursor: 'pointer',
                 }}
@@ -3758,9 +3779,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         width: 32,
                         height: 32,
                         borderRadius: 8,
-                        background: 'rgba(255, 218, 210, 0.35)',
-                        border: '1px solid #fed7aa',
-                        color: '#ab2f0d',
+                        background: 'var(--warm-badge-bg)',
+                        border: '1px solid var(--warm-border)',
+                        color: 'var(--clay)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -3776,7 +3797,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         fontSize: 14,
                         fontWeight: 800,
-                        color: '#891d00',
+                        color: 'var(--warm-badge-text)',
                         letterSpacing: '0.06em',
                         textTransform: 'uppercase',
                       }}
@@ -3784,7 +3805,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       Upcoming
                     </span>
                   </div>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ab2f0d' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--clay)' }}>
                     arrow_forward
                   </span>
                 </div>
@@ -3794,7 +3815,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     style={{
                       fontSize: '1.25rem',
                       fontWeight: 800,
-                      color: '#1b1c1a',
+                      color: 'var(--text)',
                       letterSpacing: '-0.02em',
                       lineHeight: 1.2,
                       whiteSpace: 'nowrap',
@@ -3808,7 +3829,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     className="font-mono"
                     style={{
                       fontSize: 12,
-                      color: '#59413b',
+                      color: 'var(--text-secondary)',
                       paddingTop: 4,
                       fontWeight: 500,
                       whiteSpace: 'nowrap',
@@ -3827,7 +3848,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     paddingTop: 8,
-                    borderTop: '1px solid #f5e6c8',
+                    borderTop: '1px solid var(--warm-divider)',
                     width: '100%',
                     fontSize: 10,
                   }}
@@ -3835,15 +3856,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   <span
                     style={{
                       fontWeight: 700,
-                      color: '#ab2f0d',
-                      background: '#ffdad2',
+                      color: 'var(--warm-badge-text)',
+                      background: 'var(--warm-badge-bg)',
                       padding: '2px 8px',
                       borderRadius: 999,
                     }}
                   >
                     3 SCHEDULED
                   </span>
-                  <span style={{ color: '#8d716a', fontWeight: 600 }}>Oct 25–27</span>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Oct 25–27</span>
                 </div>
               </button>
 
@@ -3859,8 +3880,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   flex: 1,
-                  border: '1px solid #d2dbe8',
-                  background: 'linear-gradient(135deg, rgba(244, 247, 255, 0.5) 0%, rgba(237, 242, 254, 0.35) 100%)',
+                  border: '1px solid var(--cobalt-border)',
+                  background: 'var(--cobalt-bento-bg)',
                   textAlign: 'left',
                   cursor: 'pointer',
                 }}
@@ -3872,9 +3893,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         width: 32,
                         height: 32,
                         borderRadius: 8,
-                        background: '#edf2fe',
-                        border: '1px solid #d2dbe8',
-                        color: '#2b59ff',
+                        background: 'var(--cobalt-surface)',
+                        border: '1px solid var(--cobalt-border)',
+                        color: 'var(--cobalt)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -3890,7 +3911,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         fontSize: 14,
                         fontWeight: 800,
-                        color: '#2b59ff',
+                        color: 'var(--cobalt)',
                         letterSpacing: '0.06em',
                         textTransform: 'uppercase',
                       }}
@@ -3898,7 +3919,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       Takeout
                     </span>
                   </div>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2b59ff' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
                     arrow_forward
                   </span>
                 </div>
@@ -3908,7 +3929,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     style={{
                       fontSize: '1.25rem',
                       fontWeight: 800,
-                      color: '#1b1c1a',
+                      color: 'var(--text)',
                       letterSpacing: '-0.02em',
                       lineHeight: 1.2,
                       whiteSpace: 'nowrap',
@@ -3922,7 +3943,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     className="font-mono"
                     style={{
                       fontSize: 12,
-                      color: '#59413b',
+                      color: 'var(--text-secondary)',
                       paddingTop: 4,
                       fontWeight: 500,
                       whiteSpace: 'nowrap',
@@ -3941,7 +3962,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     paddingTop: 8,
-                    borderTop: '1px solid #d2dbe8',
+                    borderTop: '1px solid var(--cobalt-border)',
                     width: '100%',
                     fontSize: 10,
                   }}
@@ -3949,15 +3970,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   <span
                     style={{
                       fontWeight: 700,
-                      color: '#2b59ff',
-                      background: '#edf2fe',
+                      color: 'var(--cobalt)',
+                      background: 'var(--cobalt-surface)',
                       padding: '2px 8px',
                       borderRadius: 999,
                     }}
                   >
                     FAVORITES READY
                   </span>
-                  <span style={{ color: '#8d716a', fontWeight: 600 }}>~18–30m</span>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>~18–30m</span>
                 </div>
               </button>
 
@@ -3973,8 +3994,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   flex: 1,
-                  border: '1px solid #bbf7d0',
-                  background: 'linear-gradient(135deg, #ffffff 0%, rgba(237, 247, 242, 0.25) 100%)',
+                  border: '1px solid var(--emerald-border)',
+                  background: 'var(--emerald-bento-bg)',
                   textAlign: 'left',
                   cursor: 'pointer',
                 }}
@@ -3986,9 +4007,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         width: 32,
                         height: 32,
                         borderRadius: 8,
-                        background: '#edf7f2',
-                        border: '1px solid #bbf7d0',
-                        color: '#006a46',
+                        background: 'var(--emerald-surface)',
+                        border: '1px solid var(--emerald-border)',
+                        color: 'var(--emerald)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -4004,7 +4025,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         fontSize: 14,
                         fontWeight: 800,
-                        color: '#006a46',
+                        color: 'var(--emerald)',
                         letterSpacing: '0.06em',
                         textTransform: 'uppercase',
                       }}
@@ -4012,7 +4033,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       Meal Plan
                     </span>
                   </div>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#006a46' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--emerald)' }}>
                     arrow_forward
                   </span>
                 </div>
@@ -4028,14 +4049,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 6,
                           padding: '4px 10px',
                           borderRadius: 8,
-                          background: '#edf7f2',
-                          border: '1px solid #bbf7d0',
-                          color: '#006a46',
+                          background: 'var(--emerald-surface)',
+                          border: '1px solid var(--emerald-border)',
+                          color: 'var(--emerald)',
                           fontSize: 13,
                           fontWeight: 800,
                         }}
                       >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#006a46' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--emerald)' }}>
                           check_circle
                         </span>
                         Tonight Claimed
@@ -4044,7 +4065,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         className="font-mono"
                         style={{
                           fontSize: 12,
-                          color: '#59413b',
+                          color: 'var(--text-secondary)',
                           paddingTop: 6,
                           fontWeight: 500,
                           whiteSpace: 'nowrap',
@@ -4066,9 +4087,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 6,
                           padding: '4px 10px',
                           borderRadius: 8,
-                          background: '#fdf2f2',
-                          border: '1px solid #fbd5d5',
-                          color: '#ab2f0d',
+                          background: 'var(--danger-surface)',
+                          border: '1px solid var(--danger-border)',
+                          color: 'var(--clay)',
                           fontSize: 13,
                           fontWeight: 800,
                         }}
@@ -4078,7 +4099,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             width: 8,
                             height: 8,
                             borderRadius: '50%',
-                            background: '#ab2f0d',
+                            background: 'var(--clay)',
                           }}
                         />
                         1 Night Unclaimed
@@ -4087,7 +4108,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         className="font-mono"
                         style={{
                           fontSize: 12,
-                          color: '#59413b',
+                          color: 'var(--text-secondary)',
                           paddingTop: 6,
                           fontWeight: 500,
                           whiteSpace: 'nowrap',
@@ -4108,7 +4129,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     paddingTop: 8,
-                    borderTop: '1px solid #bbf7d0',
+                    borderTop: '1px solid var(--emerald-border)',
                     width: '100%',
                     fontSize: 10,
                   }}
@@ -4116,8 +4137,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   <span
                     style={{
                       fontWeight: 700,
-                      color: '#006a46',
-                      background: '#edf7f2',
+                      color: 'var(--emerald)',
+                      background: 'var(--emerald-surface)',
                       padding: '2px 8px',
                       borderRadius: 999,
                     }}
@@ -4127,8 +4148,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   <span
                     style={{
                       fontWeight: 700,
-                      color: d.status !== 'unclaimed' ? '#006a46' : '#ab2f0d',
-                      background: d.status !== 'unclaimed' ? '#edf7f2' : '#ffdad2',
+                      color: d.status !== 'unclaimed' ? 'var(--emerald)' : 'var(--warm-badge-text)',
+                      background: d.status !== 'unclaimed' ? 'var(--emerald-surface)' : 'var(--warm-badge-bg)',
                       padding: '2px 8px',
                       borderRadius: 999,
                       textTransform: 'uppercase',
@@ -4196,21 +4217,30 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         fontWeight: 700,
                         padding: '2px 10px',
                         borderRadius: 999,
-                        background: state.conflicts.length ? '#fef3c7' : '#edf7f2',
-                        border: `1px solid ${state.conflicts.length ? '#fde68a' : '#bbf7d0'}`,
-                        color: state.conflicts.length ? '#b45309' : 'var(--emerald)',
+                        background: state.conflicts.length ? 'var(--warn-surface)' : 'var(--emerald-surface)',
+                        border: `1px solid ${state.conflicts.length ? 'var(--warn-border)' : 'var(--emerald-border)'}`,
+                        color: state.conflicts.length ? 'var(--warn-text)' : 'var(--emerald)',
                       }}
                     >
                       ● {state.conflicts.length ? `${state.conflicts.length} Needs Owner` : 'On Track'}
                     </span>
                   </div>
 
-                  {/* Member Filter Pills (All / Daniela / Warren / Wesley) */}
+                  {/* Member & School Logistics Filter Pills (All / School / Daniela / Warren / Wesley / Lachlan) */}
                   <div
                     className="ceramic-well font-mono"
-                    style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 12, fontSize: '0.72rem' }}
+                    style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 12, fontSize: '0.72rem', flexWrap: 'wrap' }}
                   >
-                    {(['all', 'daniela', 'warren', 'wesley'] as MemberFilter[]).map((f) => (
+                    {(
+                      [
+                        ['all', 'All'],
+                        ['school', '🎒 School'],
+                        ['daniela', 'Daniela'],
+                        ['warren', 'Warren'],
+                        ['wesley', 'Wesley'],
+                        ['lachlan', 'Lachlan'],
+                      ] as [MemberFilter, string][]
+                    ).map(([f, label]) => (
                       <button
                         key={f}
                         onClick={() => setMemberFilter(f)}
@@ -4224,7 +4254,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           fontWeight: memberFilter === f ? 700 : 500,
                         }}
                       >
-                        {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                        {label}
                       </button>
                     ))}
                   </div>
@@ -4253,13 +4283,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         margin: 'auto 0',
                       }}
                     >
-                      No calendar events synced for today yet.
+                      No calendar events match this filter for today.
                     </div>
                   )}
                   {filteredEvents.map((ev) => {
-                    const needsOwner =
-                      (ev.logistics_type === 'pickup' || ev.logistics_type === 'appointment') &&
-                      ev.assigned_parent === 'unassigned';
+                    const claimable = isClaimableLogistics(ev);
+                    const needsOwner = claimable && ev.assigned_parent === 'unassigned';
                     const isLate = ev.logistics_type === 'late_office';
                     const timeStr = isAllDay(ev.start_time, ev.end_time) ? 'ALL DAY' : fmtEventTime(ev.start_time, state.date);
                     return (
@@ -4272,8 +4301,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           gap: 14,
                           padding: '11px 14px',
                           borderRadius: 16,
-                          background: needsOwner ? '#fffaf5' : isLate ? '#fff5f2' : 'var(--surface-tint)',
-                          border: `1.5px solid ${needsOwner ? '#fed7aa' : isLate ? 'var(--terracotta)' : 'var(--border)'}`,
+                          background: needsOwner ? 'var(--warm-surface)' : isLate ? 'var(--danger-surface)' : 'var(--surface-tint)',
+                          border: `1.5px solid ${needsOwner ? 'var(--warm-border)' : isLate ? 'var(--terracotta)' : 'var(--border)'}`,
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
@@ -4283,7 +4312,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               style={{
                                 fontSize: '0.78rem',
                                 fontWeight: 800,
-                                color: needsOwner ? '#b45309' : isLate ? 'var(--clay)' : 'var(--text)',
+                                color: needsOwner ? 'var(--warn-text)' : isLate ? 'var(--clay)' : 'var(--text)',
                               }}
                             >
                               {timeStr}
@@ -4292,7 +4321,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               className="font-mono"
                               style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}
                             >
-                              {ev.logistics_type.replace('_', ' ')}
+                              {claimable && /dropoff|drop off/i.test(ev.title)
+                                ? 'DROPOFF'
+                                : ev.logistics_type.replace('_', ' ')}
                             </div>
                           </div>
 
@@ -4317,12 +4348,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                     fontWeight: 700,
                                     padding: '2px 8px',
                                     borderRadius: 999,
-                                    background: '#fef3c7',
-                                    border: '1px solid #fde68a',
-                                    color: '#b45309',
+                                    background: 'var(--warn-surface)',
+                                    border: '1px solid var(--warn-border)',
+                                    color: 'var(--warn-text)',
                                   }}
                                 >
-                                  DRIVER UNASSIGNED
+                                  UNCLAIMED
                                 </span>
                               ) : (
                                 <span
@@ -4332,8 +4363,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                     fontWeight: 700,
                                     padding: '2px 8px',
                                     borderRadius: 999,
-                                    background: '#edf7f2',
-                                    border: '1px solid #bbf7d0',
+                                    background: 'var(--emerald-surface)',
+                                    border: '1px solid var(--emerald-border)',
                                     color: 'var(--emerald)',
                                   }}
                                 >
@@ -4343,29 +4374,38 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                               {SOURCE_LABEL[ev.source_calendar]} • {fmtTime(ev.start_time)}–{fmtTime(ev.end_time)}
+                              {ev.description ? ` • ${ev.description}` : ''}
                             </div>
                           </div>
                         </div>
 
-                        {/* Claim / Assign Pickup Buttons */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                          {PARENTS.map((p) => (
-                            <button
-                              key={p}
-                              className={`hw-btn ${ev.assigned_parent === p ? 'terracotta' : ''}`}
-                              style={{ padding: '6px 11px', fontSize: '0.7rem' }}
-                              onClick={() =>
-                                act({
-                                  type: 'assign_logistics',
-                                  id: ev.id,
-                                  parent: ev.assigned_parent === p ? 'unassigned' : p,
-                                })
-                              }
-                            >
-                              {ev.assigned_parent === p ? `✓ ${NAMES[p]}` : `Claim: ${NAMES[p]}`}
-                            </button>
-                          ))}
-                        </div>
+                        {/* Claim / Assign Pickup Buttons — reserved ONLY for Family Calendar items (like school dropoffs/pickups) */}
+                        {claimable && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {PARENTS.map((p) => (
+                              <button
+                                key={p}
+                                className={`hw-btn ${ev.assigned_parent === p ? 'terracotta' : ''}`}
+                                style={{ padding: '6px 11px', fontSize: '0.7rem' }}
+                                onClick={() => {
+                                  const nextParent = ev.assigned_parent === p ? 'unassigned' : p;
+                                  act({
+                                    type: 'assign_logistics',
+                                    id: ev.id,
+                                    parent: nextParent,
+                                  });
+                                  showToast(
+                                    nextParent === 'unassigned'
+                                      ? `Unclaimed ${ev.title} — updated Family Calendar description`
+                                      : `${NAMES[nextParent]} claimed ${ev.title} — added to Family Calendar event description`,
+                                  );
+                                }}
+                              >
+                                {ev.assigned_parent === p ? `✓ ${NAMES[p]}` : `Claim: ${NAMES[p]}`}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -4391,7 +4431,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       {mode === 'timeline' ? 'expand_less' : 'schedule'}
                     </span>
                     <span>
-                      {mode === 'timeline' ? 'COLLAPSE TO BENTO OVERVIEW' : `EXPAND FULL TIMELINE (${state.events.length} EVENTS)`}
+                      {mode === 'timeline' ? 'COLLAPSE' : `EXPAND FULL TIMELINE (${state.events.length} EVENTS)`}
                     </span>
                   </button>
 
@@ -4424,8 +4464,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           width: 40,
                           height: 40,
                           borderRadius: 12,
-                          background: '#faf7f2',
-                          border: '1px solid #edd5c3',
+                          background: 'var(--warm-surface)',
+                          border: '1px solid var(--warm-border-soft)',
                           color: 'var(--terracotta)',
                           display: 'grid',
                           placeItems: 'center',
@@ -4448,8 +4488,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               fontWeight: 700,
                               padding: '2px 8px',
                               borderRadius: 999,
-                              background: d.status === 'unclaimed' ? '#fef3c7' : '#edf7f2',
-                              color: d.status === 'unclaimed' ? '#b45309' : 'var(--emerald)',
+                              background: d.status === 'unclaimed' ? 'var(--warn-surface)' : 'var(--emerald-surface)',
+                              color: d.status === 'unclaimed' ? 'var(--warn-text)' : 'var(--emerald)',
                             }}
                           >
                             {d.status === 'unclaimed'
@@ -4756,7 +4796,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           padding: '10px 12px',
                           borderRadius: 16,
                           background: c.completed ? 'var(--surface-tint)' : 'var(--surface)',
-                          border: `1.5px solid ${c.completed ? 'var(--border)' : '#d2dbe8'}`,
+                          border: `1.5px solid ${c.completed ? 'var(--border)' : 'var(--cobalt-border)'}`,
                           cursor: 'pointer',
                         }}
                       >
@@ -4766,8 +4806,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               width: 28,
                               height: 28,
                               borderRadius: 10,
-                              background: c.completed ? '#edf7f2' : '#f4f7ff',
-                              border: `1px solid ${c.completed ? '#bbf7d0' : 'rgba(43,89,255,0.35)'}`,
+                              background: c.completed ? 'var(--emerald-surface)' : 'var(--cobalt-surface-soft)',
+                              border: `1px solid ${c.completed ? 'var(--emerald-border)' : 'var(--cobalt-border)'}`,
                               color: c.completed ? 'var(--emerald)' : 'var(--cobalt)',
                               display: 'grid',
                               placeItems: 'center',
@@ -4800,8 +4840,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           style={{
                             padding: '2px 8px',
                             borderRadius: 6,
-                            background: c.completed ? '#edf7f2' : (c.reward_cents ?? 0) > 0 ? '#ecfdf5' : '#f4f7ff',
-                            color: c.completed ? 'var(--emerald)' : (c.reward_cents ?? 0) > 0 ? '#047857' : 'var(--cobalt)',
+                            background: c.completed ? 'var(--emerald-surface)' : (c.reward_cents ?? 0) > 0 ? 'var(--emerald-surface)' : 'var(--cobalt-surface-soft)',
+                            color: c.completed ? 'var(--emerald)' : (c.reward_cents ?? 0) > 0 ? 'var(--emerald)' : 'var(--cobalt)',
                             fontSize: '0.72rem',
                             fontWeight: 700,
                           }}
@@ -4867,23 +4907,31 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    background: '#fffcf5',
-                    borderColor: '#edd5c3',
+                    background: 'var(--warm-bento-bg)',
+                    borderColor: 'var(--warm-border-soft)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="font-mono" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#9a3412' }}>
+                    <span className="font-mono" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--clay)' }}>
                       🍲 TONIGHT&apos;S DINNER
                     </span>
                     <span
                       className="font-mono"
-                      style={{ fontSize: '0.64rem', fontWeight: 700, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: 6 }}
+                      style={{
+                        fontSize: '0.64rem',
+                        fontWeight: 700,
+                        background: 'var(--warn-surface)',
+                        border: '1px solid var(--warn-border)',
+                        color: 'var(--amber)',
+                        padding: '2px 6px',
+                        borderRadius: 6,
+                      }}
                     >
                       6:30 PM
                     </span>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 800 }}>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)' }}>
                       {d.recipe_name || (d.status === 'unclaimed' ? 'Unclaimed' : `${isParent(d.chef) ? NAMES[d.chef] : 'Planned'} Cooking`)}
                     </div>
                     <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>
@@ -4915,7 +4963,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     </span>
                     <span
                       className="font-mono"
-                      style={{ fontSize: '0.64rem', fontWeight: 700, background: '#edf7f2', color: 'var(--emerald)', padding: '2px 6px', borderRadius: 6 }}
+                      style={{ fontSize: '0.64rem', fontWeight: 700, background: 'var(--emerald-surface)', color: 'var(--emerald)', padding: '2px 6px', borderRadius: 6 }}
                     >
                       {chorePct}% Done
                     </span>
@@ -4929,7 +4977,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         ${allowanceEarned}
                       </span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden', margin: '6px 0' }}>
+                    <div style={{ height: 6, borderRadius: 99, background: 'var(--border)', overflow: 'hidden', margin: '6px 0' }}>
                       <div style={{ width: `${chorePct}%`, height: '100%', background: 'var(--cobalt)' }} />
                     </div>
                     <div className="font-mono" style={{ fontSize: '0.66rem', color: 'var(--emerald)', fontWeight: 700 }}>
@@ -4961,7 +5009,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     </span>
                     <span
                       className="font-mono"
-                      style={{ fontSize: '0.62rem', fontWeight: 700, background: '#fdf2f2', color: '#b91c1c', padding: '2px 6px', borderRadius: 6 }}
+                      style={{ fontSize: '0.62rem', fontWeight: 700, background: 'var(--danger-surface)', color: 'var(--danger-text)', padding: '2px 6px', borderRadius: 6 }}
                     >
                       SAT GATE
                     </span>
@@ -5215,7 +5263,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       letterSpacing: '0.06em',
                     }}
                   >
-                    <span style={{ color: '#1549d6' }}>AT COOKTOP</span>
+                    <span style={{ color: 'var(--cobalt)' }}>AT COOKTOP</span>
                     {geminiStampedAt && (
                       <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{geminiStampedAt}</span>
                     )}
@@ -5260,7 +5308,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       fontSize: '0.76rem',
                       fontWeight: 800,
                       letterSpacing: '0.06em',
-                      color: '#b5381a',
+                      color: 'var(--clay)',
                     }}
                   >
                     GEMINI RESPONSE
@@ -5344,9 +5392,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
               padding: '10px 20px',
               borderRadius: 9999,
               background: '#1b1c1a',
+              border: '1px solid var(--border)',
               color: '#ffffff',
               fontSize: 12,
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
               display: 'flex',
               alignItems: 'center',
               gap: 10,

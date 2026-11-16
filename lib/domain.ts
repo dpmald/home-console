@@ -1,9 +1,9 @@
 // Core family-data operations. Shared by Slack, the kiosk, voice and crons
 // so every surface behaves identically.
 import { db, unwrap } from './supabase/server';
-import { syncIcsCalendarsIfConfigured } from './gcal';
+import { syncIcsCalendarsIfConfigured, updateGoogleCalendarEventDescription } from './gcal';
 import { addDays, dayBoundsUTC, dowOf, fmtTime, localHour, todayISO } from './time';
-import { NAMES, isParent, ownerOfCalendar } from './family';
+import { NAMES, formatClaimedDescription, isClaimableLogistics, isParent, ownerOfCalendar } from './family';
 import type {
   Assignee, BacklogItem, BacklogLocation, CartProposal, Chef, Chore, Conflict,
   DinnerRow, GroceryItem, KitchenState, LateNote, LogisticsEvent, Parent,
@@ -288,10 +288,29 @@ export async function eventsForDate(date: string): Promise<LogisticsEvent[]> {
 }
 
 export async function assignLogistics(id: string, parent: Assignee) {
+  const existing = unwrap<LogisticsEvent | null>(
+    await db().from('family_logistics').select('*').eq('id', id).maybeSingle(),
+    'get logistics event',
+  );
+  const newDescription = existing
+    ? formatClaimedDescription(existing.description, existing.title, parent)
+    : undefined;
+
   unwrap(
-    await db().from('family_logistics').update({ assigned_parent: parent, updated_at: now() }).eq('id', id),
+    await db()
+      .from('family_logistics')
+      .update({
+        assigned_parent: parent,
+        ...(newDescription !== undefined ? { description: newDescription } : {}),
+        updated_at: now(),
+      })
+      .eq('id', id),
     'assign logistics',
   );
+
+  if (existing && newDescription && existing.source_calendar === 'family_google') {
+    await updateGoogleCalendarEventDescription(existing.external_event_id, newDescription);
+  }
 }
 
 const overlaps = (a: LogisticsEvent, b: LogisticsEvent) =>
@@ -300,7 +319,7 @@ const overlaps = (a: LogisticsEvent, b: LogisticsEvent) =>
 export function computeConflicts(events: LogisticsEvent[]): Conflict[] {
   const out: Conflict[] = [];
   for (const ev of events) {
-    if (ev.logistics_type !== 'pickup' && ev.logistics_type !== 'appointment') continue;
+    if (!isClaimableLogistics(ev)) continue;
     if (ev.assigned_parent === 'unassigned') {
       out.push({ eventId: ev.id, kind: 'unassigned', message: `${fmtTime(ev.start_time)} ${ev.title} has no owner` });
       continue;

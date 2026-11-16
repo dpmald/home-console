@@ -1,6 +1,6 @@
 // Block Kit builders. Every message is rebuilt from current DB state, so a
 // tap on the kiosk and a click in Slack always converge on the same view.
-import { NAMES, PARENTS, isParent } from '../family';
+import { NAMES, PARENTS, isClaimableLogistics, isParent } from '../family';
 import { daysBetween, fmtDay, fmtShortDate, fmtTime } from '../time';
 import type { BacklogItem, CartProposal, DinnerRow, KitchenState } from '../types';
 import type { GreenlightSummary } from '../domain';
@@ -118,7 +118,7 @@ export function standupBlocks(s: KitchenState): Block[] {
   if (clashes.length) blocks.push(md(`*⚠️ Conflicts*\n${clashes.map((c) => `• ${esc(c.message)}`).join('\n')}`));
 
   important
-    .filter((e) => (e.logistics_type === 'pickup' || e.logistics_type === 'appointment') && e.assigned_parent === 'unassigned')
+    .filter((e) => isClaimableLogistics(e) && e.assigned_parent === 'unassigned')
     .slice(0, 8)
     .forEach((e, i) => {
       blocks.push(ctx(`Who's got *${fmtTime(e.start_time)} ${esc(e.title)}*?`));

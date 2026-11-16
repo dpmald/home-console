@@ -1,17 +1,28 @@
-// Zero-OAuth Google Calendar iCal (.ics) feed sync for Vercel.
+// Zero-OAuth Google Calendar iCal (.ics) feed sync + Family Calendar event description write-back.
 // Supports comma-separated Secret iCal URLs in GOOGLE_CALENDAR_ICS_URLS
 // (e.g. Daniela's primary calendar + Google Family calendar + Warren's calendar).
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { db } from './supabase/server';
 import { ownerOfCalendar } from './family';
 import { localHour } from './time';
 import type { Assignee, LogisticsType, SourceCalendar } from './types';
+
+const execFileAsync = promisify(execFile);
+
+export const FAMILY_CALENDAR_ID =
+  process.env.GOOGLE_FAMILY_CALENDAR_ID || 'family04106130811563564934@group.calendar.google.com';
 
 let lastSyncAt = 0;
 const SYNC_TTL_MS = 5 * 60_000; // Refresh at most every 5 minutes per serverless instance
 
 function classify(title: string, startIso: string, endIso: string): LogisticsType {
   const t = title.toLowerCase();
-  if (/\b(pick\s*up|drop\s*off|carpool|bus|aftercare|camp|school\s*run|wesley\s*from|wesley\s*to)\b/.test(t)) {
+  if (
+    /\b(pick\s*up|pickup|drop\s*off|dropoff|carpool|bus|aftercare|camp|school\s*run|wesley\s*from|wesley\s*to|lachlan\s*from|lachlan\s*to|goddard\s*early\s*closure)\b/.test(
+      t,
+    )
+  ) {
     return 'pickup';
   }
   if (
@@ -31,13 +42,67 @@ function classify(title: string, startIso: string, endIso: string): LogisticsTyp
   return 'general';
 }
 
-function defaultAssignee(type: LogisticsType, src: SourceCalendar, title: string): Assignee {
+function defaultAssignee(
+  type: LogisticsType,
+  src: SourceCalendar,
+  title: string,
+  description?: string | null,
+): Assignee {
+  const desc = (description ?? '').toLowerCase();
+  if (/\bclaimed by daniela\b/.test(desc)) return 'daniela';
+  if (/\bclaimed by warren\b/.test(desc)) return 'warren';
   const t = title.toLowerCase();
   if (/\bdaniela\b/.test(t) && !/\bwarren\b/.test(t)) return 'daniela';
   if (/\bwarren\b/.test(t) && !/\bdaniela\b/.test(t)) return 'warren';
-  if (type === 'pickup') return 'unassigned';
-  if (type === 'appointment' && /\bwesley\b/.test(t)) return 'unassigned';
+  if (type === 'pickup' || src === 'family_google') return 'unassigned';
   return ownerOfCalendar(src) ?? 'unassigned';
+}
+
+export async function updateGoogleCalendarEventDescription(
+  externalEventId: string,
+  description: string,
+  calendarId: string = FAMILY_CALENDAR_ID,
+): Promise<boolean> {
+  const rawId = externalEventId
+    .replace(/^(gcal|ics):/, '')
+    .replace(/@google\.com$/, '')
+    .trim();
+  if (!rawId) return false;
+
+  // 1. If Google Calendar REST token is configured, PATCH event description via REST API
+  const token = process.env.GOOGLE_CALENDAR_ACCESS_TOKEN;
+  if (token) {
+    try {
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        calendarId,
+      )}/events/${encodeURIComponent(rawId)}`;
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ description }),
+      });
+      if (res.ok) return true;
+    } catch {}
+  }
+
+  // 2. Fallback to gcalendar CLI when running locally / on connected host
+  try {
+    await execFileAsync('gcalendar', [
+      'mutate',
+      'update',
+      rawId,
+      '--cal',
+      calendarId,
+      '--description',
+      description,
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function parseIcsDate(raw: string): string | null {
@@ -75,11 +140,15 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
 
   for (const entry of urls) {
     try {
-      // Optional prefix format: "warren_outlook|https://..." or plain URL (defaults to daniela_google)
+      // Optional prefix format: "warren_outlook|https://..." or "family_google|https://..." or plain URL
       const [prefix, maybeUrl] = entry.includes('|') ? entry.split('|', 2) : ['daniela_google', entry];
-      const src: SourceCalendar =
-        prefix === 'warren_outlook' || prefix === 'manual' ? prefix : 'daniela_google';
       const url = maybeUrl.trim();
+      const src: SourceCalendar =
+        prefix === 'warren_outlook' || prefix === 'family_google' || prefix === 'manual'
+          ? prefix
+          : url.includes('family04106130811563564934')
+            ? 'family_google'
+            : 'daniela_google';
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) continue;
       const text = (await res.text()).replace(/\r?\n[ \t]/g, '');
@@ -90,6 +159,7 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
         title: string;
         start_time: string;
         end_time: string;
+        description: string;
       }[] = [];
 
       for (const blk of blocks) {
@@ -98,6 +168,7 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
         const lines = body.split(/\r?\n/);
         let uid = '';
         let summary = '';
+        let description = '';
         let dtStart = '';
         let dtEnd = '';
         let status = '';
@@ -108,6 +179,7 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
           const val = line.slice(colon + 1);
           if (k === 'UID') uid = val.trim();
           else if (k.startsWith('SUMMARY')) summary = val.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, ' ').trim();
+          else if (k.startsWith('DESCRIPTION')) description = val.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, ' ').trim();
           else if (k.startsWith('DTSTART')) dtStart = parseIcsDate(val) ?? '';
           else if (k.startsWith('DTEND')) dtEnd = parseIcsDate(val) ?? '';
           else if (k === 'STATUS') status = val.trim().toUpperCase();
@@ -122,6 +194,7 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
           title: summary,
           start_time: dtStart,
           end_time: endIso,
+          description,
         });
       }
 
@@ -129,7 +202,7 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
       const ids = parsed.map((p) => p.external_event_id);
       const { data: existing } = await db()
         .from('family_logistics')
-        .select('external_event_id, source_calendar, title, start_time, end_time, assigned_parent, logistics_type')
+        .select('external_event_id, source_calendar, title, start_time, end_time, assigned_parent, logistics_type, description')
         .in('external_event_id', ids);
       const byExt = new Map((existing ?? []).map((e: any) => [e.external_event_id, e]));
 
@@ -143,18 +216,25 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
           const assigned =
             prev && prev.assigned_parent !== 'unassigned'
               ? prev.assigned_parent
-              : defaultAssignee(type, e.source_calendar, e.title);
+              : defaultAssignee(type, e.source_calendar, e.title, e.description);
+          const desc = prev?.description || e.description || null;
           const unchanged =
             prev &&
             prev.title === e.title &&
             prev.source_calendar === e.source_calendar &&
             prev.logistics_type === type &&
             prev.assigned_parent === assigned &&
+            (prev.description ?? null) === desc &&
             sameInstant(prev.start_time, e.start_time) &&
             sameInstant(prev.end_time, e.end_time);
           if (unchanged) return null;
           return {
-            ...e,
+            external_event_id: e.external_event_id,
+            source_calendar: e.source_calendar,
+            title: e.title,
+            start_time: e.start_time,
+            end_time: e.end_time,
+            description: desc,
             logistics_type: type,
             assigned_parent: assigned,
             updated_at: new Date().toISOString(),

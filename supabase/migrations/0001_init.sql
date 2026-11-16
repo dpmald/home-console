@@ -72,8 +72,9 @@ create table if not exists public.family_logistics (
   id                uuid primary key default gen_random_uuid(),
   external_event_id text not null unique,
   source_calendar   text not null
-                      check (source_calendar in ('warren_outlook', 'daniela_google', 'manual')),
+                      check (source_calendar in ('warren_outlook', 'daniela_google', 'family_google', 'manual')),
   title             text not null,
+  description       text,
   start_time        timestamptz not null,
   end_time          timestamptz not null,
   logistics_type    text not null default 'general'
