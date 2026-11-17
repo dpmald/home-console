@@ -615,6 +615,7 @@ export function KioskBoard({ initial, initialWeather, groceryDevelopment = false
   }, [broilRunning, showToast]);
 
   const refreshWeather = useCallback(async () => {
+    if (groceryDevelopment) return;
     try {
       const r = await fetch('/api/weather', { cache: 'no-store' });
       if (r.ok) {
@@ -633,7 +634,7 @@ export function KioskBoard({ initial, initialWeather, groceryDevelopment = false
         setWeather(parseOpenMeteoResponse(await r2.json()));
       }
     } catch {}
-  }, []);
+  }, [groceryDevelopment]);
 
   // Supabase Realtime broadcast subscription + fallback poll
   useEffect(() => {

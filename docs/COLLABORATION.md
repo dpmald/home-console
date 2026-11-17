@@ -18,7 +18,7 @@ committed to this public repository.
 Production deployment agreement: pushes to main use .github/workflows/deploy.yml,
 with VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID held in repository secrets.
 Keep personal Git identities and preserve git.deploymentEnabled=false in
-vercel.json. These files were verified on main at 8fcfbf4; a successful production
+vercel.json. These files were verified on main at 39a227f; a successful production
 Actions run was not rechecked during grocery integration. Branch pushes do not
 trigger this production workflow. Automatic PR previews are not configured here.
 
@@ -26,6 +26,11 @@ The grocery branch includes a current-main integration of earlier uncommitted
 connector work. The original preview, data-refresh, connector and checkout-design
 worktrees remain intact. The private-data refresher is intentionally unchanged;
 its schema/history compatibility is a separate rollout prerequisite.
+
+On November 16 the grocery branch was rebased onto main at 39a227f. The shared
+KioskBoard conflicts retained Daniela's bottom navigation and larger pantry type,
+while exposing the new grocery panel through a Groceries dock tab and pantry
+button. The pre-rebase tip is preserved as codex/grocery-flow-before-main-20261116.
 
 Review handoff: identify branch/commit, describe behavior and acceptance checks,
 list validation actually run, and identify what still needs physical-device,

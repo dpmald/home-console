@@ -16,7 +16,8 @@ npm run dev:grocery-ui
 Open the local-only sign-in URL printed by the launcher on port 3004. Grocery
 requests persist in home-console-grocery-dev on 127.0.0.1:55432. Other dashboard
 cards are demo data; the screen labels this. External voice, calendar, Slack,
-Gemini and Spotify credentials are blanked by the launcher. Browser assets/audio
+Gemini and Spotify credentials are blanked by the launcher. Server weather and the
+browser weather fallback are explicitly disabled in this mode. Browser assets/audio
 can still access the internet. Use the dedicated launcher, not a raw next dev
 command that might load unrelated environment settings.
 

@@ -1,7 +1,8 @@
 # Grocery requests: implementation plan and handoff
 
 Updated November 16, 2026. Integration branch: `codex/grocery-flow`, based on
-`8fcfbf455b75fa4f65694c883dcb9b12c47d4e1e`. Production has not been changed.
+`39a227f35a134cde22d10a4d35104df4ba561888` after rebasing onto Daniela's November 16
+navigation and weather update. Production has not been changed.
 
 ## Outcome
 
@@ -44,7 +45,7 @@ voice model. The physical Cozyla microphone is still a separate acceptance test.
 
 ## What is implemented
 
-- `GroceryRequestsPanel` opens from the ambient GROCERIES button and pantry list.
+- `GroceryRequestsPanel` opens from the Groceries tab in the bottom navigation and pantry list.
   It has one row per item, a quantity and notes; edits/cancels use the last revision.
 - `/api/groceries` and the voice grocery tools use one storage adapter. Development
   targets only the existing synthetic database on `127.0.0.1:55432`; production
@@ -78,7 +79,9 @@ The synthetic preview uses its own cookie name so it can coexist with the privat
 preview on the same localhost hostname.
 The launcher blanks integration settings, including calendar URLs/tokens, Supabase,
 Slack, OpenAI, Gemini and Spotify credentials. Calendar CLI write-back is also
-disabled in this development mode. Browser audio/assets can still use the network.
+disabled in this development mode. Both server weather and the new browser weather
+fallback are disabled here; normal deployments retain main's NYC weather defaults
+and icons. Browser audio/assets can still use the network.
 
 ```sh
 npm run test:groceries
@@ -90,8 +93,9 @@ npm run build:grocery-check                  # with this worktree's dev server s
 
 Verified in this implementation:
 
-- 26 focused tests passed: MCP/auth/validation, dedicated DB isolation, environment
-  coverage, streaming limits, migration mapping, uncertain-save recovery and voice inputs.
+- 28 focused tests passed after the rebase: MCP/auth/validation, dedicated DB isolation,
+  environment coverage, streaming limits, migration mapping, uncertain-save recovery,
+  voice inputs and weather network isolation.
 - Database checks passed: atomic batch/replay, quantities, stale edits/cancellation,
   result projection, grants, connector/lease regressions and fresh canonical migrations.
   Transaction fixtures rolled back; the fresh database was disposable and removed.
@@ -104,7 +108,12 @@ Verified in this implementation:
   Captured viewport was 1284 x 1002; the browser's requested 1920 x 1080 override
   did not take effect. Exact device landscape validation remains pending.
 
-![Local synthetic grocery panel](images/grocery-requests-local.jpg)
+The screenshot and browser interaction checks below predate the November 16
+navigation rebase. The current branch retains Daniela's consolidated bottom dock;
+its Groceries tab is available from every dashboard mode. A fresh visual/device
+check of that combined navigation remains pending.
+
+![Local synthetic grocery panel before the navigation rebase](images/grocery-requests-local.jpg)
 
 The development database's older Claude test receipts remain intact. The browser
 test leaves clearly named synthetic UI requests for inspection. Never attach this

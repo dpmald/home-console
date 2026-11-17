@@ -8,5 +8,6 @@ const env=groceryUiEnvironment(process.env,names,{
 });
 for(const name of names)env[name]='';
 env.NODE_ENV='production';env.NEXT_PUBLIC_FAMILY_TIMEZONE='America/New_York';
+env.HOME_CONSOLE_GROCERY_DEVELOPMENT='1';
 const child=spawn(process.execPath,['node_modules/next/dist/bin/next','build'],{env,stdio:'inherit',windowsHide:true});
 child.on('exit',code=>{process.exitCode=code??1;});

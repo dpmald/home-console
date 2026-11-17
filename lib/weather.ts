@@ -63,6 +63,9 @@ export function parseOpenMeteoResponse(j: any): Weather {
 
 /** Open-Meteo — free, no API key. Defaults to NYC (40.7128, -74.0060). */
 export async function getWeather(): Promise<Weather> {
+  if (process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1') {
+    throw new Error('Weather is disabled in the synthetic grocery preview.');
+  }
   const lat = process.env.WEATHER_LAT || NYC_LAT;
   const lon = process.env.WEATHER_LON || NYC_LON;
   const url =

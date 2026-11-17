@@ -24,7 +24,7 @@ Direct instructions from the person requesting the work take precedence over the
 
 - Warren relayed Daniela's deployment update on November 15, 2026: use GitHub Actions on pushes to main for Vercel production, authenticated with repository secrets VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID. Contributors keep their own Git name and email.
 - Preserve .github/workflows/deploy.yml and "git": { "deploymentEnabled": false } in vercel.json once present. Do not restore native Git auto-deploy or replace the agreed workflow without a new instruction.
-- Main at 8fcfbf455b75fa4f65694c883dcb9b12c47d4e1e contains the Actions workflow and native-Git-disable setting. A successful production Actions deployment was not rechecked during grocery integration. Verify a successful deployment before calling any change live.
+- Main at 39a227f35a134cde22d10a4d35104df4ba561888 contains the Actions workflow and native-Git-disable setting. A successful production Actions deployment was not rechecked during grocery integration. Verify a successful deployment before calling any change live.
 - Treat a push or merge to main as a production deployment trigger once the workflow is installed. Local preview work does not require Vercel credentials. Do not assume automatic PR previews are available with native Git deployment disabled.
 
 ## Architecture and behavior
