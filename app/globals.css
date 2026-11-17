@@ -258,14 +258,14 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 8px 15px;
+  gap: 8px;
+  padding: 9px 16px;
   border-radius: 14px;
   background: var(--surface-well);
   border: 1px solid var(--border);
   box-shadow: var(--bezel-shadow);
   font-family: var(--font-mono), monospace;
-  font-size: 0.76rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   color: var(--text);
@@ -309,7 +309,7 @@ select {
 .hearth-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   padding-bottom: 4px;
   flex-shrink: 0;
@@ -343,14 +343,14 @@ select {
 .dock-tab {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
+  gap: 9px;
+  padding: 11px 20px;
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--bezel-shadow);
   font-family: var(--font-mono), monospace;
-  font-size: 0.77rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: var(--text);
   cursor: pointer;

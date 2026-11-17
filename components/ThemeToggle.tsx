@@ -25,8 +25,23 @@ export function useTheme(defaultTheme: Theme = 'light'): [Theme, () => void] {
 export function ThemeToggle({ defaultTheme = 'light' }: { defaultTheme?: Theme }) {
   const [theme, toggle] = useTheme(defaultTheme);
   return (
-    <button className="btn sm" onClick={toggle} title="Switch between Light and Dark mode">
-      {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+    <button
+      type="button"
+      className="hw-btn"
+      onClick={toggle}
+      title={theme === 'light' ? 'Switch to Dark mode' : 'Switch to Light mode'}
+      aria-label={theme === 'light' ? 'Switch to Dark mode' : 'Switch to Light mode'}
+      style={{
+        width: 38,
+        height: 38,
+        padding: 0,
+        borderRadius: 12,
+        color: 'var(--muted)',
+      }}
+    >
+      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+        {theme === 'light' ? 'dark_mode' : 'light_mode'}
+      </span>
     </button>
   );
 }

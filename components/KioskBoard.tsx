@@ -10,7 +10,7 @@ import {
   isParent,
   isSchoolLogisticsEvent,
 } from '@/lib/family';
-import { daysBetween, fmtDay, fmtEventTime, fmtShortDate, fmtTime, isAllDay } from '@/lib/time';
+import { daysBetween, fmtDay, fmtEventTime, fmtShortDate, fmtTime, isAllDay, todayISO } from '@/lib/time';
 import {
   isFullyKiosk,
   launchGeminiOnCozyla,
@@ -21,7 +21,7 @@ import {
   wakeSpotifyOnCozyla,
 } from '@/lib/cozyla';
 import type { BacklogLocation, KioskAction, KitchenState } from '@/lib/types';
-import type { Weather } from '@/lib/weather';
+import { NYC_LAT, NYC_LON, parseOpenMeteoResponse, type Weather } from '@/lib/weather';
 import type { SpotifyNowPlaying } from '@/lib/spotify';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -611,8 +611,32 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     return () => clearInterval(id);
   }, [broilRunning, showToast]);
 
+  const refreshWeather = useCallback(async () => {
+    try {
+      const r = await fetch('/api/weather', { cache: 'no-store' });
+      if (r.ok) {
+        setWeather(await r.json());
+        return;
+      }
+    } catch {}
+    try {
+      const url =
+        `https://api.open-meteo.com/v1/forecast?latitude=${NYC_LAT}&longitude=${NYC_LON}` +
+        '&current=temperature_2m,apparent_temperature,weather_code' +
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+        '&temperature_unit=fahrenheit&timezone=auto&forecast_days=2';
+      const r2 = await fetch(url);
+      if (r2.ok) {
+        setWeather(parseOpenMeteoResponse(await r2.json()));
+      }
+    } catch {}
+  }, []);
+
   // Supabase Realtime broadcast subscription + fallback poll
   useEffect(() => {
+    if (!initialWeather) {
+      refreshWeather();
+    }
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const sb = browserSupabase();
     const channel = sb
@@ -626,17 +650,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
       })
       .subscribe();
     const poll = setInterval(refresh, 45_000);
-    const wx = setInterval(async () => {
-      const r = await fetch('/api/weather');
-      if (r.ok) setWeather(await r.json());
-    }, 600_000);
+    const wx = setInterval(refreshWeather, 600_000);
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (channel && sb) sb.removeChannel(channel);
       clearInterval(poll);
       clearInterval(wx);
     };
-  }, [refresh, refreshKitchen]);
+  }, [initialWeather, refresh, refreshKitchen, refreshWeather]);
 
   const playNpr = useCallback(() => {
     if (!nprRef.current) nprRef.current = new Audio(NPR_URL);
@@ -922,6 +943,17 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
     }
     return ev.assigned_parent === memberFilter || ev.source_calendar.startsWith(memberFilter);
   });
+  const primaryEvent = filteredEvents[0] ?? state.events[0];
+  const eventDate = primaryEvent ? todayISO(new Date(primaryEvent.start_time)) : state.date;
+  const weatherIcon = weather?.current?.icon || 'sunny';
+  const weatherIconColor =
+    weatherIcon === 'rainy' || weatherIcon === 'weather_snowy'
+      ? 'var(--cobalt)'
+      : weatherIcon === 'thunderstorm'
+        ? 'var(--terracotta)'
+        : weatherIcon === 'cloud' || weatherIcon === 'foggy'
+          ? 'var(--muted)'
+          : 'var(--amber)';
 
   const audioStatusLabel = nprPlaying
     ? 'NPR LIVE STREAM (PLAYING)'
@@ -937,47 +969,10 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
       <div className="hearth-glow-bottom" />
 
       <main className="hearth-shell">
-        {/* ── 1. Top Navigation Header (Aligned with Stitch Chore Board View) ── */}
+        {/* ── 1. Top Glance Header (Clock + Date + NYC Outdoor Temp) ── */}
         {mode !== 'ambient' && (
           <header className="hearth-topbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button
-                type="button"
-                onClick={() => setMode('ambient')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '7px 14px',
-                  borderRadius: 12,
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  boxShadow: '0 1px 2px rgba(40, 25, 15, 0.04)',
-                  cursor: 'pointer',
-                  color: 'var(--text)',
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
-                  arrow_back
-                </span>
-                <span
-                  className="font-mono"
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  RETURN TO AMBIENT
-                </span>
-              </button>
-
-              <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
-            </div>
-
-            {/* Right Glance Clock + Date */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontSize: '2.65rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
                   {clockDigits}
@@ -989,9 +984,33 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   {clockAmPm}
                 </span>
               </div>
-              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text)' }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>
                 {fmtDay(state.date)}
               </div>
+              {weather?.current?.temp != null && (
+                <>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--dot)' }} />
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: '1.05rem',
+                      fontWeight: 700,
+                      color: 'var(--text)',
+                    }}
+                    title={weather.current.label}
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ color: weatherIconColor, fontSize: 22 }}
+                    >
+                      {weatherIcon}
+                    </span>
+                    <span>{weather.current.temp}°F</span>
+                  </div>
+                </>
+              )}
             </div>
           </header>
         )}
@@ -1006,7 +1025,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
               minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'flex-end',
+              justifyContent: 'center',
               paddingBottom: 8,
             }}
           >
@@ -1015,9 +1034,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 display: 'grid',
                 gridTemplateColumns: '55fr 45fr',
                 gap: 24,
-                minHeight: 430,
-                maxHeight: 500,
-                height: '62vh',
+                minHeight: 500,
+                maxHeight: 720,
+                height: '76vh',
               }}
             >
               {/* Left Primary Glanceable Card: Clean Giant Clock + Date + Outdoor Temp + Conditional Schedule Callout */}
@@ -1034,7 +1053,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     'radial-gradient(circle at 86% 16%, rgba(217, 78, 52, 0.085), transparent 54%), var(--surface)',
                 }}
               >
-                <div style={{ marginTop: state.events.length > 0 ? 8 : 28 }}>
+                <div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
                     <span
                       style={{
@@ -1059,17 +1078,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       >
                         {clockAmPm}
                       </span>
-                      <span
-                        className="font-mono"
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          color: 'var(--muted)',
-                          letterSpacing: '0.08em',
-                        }}
-                      >
-                        EST • HOME
-                      </span>
                     </div>
                   </div>
 
@@ -1081,21 +1089,28 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       flexWrap: 'wrap',
                       alignItems: 'center',
                       gap: 14,
-                      fontSize: '1.25rem',
+                      fontSize: '1.35rem',
                       fontWeight: 600,
                     }}
                   >
                     <span>{fmtDay(state.date)}</span>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span className="material-symbols-outlined" style={{ color: 'var(--amber)', fontSize: 22 }}>
-                        sunny
-                      </span>
-                      <span>
-                        {weather ? `Outdoor ${weather.current.temp}°F` : 'Outdoor —°F'}
-                      </span>
-                    </span>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
+                    {weather?.current?.temp != null && (
+                      <>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--dot)' }} />
+                        <span
+                          style={{ display: 'flex', alignItems: 'center', gap: 7 }}
+                          title={weather.current.label}
+                        >
+                          <span
+                            className="material-symbols-outlined"
+                            style={{ color: weatherIconColor, fontSize: 26 }}
+                          >
+                            {weatherIcon}
+                          </span>
+                          <span>{weather.current.temp}°F</span>
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {/* Conditional SCHEDULE & LOGISTICS Callout (Only shown when events exist) */}
@@ -1338,13 +1353,13 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                             <span
                               className="font-mono"
                               style={{
-                                fontSize: '0.72rem',
+                                fontSize: '0.78rem',
                                 fontWeight: 700,
                                 color: 'var(--terracotta)',
                                 letterSpacing: '0.05em',
                               }}
                             >
-                              [MENU // TONIGHT]
+                              TONIGHT&apos;S MENU
                             </span>
                             <span
                               className="font-mono"
@@ -1482,9 +1497,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         />
                         <span
                           className="font-mono"
-                          style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
+                          style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--terracotta)', letterSpacing: '0.06em' }}
                         >
-                          TIMER 01 // {timerRunning ? 'ACTIVE' : 'PAUSED'}
+                          KITCHEN TIMER • {timerRunning ? 'ACTIVE' : 'PAUSED'}
                         </span>
                       </div>
                       <div style={{ margin: '6px 0 14px' }}>
@@ -1588,9 +1603,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         />
                         <span
                           className="font-mono"
-                          style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--cobalt)', letterSpacing: '0.05em' }}
+                          style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--cobalt)', letterSpacing: '0.05em' }}
                         >
-                          [ EVENING ROUTINE &amp; RESTOCK ]
+                          EVENING ROUTINE &amp; RESTOCK
                         </span>
                       </div>
 
@@ -4203,19 +4218,16 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     flexShrink: 0,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--clay)', letterSpacing: '0.06em' }}
-                    >
-                      [ 01 // MASTER FAMILY TIMELINE — {filteredEvents.length} SCHEDULED ITEMS ]
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>
+                      Schedule • {fmtDay(eventDate)}
+                    </h2>
                     <span
                       className="font-mono"
                       style={{
-                        fontSize: '0.68rem',
+                        fontSize: '0.74rem',
                         fontWeight: 700,
-                        padding: '2px 10px',
+                        padding: '3px 10px',
                         borderRadius: 999,
                         background: state.conflicts.length ? 'var(--warn-surface)' : 'var(--emerald-surface)',
                         border: `1px solid ${state.conflicts.length ? 'var(--warn-border)' : 'var(--emerald-border)'}`,
@@ -4229,7 +4241,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   {/* Member & School Logistics Filter Pills (All / School / Daniela / Warren / Wesley / Lachlan) */}
                   <div
                     className="ceramic-well font-mono"
-                    style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 12, fontSize: '0.72rem', flexWrap: 'wrap' }}
+                    style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, fontSize: '0.86rem', flexWrap: 'wrap' }}
                   >
                     {(
                       [
@@ -4245,8 +4257,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         key={f}
                         onClick={() => setMemberFilter(f)}
                         style={{
-                          padding: '4px 11px',
-                          borderRadius: 9,
+                          padding: '8px 14px',
+                          borderRadius: 10,
                           border: 'none',
                           cursor: 'pointer',
                           background: memberFilter === f ? 'var(--surface)' : 'transparent',
@@ -4268,8 +4280,8 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                     overflowY: 'auto',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 8,
-                    padding: '10px 0',
+                    gap: 10,
+                    padding: '12px 0 4px',
                   }}
                 >
                   {filteredEvents.length === 0 && (
@@ -4278,19 +4290,19 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       style={{
                         padding: '18px 20px',
                         color: 'var(--muted)',
-                        fontSize: '0.86rem',
+                        fontSize: '0.96rem',
                         textAlign: 'center',
                         margin: 'auto 0',
                       }}
                     >
-                      No calendar events match this filter for today.
+                      No calendar events match this filter.
                     </div>
                   )}
                   {filteredEvents.map((ev) => {
                     const claimable = isClaimableLogistics(ev);
                     const needsOwner = claimable && ev.assigned_parent === 'unassigned';
                     const isLate = ev.logistics_type === 'late_office';
-                    const timeStr = isAllDay(ev.start_time, ev.end_time) ? 'ALL DAY' : fmtEventTime(ev.start_time, state.date);
+                    const timeStr = isAllDay(ev.start_time, ev.end_time) ? 'ALL DAY' : fmtEventTime(ev.start_time, eventDate);
                     return (
                       <div
                         key={ev.id}
@@ -4298,32 +4310,24 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: 14,
-                          padding: '11px 14px',
+                          gap: 16,
+                          padding: '13px 16px',
                           borderRadius: 16,
                           background: needsOwner ? 'var(--warm-surface)' : isLate ? 'var(--danger-surface)' : 'var(--surface-tint)',
                           border: `1.5px solid ${needsOwner ? 'var(--warm-border)' : isLate ? 'var(--terracotta)' : 'var(--border)'}`,
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-                          <div style={{ width: 128, flexShrink: 0 }}>
+                          <div style={{ width: 112, flexShrink: 0 }}>
                             <div
                               className="font-mono"
                               style={{
-                                fontSize: '0.78rem',
+                                fontSize: '0.98rem',
                                 fontWeight: 800,
                                 color: needsOwner ? 'var(--warn-text)' : isLate ? 'var(--clay)' : 'var(--text)',
                               }}
                             >
                               {timeStr}
-                            </div>
-                            <div
-                              className="font-mono"
-                              style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}
-                            >
-                              {claimable && /dropoff|drop off/i.test(ev.title)
-                                ? 'DROPOFF'
-                                : ev.logistics_type.replace('_', ' ')}
                             </div>
                           </div>
 
@@ -4338,55 +4342,21 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           />
 
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.92rem', fontWeight: 700 }}>{ev.title}</span>
-                              {needsOwner ? (
-                                <span
-                                  className="font-mono"
-                                  style={{
-                                    fontSize: '0.62rem',
-                                    fontWeight: 700,
-                                    padding: '2px 8px',
-                                    borderRadius: 999,
-                                    background: 'var(--warn-surface)',
-                                    border: '1px solid var(--warn-border)',
-                                    color: 'var(--warn-text)',
-                                  }}
-                                >
-                                  UNCLAIMED
-                                </span>
-                              ) : (
-                                <span
-                                  className="font-mono"
-                                  style={{
-                                    fontSize: '0.62rem',
-                                    fontWeight: 700,
-                                    padding: '2px 8px',
-                                    borderRadius: 999,
-                                    background: 'var(--emerald-surface)',
-                                    border: '1px solid var(--emerald-border)',
-                                    color: 'var(--emerald)',
-                                  }}
-                                >
-                                  {ev.assigned_parent !== 'unassigned' ? `✓ ${NAMES[ev.assigned_parent]}` : 'SCHEDULED'}
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                              {SOURCE_LABEL[ev.source_calendar]} • {fmtTime(ev.start_time)}–{fmtTime(ev.end_time)}
-                              {ev.description ? ` • ${ev.description}` : ''}
+                            <div style={{ fontSize: '1.08rem', fontWeight: 700, lineHeight: 1.25 }}>{ev.title}</div>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                              {SOURCE_LABEL[ev.source_calendar]}
                             </div>
                           </div>
                         </div>
 
                         {/* Claim / Assign Pickup Buttons — reserved ONLY for Family Calendar items (like school dropoffs/pickups) */}
                         {claimable && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                             {PARENTS.map((p) => (
                               <button
                                 key={p}
                                 className={`hw-btn ${ev.assigned_parent === p ? 'terracotta' : ''}`}
-                                style={{ padding: '6px 11px', fontSize: '0.7rem' }}
+                                style={{ padding: '9px 15px', fontSize: '0.85rem' }}
                                 onClick={() => {
                                   const nextParent = ev.assigned_parent === p ? 'unassigned' : p;
                                   act({
@@ -4401,7 +4371,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                   );
                                 }}
                               >
-                                {ev.assigned_parent === p ? `✓ ${NAMES[p]}` : `Claim: ${NAMES[p]}`}
+                                {ev.assigned_parent === p ? `✓ ${NAMES[p]}` : NAMES[p]}
                               </button>
                             ))}
                           </div>
@@ -4409,39 +4379,6 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       </div>
                     );
                   })}
-                </div>
-
-                {/* Expand / Collapse Timeline Footer */}
-                <div
-                  style={{
-                    paddingTop: 10,
-                    borderTop: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    flexShrink: 0,
-                  }}
-                >
-                  <button
-                    className="hw-btn"
-                    onClick={() => setMode(mode === 'timeline' ? 'bento' : 'timeline')}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      {mode === 'timeline' ? 'expand_less' : 'schedule'}
-                    </span>
-                    <span>
-                      {mode === 'timeline' ? 'COLLAPSE' : `EXPAND FULL TIMELINE (${state.events.length} EVENTS)`}
-                    </span>
-                  </button>
-
-                  <div
-                    className="font-mono"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', color: 'var(--muted)' }}
-                  >
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--emerald)' }} />
-                    <span>Outlook + Google Calendar Synced</span>
-                  </div>
                 </div>
               </section>
 
@@ -4477,9 +4414,9 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span
                             className="font-mono"
-                            style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--clay)', letterSpacing: '0.06em' }}
+                            style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', letterSpacing: '0.06em' }}
                           >
-                            [ TONIGHT&apos;S HEARTH DINNER ]
+                            TONIGHT&apos;S DINNER
                           </span>
                           <span
                             className="font-mono"
@@ -4648,25 +4585,20 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      paddingBottom: 10,
+                      paddingBottom: 12,
                       borderBottom: '1px solid var(--border-subtle)',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div
                         className="ceramic-well"
-                        style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', color: 'var(--cobalt)' }}
+                        style={{ width: 38, height: 38, display: 'grid', placeItems: 'center', color: 'var(--cobalt)' }}
                       >
-                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
                           task_alt
                         </span>
                       </div>
-                      <div>
-                        <h2 style={{ fontSize: '1.08rem', fontWeight: 800 }}>Wesley&apos;s Chores</h2>
-                        <span className="font-mono" style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
-                          Daily Contributions &amp; Greenlight Audit
-                        </span>
-                      </div>
+                      <h2 style={{ fontSize: '1.22rem', fontWeight: 800 }}>Wesley&apos;s Chores</h2>
                     </div>
                     <button
                       type="button"
@@ -4674,78 +4606,45 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       onClick={() => launchGreenlightOnCozyla()}
                       title="Open Greenlight App"
                       style={{
-                        padding: '4px 11px',
+                        padding: '6px 14px',
                         borderRadius: 999,
-                        fontSize: '0.72rem',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 5,
+                        gap: 6,
                         cursor: 'pointer',
                       }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--cobalt)' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
                         credit_card
                       </span>
                       Greenlight
                     </button>
                   </div>
 
-                  {/* Weekly Allowance & Pay-per-chore Progress Card */}
+                  {/* Kid-Friendly Chore Progress Bar */}
                   <div
                     className="ceramic-well"
-                    style={{ margin: '10px 0', padding: '12px 14px', borderRadius: 18 }}
+                    style={{ margin: '12px 0', padding: '14px 16px', borderRadius: 18 }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                      <div>
-                        <span
-                          className="font-mono"
-                          style={{
-                            fontSize: '0.64rem',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.07em',
-                            color: 'var(--muted)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 5,
-                          }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--amber)' }}>
-                            account_balance_wallet
-                          </span>
-                          Allowance ({allowanceDone}/{allowanceChores.length}) • Pay Per Chore
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
-                          <span style={{ fontSize: '1.75rem', fontWeight: 800 }}>+${allowanceEarned}</span>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--muted)' }}>
-                            of ${allowanceTotal} Bonus Today
-                          </span>
-                        </div>
-                      </div>
-                      <span
-                        className="font-mono"
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 8,
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {chorePct}% COMPLETE
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '1.08rem', fontWeight: 800 }}>
+                        {doneChores} of {state.chores.length} Done
+                      </span>
+                      <span className="font-mono" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--emerald)' }}>
+                        +${allowanceEarned}
                       </span>
                     </div>
 
                     <div
                       style={{
                         width: '100%',
-                        height: 9,
+                        height: 14,
                         borderRadius: 999,
                         background: 'var(--border)',
                         overflow: 'hidden',
-                        marginTop: 8,
+                        marginTop: 10,
                       }}
                     >
                       <div
@@ -4768,16 +4667,17 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       overflowY: 'auto',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 7,
+                      justifyContent: 'space-evenly',
+                      gap: 10,
                     }}
                   >
                     {state.chores.length === 0 && (
                       <div
                         className="ceramic-well"
                         style={{
-                          padding: '16px 18px',
+                          padding: '18px 20px',
                           color: 'var(--muted)',
-                          fontSize: '0.82rem',
+                          fontSize: '0.96rem',
                           textAlign: 'center',
                           margin: 'auto 0',
                         }}
@@ -4793,76 +4693,73 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '10px 12px',
-                          borderRadius: 16,
+                          padding: '16px 18px',
+                          borderRadius: 18,
                           background: c.completed ? 'var(--surface-tint)' : 'var(--surface)',
                           border: `1.5px solid ${c.completed ? 'var(--border)' : 'var(--cobalt-border)'}`,
                           cursor: 'pointer',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                           <div
                             style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 10,
+                              width: 42,
+                              height: 42,
+                              borderRadius: 12,
                               background: c.completed ? 'var(--emerald-surface)' : 'var(--cobalt-surface-soft)',
-                              border: `1px solid ${c.completed ? 'var(--emerald-border)' : 'var(--cobalt-border)'}`,
+                              border: `1.5px solid ${c.completed ? 'var(--emerald-border)' : 'var(--cobalt-border)'}`,
                               color: c.completed ? 'var(--emerald)' : 'var(--cobalt)',
                               display: 'grid',
                               placeItems: 'center',
+                              flexShrink: 0,
                             }}
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 24 }}>
                               {c.completed ? 'check' : 'check_box_outline_blank'}
                             </span>
                           </div>
-                          <div>
-                            <div
-                              style={{
-                                fontSize: '0.86rem',
-                                fontWeight: 700,
-                                textDecoration: c.completed ? 'line-through' : 'none',
-                                color: c.completed ? 'var(--text-secondary)' : 'var(--text)',
-                              }}
-                            >
-                              {c.emoji ? `${c.emoji} ` : ''}
-                              {c.chore_title}
-                            </div>
-                            <div className="font-mono" style={{ fontSize: '0.64rem', color: 'var(--muted)' }}>
-                              {c.completed ? 'Completed on Kitchen Board' : 'Tap to complete'}
-                            </div>
+                          <div
+                            style={{
+                              fontSize: '1.12rem',
+                              fontWeight: 700,
+                              textDecoration: c.completed ? 'line-through' : 'none',
+                              color: c.completed ? 'var(--text-secondary)' : 'var(--text)',
+                            }}
+                          >
+                            {c.emoji ? `${c.emoji} ` : ''}
+                            {c.chore_title}
                           </div>
                         </div>
 
-                        <span
-                          className="font-mono"
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: 6,
-                            background: c.completed ? 'var(--emerald-surface)' : (c.reward_cents ?? 0) > 0 ? 'var(--emerald-surface)' : 'var(--cobalt-surface-soft)',
-                            color: c.completed ? 'var(--emerald)' : (c.reward_cents ?? 0) > 0 ? 'var(--emerald)' : 'var(--cobalt)',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {(c.reward_cents ?? 0) > 0
-                            ? `+$${((c.reward_cents ?? 0) / 100).toFixed(2)}`
-                            : 'Allowance'}
-                        </span>
+                        {(c.reward_cents ?? 0) > 0 && (
+                          <span
+                            className="font-mono"
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 8,
+                              background: 'var(--emerald-surface)',
+                              color: 'var(--emerald)',
+                              fontSize: '0.88rem',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                            }}
+                          >
+                            +${((c.reward_cents ?? 0) / 100).toFixed(2)}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Pantry & Grocery Cart Staging Footer */}
-                <div style={{ paddingTop: 10, marginTop: 10, borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ paddingTop: 12, marginTop: 12, borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span
                       className="font-mono"
-                      style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}
+                      style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--muted)' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--muted)' }}>
                         local_shipping
                       </span>
                       Pantry Cart Staging ({state.groceries.length})
@@ -4870,7 +4767,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   </div>
 
                   <form
-                    style={{ display: 'flex', gap: 6 }}
+                    style={{ display: 'flex', gap: 8 }}
                     onSubmit={(e) => {
                       e.preventDefault();
                       if (!newGrocery.trim()) return;
@@ -4880,7 +4777,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   >
                     <input
                       className="ceramic-well"
-                      style={{ flex: 1, padding: '7px 12px', fontSize: '0.8rem' }}
+                      style={{ flex: 1, padding: '11px 16px', fontSize: '0.94rem' }}
                       placeholder={
                         state.groceries.length
                           ? `In cart: ${state.groceries.map((g) => g.name).join(', ')} — add more…`
@@ -4889,7 +4786,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                       value={newGrocery}
                       onChange={(e) => setNewGrocery(e.target.value)}
                     />
-                    <button className="hw-btn" type="submit">
+                    <button className="hw-btn" type="submit" style={{ padding: '11px 18px', fontSize: '0.86rem' }}>
                       + ADD
                     </button>
                   </form>
@@ -5034,7 +4931,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
           </div>
         )}
 
-        {/* ── Bottom Hardware Navigation Dock (Clean Stitch bar in Ambient; full dock in Bento/Timeline) ── */}
+        {/* ── Bottom Hardware Navigation Dock (Bottom-only navigation + tucked utility icons) ── */}
         <footer
           className="hearth-dock"
           style={
@@ -5043,154 +4940,121 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                   borderTop: '1px solid var(--border-subtle)',
                   paddingTop: 18,
                   marginTop: 18,
-                  justifyContent: 'flex-end',
-                  gap: 10,
                 }
               : undefined
           }
         >
-          {mode === 'ambient' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {mode !== 'ambient' && (
               <button
-                className="hw-btn pill font-mono"
-                onClick={() => setMode('dinner')}
-                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
+                className="dock-tab"
+                onClick={() => setMode('ambient')}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
-                  restaurant
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
+                  home
                 </span>
-                <span>[ DINNER HUB ]</span>
+                <span>Ambient</span>
               </button>
+            )}
 
-              <button
-                className="hw-btn pill font-mono"
-                onClick={() => setMode('bento')}
-                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--cobalt)' }}>
-                  checklist
-                </span>
-                <span>[ CHORE BOARD ]</span>
-              </button>
+            <button
+              className={`dock-tab ${mode === 'dinner' ? 'active' : ''}`}
+              onClick={() => setMode('dinner')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'dinner' ? '#fff' : 'var(--terracotta)' }}>
+                restaurant
+              </span>
+              <span>Dinner Hub</span>
+            </button>
 
-              <button
-                className="hw-btn pill font-mono"
-                onClick={() => openGeminiOverlay()}
-                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
-                title="Engage Gemini Voice"
-              >
-                <GeminiSparkIcon size={14} />
-                <span>[ GEMINI ]</span>
-              </button>
+            <button
+              className={`dock-tab ${mode === 'bento' || mode === 'timeline' ? 'active' : ''}`}
+              onClick={() => setMode('bento')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'bento' || mode === 'timeline' ? '#fff' : 'var(--cobalt)' }}>
+                checklist
+              </span>
+              <span>Chores &amp; Schedule ({doneChores}/{state.chores.length})</span>
+            </button>
 
-              <ThemeToggle defaultTheme="light" />
+            <button
+              className="dock-tab"
+              onClick={() => openGeminiOverlay()}
+              title="Engage Gemini Voice"
+            >
+              <GeminiSparkIcon size={18} />
+              <span>Gemini</span>
+            </button>
 
-              <a
-                href="/guide"
-                className="hw-btn pill font-mono"
-                style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--terracotta)' }}>
-                  menu_book
-                </span>
-                <span>MANUAL</span>
-              </a>
-
-              <button
-                className="hw-btn pill font-mono"
-                onClick={() => {
-                  try {
-                    window.fully?.turnScreenOff?.(true);
-                  } catch {}
-                }}
-                style={{
-                  fontSize: '0.72rem',
-                  letterSpacing: '0.03em',
-                  background: 'var(--surface-well)',
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
-                  power_settings_new
-                </span>
-                <span>SLEEP DISP</span>
-              </button>
-            </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <button
-                  className={`dock-tab ${mode === 'dinner' ? 'active' : ''}`}
-                  onClick={() => setMode('dinner')}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'dinner' ? '#fff' : 'var(--terracotta)' }}>
-                    restaurant
-                  </span>
-                  <span>Dinner Hub</span>
-                </button>
-
-                <button
-                  className={`dock-tab ${mode === 'bento' ? 'active' : ''}`}
-                  onClick={() => setMode('bento')}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'bento' ? '#fff' : 'var(--cobalt)' }}>
-                    checklist
-                  </span>
-                  <span>Chores &amp; Schedule ({doneChores}/{state.chores.length})</span>
-                </button>
-
-                <button
-                  className={`dock-tab ${mode === 'timeline' ? 'active' : ''}`}
-                  onClick={() => setMode('timeline')}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: mode === 'timeline' ? '#fff' : 'var(--emerald)' }}>
-                    calendar_month
-                  </span>
-                  <span>Master Timeline ({state.events.length})</span>
-                </button>
-
+            {mode !== 'ambient' && (
+              <>
                 <button
                   className="dock-tab"
                   onClick={nprPlaying ? stopNpr : playNpr}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--terracotta)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
                     radio
                   </span>
-                  <span>{nprPlaying ? 'Stop NPR Live' : 'NPR Live Radio'}</span>
+                  <span>{nprPlaying ? 'Stop NPR' : 'NPR Live'}</span>
                 </button>
 
                 <button
                   className="dock-tab"
                   onClick={() => actSpotify(spotify.playing ? 'pause' : 'play')}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--cobalt)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--cobalt)' }}>
                     graphic_eq
                   </span>
                   <span>
-                    {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify Connect'}
+                    {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify'}
                   </span>
                 </button>
-              </div>
+              </>
+            )}
+          </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <ThemeToggle defaultTheme="light" />
-                <a href="/guide" className="hw-btn">
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
-                    menu_book
-                  </span>
-                  <span>MANUAL</span>
-                </a>
-                <button
-                  className="hw-btn"
-                  onClick={() => setMode('ambient')}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                    power_settings_new
-                  </span>
-                  <span>STANDBY</span>
-                </button>
-              </div>
-            </>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle defaultTheme="light" />
+            <a
+              href="/guide"
+              className="hw-btn"
+              title="Kitchen Guide & Manual"
+              aria-label="Kitchen Guide & Manual"
+              style={{
+                width: 38,
+                height: 38,
+                padding: 0,
+                borderRadius: 12,
+                color: 'var(--muted)',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                help
+              </span>
+            </a>
+            <button
+              type="button"
+              className="hw-btn"
+              title="Sleep Display"
+              aria-label="Sleep Display"
+              onClick={() => {
+                try {
+                  window.fully?.turnScreenOff?.(true);
+                } catch {}
+              }}
+              style={{
+                width: 38,
+                height: 38,
+                padding: 0,
+                borderRadius: 12,
+                color: 'var(--muted)',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                bedtime
+              </span>
+            </button>
+          </div>
         </footer>
 
         {/* ════════════════════════════════════════════════════════════════════
