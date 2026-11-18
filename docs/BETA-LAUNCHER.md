@@ -1,8 +1,10 @@
 # Stable kitchen entry to Beta
 
 The stable kitchen renders a Beta link only when `HOME_CONSOLE_BETA_URL` contains
-a valid public HTTPS destination. The link opens in the same tab, does not
-prefetch the beta app, and does not forward a device key or referrer. An absent
+a valid public HTTPS destination. The link opens the top window in the same tab
+(`target="_top"`), so local preview wrappers do not nest when entering Beta and
+returning to the kitchen. It does not prefetch the beta app or forward a device
+key or referrer. An absent
 or invalid destination hides the link. No experimental components, API routes,
 database migrations or dependencies are added to the stable kitchen by this
 launcher change.

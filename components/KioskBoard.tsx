@@ -5149,7 +5149,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {betaUrl && (
-              <a className="dock-tab" href={betaUrl} referrerPolicy="no-referrer" rel="noreferrer" style={{ minHeight: 56 }}>
+              <a className="dock-tab" href={betaUrl} target="_top" referrerPolicy="no-referrer" rel="noreferrer" style={{ minHeight: 56 }}>
                 <span className="material-symbols-outlined" aria-hidden="true">science</span>
                 <span>Beta</span>
               </a>
