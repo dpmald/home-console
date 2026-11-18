@@ -63,8 +63,20 @@ begin
   if result->>'code'<>'worker_conflict' then raise exception 'run_id stole worker lease'; end if;
 
   op:=jsonb_build_object('phase','complete','operation_id',prefix||'-complete-a','run_id',run_a,
-    'request_id',request_a,'revision',1,'retailer','Wegmans','outcome','in_cart','product',product,
+    'request_id',request_a,'revision',1,'retailer','Wegmans','outcome','in_cart',
+    'product',product||jsonb_build_object('size','SIMULATED 1 unit'),
+    'reason','Synthetic test only; no real cart changed.',
     'observed_at',stamp,'worker_token',prepared->>'worker_token','claim_token',prepared->>'claim_token');
+  -- Completion reports product evidence, not the prepare-only observed_cart.
+  -- Both empty and populated arrays used to pass MCP validation then fail here.
+  result:=public.grocery_agent_progress(op||jsonb_build_object('observed_cart','[]'::jsonb));
+  if result->>'code'<>'invalid_input' then raise exception 'empty completion cart accepted'; end if;
+  result:=public.grocery_agent_progress(op||jsonb_build_object('observed_cart',jsonb_build_array(product)));
+  if result->>'code'<>'invalid_input' then raise exception 'populated completion cart accepted'; end if;
+  if (select outcome from public.grocery_agent_attempts where id=(prepared->>'attempt_id')::uuid) is not null
+    or exists(select 1 from public.grocery_agent_operations where operation_id=prefix||'-complete-a') then
+    raise exception 'rejected completion changed the receipt or reserved its operation id';
+  end if;
   result:=public.grocery_agent_progress(op);
   if result->>'ok'<>'true' or result->>'status'<>'in_cart' then raise exception 'cart completion failed: %',result; end if;
   if (select status from public.grocery_items where id=request_a)<>'in_cart' then raise exception 'request not marked in cart'; end if;

@@ -111,11 +111,31 @@ test('prepare and complete preserve actual product fields and required scoped to
   assert.equal(result.structuredContent.worker_token, WORKER_TOKEN);
   assert.equal(result.structuredContent.claim_token, CLAIM_TOKEN);
   assert.deepEqual((calls[0] as { product: unknown }).product, PRODUCT);
-  const complete = { ...prepare(), phase: 'complete', operation_id: 'complete-1',
-    outcome: 'in_cart', worker_token: WORKER_TOKEN, claim_token: CLAIM_TOKEN };
+  const { observed_cart, ...common } = prepare();
+  const complete = { ...common, phase: 'complete', operation_id: 'complete-1',
+    outcome: 'in_cart', worker_token: WORKER_TOKEN, claim_token: CLAIM_TOKEN,
+    product: { ...PRODUCT, size: 'SIMULATED 1 unit' }, reason: 'Synthetic evidence only; no real cart changed.' };
   const completed = await handler(request(rpc('tools/call', { name: 'record_request_progress', arguments: { operation: complete } })));
   assert.equal((await completed.json()).result.isError, undefined);
   assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], complete);
+});
+
+test('complete rejects prepare-only cart evidence before any store call, with a field-specific error', async () => {
+  const { handler, calls } = fixture();
+  for (const outcome of ['in_cart', 'already_in_cart', 'pending', 'needs_attention']) {
+    for (const observed_cart of [[], [PRODUCT]]) {
+      const operation = { ...prepare(), phase: 'complete', operation_id: 'complete-1', outcome,
+        worker_token: WORKER_TOKEN, claim_token: CLAIM_TOKEN, observed_cart,
+        reason: 'Synthetic evidence only; no real cart changed.' };
+      const response = await handler(request(rpc('tools/call', { name: 'record_request_progress', arguments: { operation } })));
+      const result = (await response.json()).result;
+      assert.equal(result.isError, true);
+      assert.match(result.content[0].text, /observed_cart is prepare-only/);
+      assert.match(result.content[0].text, /Omit it on complete/);
+    }
+  }
+  assert.equal(calls.length, 0);
 });
 
 test('unknown fields, oversized input, unsupported retailer and unsafe phase shapes never reach the store', async () => {
@@ -142,10 +162,11 @@ test('unknown fields, oversized input, unsupported retailer and unsafe phase sha
 });
 
 test('recovery cannot claim a new addition; a directly covered result needs no claim token', () => {
-  const recovery = { ...prepare(), phase: 'complete', outcome: 'already_in_cart', recovery_attempt_id: CLAIM_TOKEN };
+  const { observed_cart, ...common } = prepare();
+  const recovery = { ...common, phase: 'complete', outcome: 'already_in_cart', recovery_attempt_id: CLAIM_TOKEN };
   assert.equal(groceryProgressSchema.safeParse(recovery).success, true);
   assert.equal(groceryProgressSchema.safeParse({ ...recovery, outcome: 'in_cart', worker_token: WORKER_TOKEN, claim_token: CLAIM_TOKEN }).success, false);
-  assert.equal(groceryProgressSchema.safeParse({ ...prepare(), phase: 'complete', outcome: 'pending', reason: 'No stock information available; addition not attempted.' }).success, true);
+  assert.equal(groceryProgressSchema.safeParse({ ...common, phase: 'complete', outcome: 'pending', reason: 'No stock information available; addition not attempted.' }).success, true);
 });
 
 test('store exceptions are generic and known credential fields are removed while scoped tokens remain', async () => {

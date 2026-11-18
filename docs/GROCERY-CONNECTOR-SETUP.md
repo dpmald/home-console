@@ -65,8 +65,10 @@ descriptions and write annotations. Claude should read it and align v2 with it.
 - `record_request_progress({operation})`: `phase` is `prepare` or `complete`.
   Common fields are `operation_id`, `run_id`, `request_id`, `revision`, `retailer`,
   and `observed_at`. Preparation also requires `product` and `observed_cart`.
+  `observed_cart` is **prepare-only**: omit the field entirely on completion,
+  even when empty. Completion evidence belongs in `product` and `observed_at`.
   Completion requires `outcome`, product evidence for covered outcomes, and a
-  reason for unresolved outcomes. Worker and claim tokens are required when
+  reason for unresolved outcomes (optional for covered outcomes). Worker and claim tokens are required when
   completing a prepared mutation; recovery uses `recovery_attempt_id`.
 - Product evidence: actual string `product_id`, `name`, raw `size` text and integer
   `quantity`. No invented cart/line identifiers, weights, prices or delivery status.
@@ -90,6 +92,56 @@ The endpoint intentionally cannot execute any Instacart operation. Home Console
 acknowledgements record observations; they never prove purchase or delivery.
 
 ## Scheduled development test
+
+### November 17 screen-test completion diagnostics
+
+Claude reported that `screen-test-20261117-2256-rp4m` prepared the synthetic
+screen milk request but completion returned `invalid_input`. Codex initially
+confirmed the prepared attempt was unresolved and the request was pending. Warren
+then supplied Claude's redacted completion payload: it contained `observed_cart`,
+confirming the cause. The product size, integer quantity, observation timestamp
+and optional explanatory reason were valid. Rejected validation calls do not
+reserve an operation ID or record a completion.
+
+A reproduced protocol mismatch allowed `observed_cart` through MCP completion
+validation while PostgreSQL rejected it. The MCP validator now rejects that
+field on completion with an explicit explanation, and the tool descriptions
+and exported schema say it is prepare-only. Simulated size text and an optional
+reason on a covered outcome are accepted; there is no size-text-to-request
+quantity comparison in that database validator. No migration is needed.
+
+Validation: 29 focused tests and TypeScript passed. The connector and lease SQL
+suites passed against a disposable database in the isolated synthetic container,
+including the reported size text, an optional reason, completion/replay, and
+rejection of empty/populated completion `observed_cart` without receipt changes.
+The development MCP server was reloaded; local validation and authenticated
+HTTPS tool discovery exposed the updated instructions at the unchanged endpoint.
+No existing request/attempt was changed and no real cart was accessed.
+
+Recovery must respect the original attempt. Before expiry, use its original
+run/tokens for a corrected completion; never prepare a duplicate addition. After
+expiry, use a new snapshot and `recovery_attempt_id` at the original retailer.
+For this explicitly simulated no-real-add test, a truthful `pending` recovery
+can clear reconciliation before a separate fresh synthetic run. `needs_attention`
+deliberately leaves reconciliation outstanding. These development leases do not
+lock an actual Instacart cart or the production Saturday workflow.
+
+Claude subsequently reported successful `pending` recovery in
+`screen-test-20261117-2318-rc8v`, receipt
+`c8460d74-b8a9-4d95-85e2-456520fa9ace`, followed by fresh-run readback. Codex
+independently read the local display API: the milk remains needed/revision 1,
+its latest outcome is pending, and requires_reconciliation is false. Claude
+reports no Instacart, recipe or scheduled-task changes. Codex's earlier recovery
+commands were blocked before execution; Claude performed this recovery.
+
+The reported recovery timestamp was six seconds ahead of the snapshot. The
+validator deliberately allows five minutes of clock skew; acceptance is not
+proof of an actual cart observation. The synthetic recovery reason explicitly
+states no real cart call/addition occurred. Real trials must use a clock and
+actual provider evidence. No further manual synthetic relay is planned; see
+GROCERY-FLOW-PLAN.md for hosted-path and limited real-cart acceptance.
+
+### Earlier scheduled acceptance
 
 Completed acceptance procedure (reference, not a request to rerun): a separate
 one-time cloud-only diagnostic explicitly attached Home Console, used simulated

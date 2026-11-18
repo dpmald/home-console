@@ -1,6 +1,6 @@
 # Grocery requests: implementation plan and handoff
 
-Updated November 16, 2026. Integration branch: `codex/grocery-flow`, based on
+Updated November 17, 2026. Integration branch: `codex/grocery-flow`, based on
 `39a227f35a134cde22d10a4d35104df4ba561888` after rebasing onto Daniela's November 16
 navigation and weather update. Production has not been changed.
 
@@ -37,11 +37,58 @@ voice model. The physical Cozyla microphone is still a separate acceptance test.
 | 4. Display results | Visible pending/in-cart/attention states, actual recorded product and retailer, no invented price or purchase state | Done |
 | 5. Connect voice | Mount Kitchen voice within grocery panel, multi-item save, quantity preservation, success only after persistence, cleanup on stop | Implemented; actual microphone/provider check pending |
 | 6. Handle failures | Fail-closed device authentication, same-origin writes, streamed request limits, save errors, same-tab recovery of uncertain submissions | Done; focused checks passed |
-| 7. Test the complete flow | Actual Next voice API -> synthetic persistence -> MCP prepare/complete/replay -> display API; browser save/reload/edit/cancel | Passed locally |
+| 7. Test local request/receipt flow | Actual Next voice API -> synthetic persistence -> MCP prepare/complete/replay -> display API; browser save/reload/edit/cancel | Passed locally; excludes actual speech, hosted Supabase/Vercel and Instacart |
 | 8. Share for review | Feature branch plus draft PR, reviewer commands and screenshot | Committed locally; publication blocked by GitHub write access |
 | 9. Production activation | Review migrations and live schema, private-refresh compatibility, permanent MCP host/key, attach connector to Claude v2 | Pending; no production work performed |
 | 10. Device acceptance | Verify HTTPS microphone permission, far-field speech, spoken quantities and failure handling on Cozyla | Pending |
 | 11. Delivery today | Persistent checkout screen, verified quote/slot provider, exact approval and order confirmation | Design only; separate phase |
+
+## Next acceptance gate: validate the real workflow
+
+Warren's November 17 correction: repeated manual synthetic tests and copying
+messages between assistants are not an acceptable substitute for proving the
+production workflow. Routine protocol regressions belong in automated tests.
+Do not request another manual synthetic prepare/complete cycle as the next step.
+
+Current evidence is narrower than production readiness:
+
+- Local screen saves, quantities, persistence, receipts and recovery are tested.
+  Claude has reached the development connector unattended. The November 17
+  screen-test recovery is complete; the milk remains pending without reconciliation.
+- Development calls SQL functions through `pg`; production calls Supabase RPC
+  through `db().rpc`. Direct SQL tests do not establish the hosted API/grants or
+  deployed migration state. Check this production adapter with isolated data.
+- Local HTTP smoke tests exercise the actual Next routes. Claude's temporary
+  tunnel tests reach the standalone MCP server on port 3003; neither establishes
+  the permanent Vercel `/api/mcp` endpoint, deployed configuration or independence
+  from Warren's PC.
+- Simulated evidence does not prove Claude can add the correct product/quantity
+  to the real shared cart, preserve family items or write results unattended.
+  Physical Cozyla speech and microphone permissions remain unverified.
+
+Release work comes before the next user trial: publish a reviewable feature
+branch, resolve private-data-refresh compatibility, audit hosted migrations,
+verify the normal Supabase API/Next path in an isolated hosted preview, and
+prepare the permanent endpoint/configuration. Production changes still require
+their own reviewed deployment authorization. Main at the November 17 check
+(`39a227f`) does not contain the grocery MCP route/migrations; no open PR was found.
+
+The next user acceptance test should use one genuinely wanted grocery item with
+an explicit quantity and permission to add it to the shared cart. Run one
+cloud-only Claude job containing both connectors, following the established
+retailer rule, from request reading through actual cart verification and receipt
+writeback without a manual pause between prepare and complete. Confirm the
+correct product/quantity, preservation of other cart lines, and the display's
+In cart state surviving refresh. A rerun should not add a duplicate. Do not
+check out or edit recipes. This real-cart step is planned, not authorized by the
+synthetic tests. Then verify the physical voice entry path on Cozyla.
+
+The trial must use a separate queue without synthetic pending requests; never
+attach the existing synthetic queue to the real Saturday task. Unattended
+execution is part of acceptance, not inferred from interactive success. Keep
+the real Saturday task unchanged until hosting, connector attachment and this
+trial have been verified. Present any remaining decisions together; Warren
+should not relay individual tool calls.
 
 ## What is implemented
 
