@@ -19,7 +19,7 @@ export function BetaShell({ children, kitchenUrl, testData }: {
           </Link>
           <div className={styles.headerActions}>
             {testData && <span className={styles.testBadge}>Test data</span>}
-            <a className={styles.backButton} href={kitchenUrl} referrerPolicy="no-referrer">
+            <a className={styles.backButton} href={kitchenUrl} target="_top" referrerPolicy="no-referrer">
               <span aria-hidden="true">←</span> Back to kitchen
             </a>
           </div>

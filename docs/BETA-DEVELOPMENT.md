@@ -10,6 +10,8 @@ The beta branch (`codex/beta-area`) contains the grocery work and a dedicated
 Every beta page has a persistent **Back to kitchen** link, including when a child
 feature errors. The grocery page also has **Back to Beta**. This first beta
 feature is touch-operated; the broader kitchen voice tools are not enabled here.
+The Beta and Back to kitchen links navigate the top-level tab so the normal
+preview wrapper never becomes nested inside another preview.
 
 ## Local operation
 
@@ -93,9 +95,17 @@ November 17 local verification:
 - The actual Beta hub components were rendered to static HTML and visually
   inspected at 1920x1080. Both navigation controls are visible. This is layout
   evidence, not a running-app navigation test.
-- Automatic approval review blocked replacing the old preview and then blocked
-  starting the safer separate server on 3005. Neither command executed. Explicit
-  approval for the 3005 start is pending. Live HTTP/navigation/error-path checks
-  therefore remain pending; do not describe this server as running.
+- After Warren explicitly approved the separate startup, beta started on port
+  3005. The normal preview, legacy grocery preview and Claude connector remained
+  running with their existing process IDs.
+- Live HTTP checks passed: authenticated screens and grocery reads work, device
+  cookies cannot authenticate MCP, and normal kitchen integrations return 404.
+- Live Edge checks passed at 1920x1080 and 1280x720: the one-time local sign-in,
+  normal kitchen -> Beta -> groceries, reload, Back to Beta, and Back to kitchen.
+  A preview-frame nesting bug found during this check was fixed with top-level
+  navigation. The final round trip returns to exactly one preview wrapper.
+- A browser-injected grocery read failure showed the error while keeping Back
+  to kitchen usable. Existing test requests loaded; these checks made no grocery
+  API writes and used no real carts or external integrations.
 
-![Static render of the Beta hub, before live server verification](images/beta-hub-static.png)
+![Running local Beta hub](images/beta-hub-live.png)
