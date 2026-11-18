@@ -26,6 +26,11 @@ export function todayISO(d = new Date()): string {
 }
 
 export const localHour = (d = new Date()) => Number(parts(d).hour);
+/** Minutes since local midnight (e.g. 14:30 → 870). */
+export const localMinutes = (d = new Date()) => {
+  const p = parts(d);
+  return Number(p.hour) * 60 + Number(p.minute);
+};
 /** 'Mon' | 'Tue' | … */
 export const localWeekday = (d = new Date()) => parts(d).weekday;
 

@@ -5,6 +5,7 @@ import { daysBetween, fmtDay, fmtShortDate, fmtTime } from '../time';
 import type { BacklogItem, CartProposal, DinnerRow, KitchenState } from '../types';
 import type { GreenlightSummary } from '../domain';
 import { mention } from './api';
+import { outstandingPickups, todaysPickups } from '../pickups';
 
 export type Block = Record<string, unknown>;
 
@@ -133,6 +134,39 @@ export function standupBlocks(s: KitchenState): Block[] {
 
   const done = s.chores.filter((c) => c.completed).length;
   if (s.chores.length) blocks.push(divider, ctx(`🧹 Wesley: ${done}/${s.chores.length} chores checked off today`));
+  return blocks;
+}
+
+// ──────────────────────── Pickup nudge (#calendar) ────────────────────────
+/** 2 PM pickup nudge. Re-rendered whenever a pickup is claimed anywhere. */
+export function pickupNudgeBlocks(s: KitchenState, now = new Date()): Block[] {
+  const pickups = todaysPickups(s.events, s.date);
+  const open = outstandingPickups(pickups, now);
+  const blocks: Block[] = [
+    open.length
+      ? md(
+          `⏰ *${open.length === 1 ? 'A pickup still needs' : 'Pickups still need'} an owner today.* ${mention('daniela')} ${mention('warren')}`,
+        )
+      : md("✅ *All of today's pickups are covered.*"),
+  ];
+  const lines = pickups.map(
+    (e) =>
+      `🚗 *${fmtTime(e.start_time)}* ${esc(e.title)} — ${
+        e.assigned_parent === 'unassigned' ? '❓ _unclaimed_' : `👤 ${NAMES[e.assigned_parent]}`
+      }`,
+  );
+  if (lines.length) blocks.push(md(lines.join('\n')));
+  open.slice(0, 8).forEach((e, i) => {
+    blocks.push(ctx(`Who's got *${fmtTime(e.start_time)} ${esc(e.title)}*?`));
+    blocks.push({
+      type: 'actions',
+      block_id: `pickup_assign_${i}`,
+      elements: PARENTS.map((p) => button(NAMES[p], `logistics_assign:${p}:${i}`, JSON.stringify({ id: e.id, d: s.date }))),
+    });
+  });
+  if (open.length) {
+    blocks.push(ctx('Tap a name, or reply in the thread — e.g. "I\'ve got it", "I\'ll get Wesley", "Warren has both".'));
+  }
   return blocks;
 }
 

@@ -1233,7 +1233,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                         </p>
 
                         {/* Conditional Backlog Meal Kit Rows (Only rendered when backlog items exist) */}
-                        {state.backlog.length > 0 && (
+                        {state.backlog.length > 0 ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
                             {state.backlog.slice(0, 2).map((b, idx) => (
                               <div
@@ -1274,7 +1274,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                 </div>
                                 <button
                                   className={`hw-btn ${idx === 0 ? 'emerald' : ''}`}
-                                  style={{ padding: '5px 12px', fontSize: '0.68rem', borderRadius: 8 }}
+                                  style={{ padding: '8px 14px', fontSize: '0.75rem', borderRadius: 10, minHeight: 40 }}
                                   onClick={() => act({ type: 'cook_from_backlog', backlogId: b.id })}
                                 >
                                   SELECT
@@ -1282,58 +1282,261 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                               </div>
                             ))}
                           </div>
+                        ) : (
+                          <div
+                            className="ceramic-well"
+                            style={{
+                              marginTop: 18,
+                              padding: '16px 18px',
+                              borderRadius: 16,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 14,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 12,
+                                  background: 'var(--warm-badge-bg)',
+                                  color: 'var(--terracotta)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                                  restaurant_menu
+                                </span>
+                              </span>
+                              <div>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text)' }}>
+                                  3 pantry &amp; fridge ideas ready in 15–25 min
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                                  Crispy Black Bean Tacos • Lemon Ricotta Orecchiette • Harissa Chicken
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="hw-btn"
+                              style={{
+                                minHeight: 44,
+                                padding: '10px 16px',
+                                fontSize: '0.8rem',
+                                borderRadius: 12,
+                                background: 'var(--surface)',
+                                flexShrink: 0,
+                              }}
+                              onClick={() => setMode('dinner')}
+                            >
+                              <span>Browse Ideas</span>
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                                arrow_forward
+                              </span>
+                            </button>
+                          </div>
                         )}
                       </div>
 
-                      {/* 2x2 Chef Assignment Buttons (Matches Stitch Undecided Card) */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+                      {/* 2x2 Chef Assignment Tactile Grid (Sized for 24" Touch Display) */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: 14,
+                          marginTop: 18,
+                          flex: state.backlog.length === 0 ? 1 : '0 0 auto',
+                        }}
+                      >
                         <button
                           className="hw-btn"
-                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          style={{
+                            padding: state.backlog.length === 0 ? '18px 20px' : '12px 16px',
+                            minHeight: state.backlog.length === 0 ? 108 : 56,
+                            borderRadius: 18,
+                            background: 'var(--surface)',
+                            border: '1.5px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: 14,
+                            textAlign: 'left',
+                          }}
                           onClick={() => {
                             setCaptureMealInput('');
                             setPendingChef('daniela');
                             setMode('dinner');
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--emerald)' }}>
-                            skillet
+                          <span
+                            style={{
+                              width: 46,
+                              height: 46,
+                              borderRadius: 14,
+                              background: 'var(--emerald-surface)',
+                              border: '1px solid var(--emerald-border)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--emerald)' }}>
+                              skillet
+                            </span>
                           </span>
-                          <span>Daniela cooks</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                              Daniela cooks
+                            </div>
+                            {state.backlog.length === 0 && (
+                              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: 3 }}>
+                                Claim &amp; pick tonight&apos;s recipe
+                              </div>
+                            )}
+                          </div>
                         </button>
                         <button
                           className="hw-btn"
-                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          style={{
+                            padding: state.backlog.length === 0 ? '18px 20px' : '12px 16px',
+                            minHeight: state.backlog.length === 0 ? 108 : 56,
+                            borderRadius: 18,
+                            background: 'var(--surface)',
+                            border: '1.5px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: 14,
+                            textAlign: 'left',
+                          }}
                           onClick={() => {
                             setCaptureMealInput('');
                             setPendingChef('warren');
                             setMode('dinner');
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--amber)' }}>
-                            soup_kitchen
+                          <span
+                            style={{
+                              width: 46,
+                              height: 46,
+                              borderRadius: 14,
+                              background: 'var(--warn-surface)',
+                              border: '1px solid var(--warn-border)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--amber)' }}>
+                              soup_kitchen
+                            </span>
                           </span>
-                          <span>Warren cooks</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                              Warren cooks
+                            </div>
+                            {state.backlog.length === 0 && (
+                              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: 3 }}>
+                                Claim &amp; pick tonight&apos;s recipe
+                              </div>
+                            )}
+                          </div>
                         </button>
                         <button
                           className="hw-btn"
-                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          style={{
+                            padding: state.backlog.length === 0 ? '18px 20px' : '12px 16px',
+                            minHeight: state.backlog.length === 0 ? 108 : 56,
+                            borderRadius: 18,
+                            background: 'var(--surface)',
+                            border: '1.5px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: 14,
+                            textAlign: 'left',
+                          }}
                           onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--terracotta)' }}>
-                            takeout_dining
+                          <span
+                            style={{
+                              width: 46,
+                              height: 46,
+                              borderRadius: 14,
+                              background: 'var(--warm-badge-bg)',
+                              border: '1px solid var(--warm-border)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--terracotta)' }}>
+                              takeout_dining
+                            </span>
                           </span>
-                          <span>Takeout / Order In</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                              Takeout / Order In
+                            </div>
+                            {state.backlog.length === 0 && (
+                              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: 3 }}>
+                                3 go-to spots • 20–35m delivery
+                              </div>
+                            )}
+                          </div>
                         </button>
                         <button
                           className="hw-btn"
-                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          style={{
+                            padding: state.backlog.length === 0 ? '18px 20px' : '12px 16px',
+                            minHeight: state.backlog.length === 0 ? 108 : 56,
+                            borderRadius: 18,
+                            background: 'var(--surface)',
+                            border: '1.5px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: 14,
+                            textAlign: 'left',
+                          }}
                           onClick={() => act({ type: 'claim_dinner', chef: 'takeout' })}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
-                            kitchen
+                          <span
+                            style={{
+                              width: 46,
+                              height: 46,
+                              borderRadius: 14,
+                              background: 'var(--cobalt-surface)',
+                              border: '1px solid var(--cobalt-border)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--cobalt)' }}>
+                              kitchen
+                            </span>
                           </span>
-                          <span>Leftovers &amp; Fend</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                              Leftovers &amp; Fend
+                            </div>
+                            {state.backlog.length === 0 && (
+                              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: 3 }}>
+                                Quick fridge clear-out night
+                              </div>
+                            )}
+                          </div>
                         </button>
                       </div>
                     </>
@@ -4931,7 +5134,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
           </div>
         )}
 
-        {/* ── Bottom Hardware Navigation Dock (Bottom-only navigation + tucked utility icons) ── */}
+        {/* ── Bottom Hardware Navigation Dock (Stationary tabs across all modes + 48px utility controls) ── */}
         <footer
           className="hearth-dock"
           style={
@@ -4945,17 +5148,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
           }
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {mode !== 'ambient' && (
-              <button
-                className="dock-tab"
-                onClick={() => setMode('ambient')}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
-                  home
-                </span>
-                <span>Ambient</span>
-              </button>
-            )}
+            <button
+              className={`dock-tab ${mode === 'ambient' ? 'active' : ''}`}
+              onClick={() => setMode('ambient')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'ambient' ? '#fff' : 'var(--terracotta)' }}>
+                home
+              </span>
+              <span>Ambient</span>
+            </button>
 
             <button
               className={`dock-tab ${mode === 'dinner' ? 'active' : ''}`}
@@ -4986,34 +5187,30 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
               <span>Gemini</span>
             </button>
 
-            {mode !== 'ambient' && (
-              <>
-                <button
-                  className="dock-tab"
-                  onClick={nprPlaying ? stopNpr : playNpr}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
-                    radio
-                  </span>
-                  <span>{nprPlaying ? 'Stop NPR' : 'NPR Live'}</span>
-                </button>
+            <button
+              className="dock-tab"
+              onClick={nprPlaying ? stopNpr : playNpr}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
+                radio
+              </span>
+              <span>{nprPlaying ? 'Stop NPR' : 'NPR Live'}</span>
+            </button>
 
-                <button
-                  className="dock-tab"
-                  onClick={() => actSpotify(spotify.playing ? 'pause' : 'play')}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--cobalt)' }}>
-                    graphic_eq
-                  </span>
-                  <span>
-                    {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify'}
-                  </span>
-                </button>
-              </>
-            )}
+            <button
+              className="dock-tab"
+              onClick={() => actSpotify(spotify.playing ? 'pause' : 'play')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--cobalt)' }}>
+                graphic_eq
+              </span>
+              <span>
+                {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify'}
+              </span>
+            </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <ThemeToggle defaultTheme="light" />
             <a
               href="/guide"
@@ -5021,14 +5218,14 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
               title="Kitchen Guide & Manual"
               aria-label="Kitchen Guide & Manual"
               style={{
-                width: 38,
-                height: 38,
+                width: 48,
+                height: 48,
                 padding: 0,
-                borderRadius: 12,
-                color: 'var(--muted)',
+                borderRadius: 14,
+                color: 'var(--text-secondary)',
               }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
                 help
               </span>
             </a>
@@ -5043,15 +5240,15 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                 } catch {}
               }}
               style={{
-                width: 38,
-                height: 38,
+                width: 48,
+                height: 48,
                 padding: 0,
-                borderRadius: 12,
-                color: 'var(--muted)',
+                borderRadius: 14,
+                color: 'var(--text-secondary)',
               }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                bedtime
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                power_settings_new
               </span>
             </button>
           </div>

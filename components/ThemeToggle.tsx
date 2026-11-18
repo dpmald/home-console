@@ -32,14 +32,14 @@ export function ThemeToggle({ defaultTheme = 'light' }: { defaultTheme?: Theme }
       title={theme === 'light' ? 'Switch to Dark mode' : 'Switch to Light mode'}
       aria-label={theme === 'light' ? 'Switch to Dark mode' : 'Switch to Light mode'}
       style={{
-        width: 38,
-        height: 38,
+        width: 48,
+        height: 48,
         padding: 0,
-        borderRadius: 12,
-        color: 'var(--muted)',
+        borderRadius: 14,
+        color: 'var(--text-secondary)',
       }}
     >
-      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
         {theme === 'light' ? 'dark_mode' : 'light_mode'}
       </span>
     </button>

@@ -5,7 +5,7 @@ display_information:
 
 features:
   bot_user:
-    display_name: Kitchen
+    display_name: antigravity
     always_online: true
 
 oauth_config:
@@ -13,6 +13,9 @@ oauth_config:
     bot:
       - chat:write
       - chat:write.public
+      # read thread replies on the #calendar pickup nudge
+      - channels:history
+      - groups:history
 
 settings:
   interactivity:

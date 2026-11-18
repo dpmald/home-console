@@ -8,6 +8,8 @@
     { "path": "/api/cron/daily-standup", "schedule": "0 14 * * *" },
     { "path": "/api/cron/dinner-nudge", "schedule": "0 18 * * *" },
     { "path": "/api/cron/dinner-nudge", "schedule": "0 19 * * *" },
+    { "path": "/api/cron/pickup-nudge", "schedule": "0 18 * * *" },
+    { "path": "/api/cron/pickup-nudge", "schedule": "0 19 * * *" },
     { "path": "/api/cron/greenlight-audit", "schedule": "0 22 * * *" },
     { "path": "/api/cron/greenlight-audit", "schedule": "0 23 * * *" }
   ]
