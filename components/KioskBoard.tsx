@@ -370,7 +370,7 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
   }
 }
 
-export function KioskBoard({ initial, initialWeather }: { initial: KitchenState; initialWeather: Weather | null }) {
+export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initial: KitchenState; initialWeather: Weather | null; betaUrl?: string | null }) {
   const [state, setState] = useState<KitchenState>(initial);
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
   const [mode, setMode] = useState<ViewMode>('ambient');
@@ -5148,6 +5148,12 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
           }
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {betaUrl && (
+              <a className="dock-tab" href={betaUrl} referrerPolicy="no-referrer" rel="noreferrer" style={{ minHeight: 56 }}>
+                <span className="material-symbols-outlined" aria-hidden="true">science</span>
+                <span>Beta</span>
+              </a>
+            )}
             <button
               className={`dock-tab ${mode === 'ambient' ? 'active' : ''}`}
               onClick={() => setMode('ambient')}

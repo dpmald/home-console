@@ -4,6 +4,7 @@ import { getKitchenState } from '@/lib/domain';
 import { todayISO } from '@/lib/time';
 import { getWeather, type Weather } from '@/lib/weather';
 import type { KitchenState } from '@/lib/types';
+import { getBetaDestination } from '@/lib/beta-navigation.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,5 +22,5 @@ export default async function HomePage() {
     weather = await getWeather();
   } catch {}
 
-  return <KioskBoard initial={state} initialWeather={weather} />;
+  return <KioskBoard initial={state} initialWeather={weather} betaUrl={getBetaDestination()} />;
 }
