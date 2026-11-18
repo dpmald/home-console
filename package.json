@@ -15,6 +15,8 @@
     "db:groceries": "node scripts/grocery-dev-setup.mjs",
     "dev:groceries": "node --import tsx scripts/grocery-dev-server.ts",
     "dev:grocery-ui": "node scripts/grocery-ui-preview.mjs",
+    "dev:beta": "node scripts/grocery-ui-preview.mjs --beta",
+    "test:beta": "node --import tsx --test tests/beta-deployment.test.ts && node --test tests/beta-navigation.test.mjs",
     "test:grocery-flow-db": "node --import tsx scripts/grocery-flow-check.ts",
     "build:grocery-check": "node scripts/grocery-safe-build.mjs"
   },

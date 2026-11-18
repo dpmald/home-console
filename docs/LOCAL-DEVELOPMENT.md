@@ -1,5 +1,10 @@
 # Local development
 
+For the new separate Beta screen on port 3005, use `npm run dev:beta` and follow
+[BETA-DEVELOPMENT.md](BETA-DEVELOPMENT.md). The older grocery preview on port 3004
+and its standalone connector remain separate. The instructions below describe
+that legacy grocery-only workflow, not the beta navigation checks.
+
 Read AGENTS.md and docs/GROCERY-FLOW-PLAN.md first. This feature uses a dedicated
 synthetic grocery database and its own app preview. It does not modify Warren's
 private household-data copy or the existing preview on port 3001.

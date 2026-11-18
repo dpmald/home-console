@@ -2,16 +2,19 @@ import type { NextRequest } from 'next/server';
 import { requireKioskRequest } from '@/lib/kiosk-auth';
 import { changeGroceryRequests, GroceryRequestError, listGroceryRequests } from '@/lib/grocery-requests';
 import { readBoundedBody, RequestBodyError } from '@/lib/request-body';
+import { isBetaDeployment } from '@/lib/beta-deployment';
 
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
 export async function GET(req: NextRequest) {
+  if (!isBetaDeployment()) return json({ error: 'Not found' }, 404);
   const denied = requireKioskRequest(req);
   if (denied) return denied;
   try { return json(await listGroceryRequests()); }
   catch { return json({ error: 'Groceries are unavailable. Try refreshing the list.' }, 503); }
 }
 export async function POST(req: NextRequest) {
+  if (!isBetaDeployment()) return json({ error: 'Not found' }, 404);
   const denied = requireKioskRequest(req, true);
   if (denied) return denied;
   try {

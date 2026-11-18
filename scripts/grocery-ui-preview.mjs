@@ -20,10 +20,11 @@ const ports = container?.HostConfig?.PortBindings?.['5432/tcp'];
 if (container?.Config?.Labels?.['home-console.scope'] !== 'grocery-agent-development' || !container.State.Running
   || ports?.length !== 1 || ports[0].HostIp !== '127.0.0.1' || ports[0].HostPort !== '55432') throw new Error('Dedicated synthetic database is not ready');
 const env = groceryUiEnvironment(process.env, names, config);
-const app = spawn(process.execPath, [path.join(root,'node_modules/next/dist/bin/next'),'dev','--hostname','127.0.0.1','--port','3004'], {
+const port = process.argv.includes('--beta') ? '3005' : '3004';
+const app = spawn(process.execPath, [path.join(root,'node_modules/next/dist/bin/next'),'dev','--hostname','127.0.0.1','--port',port], {
   cwd:root, env, stdio:'inherit', windowsHide:true,
 });
-console.log('Synthetic grocery preview: http://localhost:3004/?key=home-console-groceries-local-only');
-console.log('Grocery requests persist in the synthetic database. Other dashboard cards are demo data. External voice and integrations are disabled.');
+console.log(`Beta preview: http://localhost:${port}/beta?key=home-console-groceries-local-only`);
+console.log('Groceries use the separate development database. Back to kitchen returns to localhost:3001. External integrations are disabled.');
 app.on('exit', code => { process.exitCode = code ?? 1; });
 for (const signal of ['SIGINT','SIGTERM']) process.on(signal, () => app.kill(signal));

@@ -1,10 +1,21 @@
 import { Pool } from 'pg';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { db } from './supabase/server';
+import { isBetaDeployment } from './beta-deployment';
+import { getBetaDatabaseConfiguration } from './beta-database';
 import { validateGroceryDevelopmentDatabase } from './grocery-dev-isolation.mjs';
 export { validateGroceryDevelopmentDatabase } from './grocery-dev-isolation.mjs';
 
 type RpcName = 'grocery_agent_list_pending' | 'grocery_agent_progress' | 'grocery_device_list' | 'grocery_device_mutate';
 let localPool: Pool | undefined;
+let betaClient: SupabaseClient | undefined;
+
+function hostedStore() {
+  if (!isBetaDeployment()) return db();
+  const { url, key } = getBetaDatabaseConfiguration();
+  betaClient ??= createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return betaClient;
+}
 
 export async function groceryAgentRpc(name: RpcName, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   const developmentUrl = process.env.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL;
@@ -23,7 +34,7 @@ export async function groceryAgentRpc(name: RpcName, args: Record<string, unknow
     const result = await localPool.query(query);
     return result.rows[0].result as Record<string, unknown>;
   }
-  const { data, error } = await db().rpc(name, args);
+  const { data, error } = await hostedStore().rpc(name, args);
   if (error || !data || typeof data !== 'object') throw new Error('Grocery request storage unavailable');
   return data as Record<string, unknown>;
 }

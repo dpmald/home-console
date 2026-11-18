@@ -1,16 +1,26 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { kioskCookieName } from './lib/kiosk-cookie';
+import { isBetaDeployment, isBetaPathAllowed } from './lib/beta-deployment';
 
 export function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
+  const beta = isBetaDeployment();
+  const experiment = pathname === '/beta' || pathname.startsWith('/beta/')
+    || pathname === '/api/groceries' || pathname === '/api/mcp';
+  if ((!beta && experiment) || (beta && !isBetaPathAllowed(pathname))) {
+    return new NextResponse('Not found', { status: 404 });
+  }
+  // MCP uses its dedicated agent credential, never a device cookie.
+  if (pathname === '/api/mcp') return NextResponse.next();
   const COOKIE = kioskCookieName();
   const token = process.env.KIOSK_ACCESS_TOKEN;
-  if (!token && (req.nextUrl.pathname.startsWith('/api/groceries') || req.nextUrl.pathname.startsWith('/api/voice'))) {
+  if (!token && (beta || pathname.startsWith('/api/groceries') || pathname.startsWith('/api/voice'))) {
     return NextResponse.json({ error: 'Device access is not configured.' }, { status: 503 });
   }
   if (!token) return NextResponse.next();
 
-  const { pathname, searchParams } = req.nextUrl;
+  const { searchParams } = req.nextUrl;
   // Slack, crons, n8n, and Warren's agent authenticate with their own secrets.
   if (
     pathname.startsWith('/api/slack') ||
@@ -43,5 +53,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/guide', '/api/kiosk/:path*', '/api/groceries', '/api/dinner-tips', '/api/voice/:path*', '/api/weather', '/api/spotify/:path*'],
+  matcher: ['/', '/guide', '/beta/:path*', '/api/:path*'],
 };

@@ -10,7 +10,7 @@ test('unconfigured stable kitchens have no beta destination, including productio
 
 test('explicit local development uses the separate beta server and permits loopback destinations', () => {
   const local = { NODE_ENV: 'development', HOME_CONSOLE_LOCAL_DEVELOPMENT: '1' };
-  assert.equal(getBetaDestination(local), 'http://localhost:3004/beta');
+  assert.equal(getBetaDestination(local), 'http://localhost:3005/beta');
   assert.equal(getBetaDestination({ ...local, HOME_CONSOLE_BETA_URL: 'http://127.0.0.1:3005/beta' }), 'http://127.0.0.1:3005/beta');
   assert.equal(parseConsoleUrl('http://[::1]:3005/beta', true), 'http://[::1]:3005/beta');
   assert.equal(getBetaDestination({ ...local, HOME_CONSOLE_BETA_URL: 'http://beta.example/beta' }), null);

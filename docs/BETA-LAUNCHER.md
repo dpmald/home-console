@@ -9,7 +9,7 @@ launcher change.
 
 In explicitly isolated local development (`HOME_CONSOLE_LOCAL_DEVELOPMENT=1`,
 with `NODE_ENV` other than production), the default destination is
-`http://localhost:3004/beta`. Loopback HTTP overrides are permitted only in that
+`http://localhost:3005/beta`. Loopback HTTP overrides are permitted only in that
 local mode. Production never uses this local fallback, even if the local flag
 was mistakenly retained. URLs with credentials, queries or fragments are rejected.
 

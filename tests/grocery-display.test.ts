@@ -63,8 +63,10 @@ test('synthetic launcher clears all application settings including calendar and 
   const config={HOME_CONSOLE_GROCERY_AGENT_KEY:'a'.repeat(64),HOME_CONSOLE_GROCERY_DEV_DATABASE_URL:'postgresql://test:password@127.0.0.1:55432/home_console_grocery_dev'};
   const inherited=Object.fromEntries(names.flatMap(name=>[[name,'live'],[name.toLowerCase(),'live']]));
   const env=groceryUiEnvironment(inherited,names,config);
-  for(const name of names){if(!['HOME_CONSOLE_GROCERY_AGENT_KEY','HOME_CONSOLE_GROCERY_DEV_DATABASE_URL','HOME_CONSOLE_GROCERY_DEVELOPMENT','KIOSK_ACCESS_TOKEN','NEXT_PUBLIC_FAMILY_TIMEZONE'].includes(name))assert.equal(env[name],'');assert.equal(env[name.toLowerCase()],undefined);}
+  for(const name of names){if(!['HOME_CONSOLE_GROCERY_AGENT_KEY','HOME_CONSOLE_GROCERY_DEV_DATABASE_URL','HOME_CONSOLE_GROCERY_DEVELOPMENT','KIOSK_ACCESS_TOKEN','NEXT_PUBLIC_FAMILY_TIMEZONE','HOME_CONSOLE_BETA_DEPLOYMENT','HOME_CONSOLE_KITCHEN_URL'].includes(name))assert.equal(env[name],'');assert.equal(env[name.toLowerCase()],undefined);}
   assert.equal(env.HOME_CONSOLE_GROCERY_DEVELOPMENT,'1');
+  assert.equal(env.HOME_CONSOLE_BETA_DEPLOYMENT,'1');
+  assert.equal(env.HOME_CONSOLE_KITCHEN_URL,'http://localhost:3001/');
   assert.throws(()=>groceryUiEnvironment({},names,{...config,HOME_CONSOLE_GROCERY_DEV_DATABASE_URL:'postgresql://test:password@127.0.0.1:54322/postgres'}));
 });
 test('legacy dev migration mapping does not confuse the private calendar migration', () => {
