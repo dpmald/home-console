@@ -44,11 +44,13 @@ async function responseItems(response: Response): Promise<GroceryRequestView[]> 
   return body.items;
 }
 
-export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey }: {
+export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, embedded = false, description }: {
   onClose: () => void;
   onChanged?: () => void;
   toolbar?: ReactNode;
   refreshKey?: number;
+  embedded?: boolean;
+  description?: string;
 }) {
   const titleId = useId();
   const [items, setItems] = useState<GroceryRequestView[]>([]);
@@ -219,6 +221,9 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey }
   };
 
   const keyboard = (event: KeyboardEvent<HTMLElement>) => {
+    // A full-page list shares navigation with the beta shell; only a modal
+    // should trap focus or consume Escape.
+    if (embedded) return;
     if (event.key === 'Escape') {
       event.stopPropagation();
       if (!saving.current) callbacks.current.onClose();
@@ -285,12 +290,16 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey }
   const pendingCount = items.filter((item) => item.status === 'needed' || item.status === 'needs_attention').length;
 
   return (
-    <section ref={panel} className={styles.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}
+    <section ref={panel} className={`${styles.panel}${embedded ? ` ${styles.embedded}` : ''}`}
+      role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : true} aria-labelledby={titleId}
       tabIndex={-1} onKeyDown={keyboard} onClick={(event) => event.stopPropagation()}>
       <header className={styles.header}>
         <div><p className={styles.eyebrow}>Household groceries</p><h2 id={titleId}>Saturday’s list</h2>
-          <p className={styles.subtitle}>Save requests here. Claude picks them up for the Saturday cart.</p></div>
-        <button type="button" className={styles.close} disabled={busy} onClick={onClose} aria-label="Close grocery list">Close <span aria-hidden="true">×</span></button>
+          <p className={styles.subtitle}>{description ?? 'Save requests here. Claude picks them up for the Saturday cart.'}</p></div>
+        <button type="button" className={styles.close} disabled={busy} onClick={onClose}
+          aria-label={embedded ? 'Back to Beta' : 'Close grocery list'}>
+          {embedded ? 'Back to Beta' : 'Close'} <span aria-hidden="true">{embedded ? '←' : '×'}</span>
+        </button>
       </header>
       {toolbar && <div className={styles.toolbar}>{toolbar}</div>}
       <div className={styles.messages}>

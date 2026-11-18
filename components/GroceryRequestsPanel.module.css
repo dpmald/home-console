@@ -13,6 +13,8 @@
   text-align: left;
 }
 .panel:focus { outline: none; }
+.panel.embedded { width: 100%; max-height: none; overflow: visible; box-shadow: 0 6px 24px -8px rgba(29, 30, 32, .08); }
+.embedded .body { overflow: visible; }
 .panel button, .panel input, .panel textarea { font: inherit; }
 .panel button {
   min-height: 56px;
