@@ -1165,7 +1165,7 @@ export function KioskBoard({ initial, initialWeather }: { initial: KitchenState;
                                     color: 'var(--terracotta)',
                                   }}
                                 >
-                                  DRIVER NEEDED
+                                  UNCLAIMED
                                 </span>
                               </>
                             )}
