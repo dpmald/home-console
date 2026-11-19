@@ -104,3 +104,5 @@
   .itemHeading { flex-direction: column; }
   .badge { max-width: 100%; }
 }
+
+.panel a.close { text-decoration: none; color: inherit; min-height: 48px; padding: 0 14px; }

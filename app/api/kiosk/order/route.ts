@@ -6,13 +6,18 @@ import { cartBlocks } from '@/lib/slack/blocks';
 import { refreshDinnerMessages } from '@/lib/slack/sync';
 import { todayISO } from '@/lib/time';
 
+import { isBetaDeployment } from '@/lib/beta-deployment';
+import { requireKioskRequest } from '@/lib/kiosk-auth';
+
 export const dynamic = 'force-dynamic';
 
 /** Lets Daniela or Warren approve/hold a Saturday order directly on the wall screen too. */
 export async function POST(req: NextRequest) {
+  const denied = isBetaDeployment() && requireKioskRequest(req, true);
+  if (denied) return denied;
   const { id, approve, by } = (await req.json()) as { id: string; approve: boolean; by?: string };
   const p = await decideProposal(id, !!approve, by || 'Kitchen screen');
-  after(async () => {
+  if (!isBetaDeployment()) after(async () => {
     if (p.slack_channel && p.slack_ts) await updateMessage(p.slack_channel, p.slack_ts, `Order ${p.status}`, cartBlocks(p));
     await notifyAgent(p);
     await refreshDinnerMessages(todayISO());

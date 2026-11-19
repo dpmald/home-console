@@ -19,5 +19,6 @@ export function getBetaDeployment(environment: Environment = process.env) {
 /** A beta host serves experiments, never the stable kitchen's integrations. */
 export function isBetaPathAllowed(pathname: string) {
   return pathname === '/' || pathname === '/beta' || pathname.startsWith('/beta/')
+    || pathname === '/guide' || pathname === '/api/kiosk' || pathname === '/api/kiosk/order'
     || pathname === '/api/groceries' || pathname === '/api/mcp';
 }

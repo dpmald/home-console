@@ -370,7 +370,8 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
   }
 }
 
-export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initial: KitchenState; initialWeather: Weather | null; betaUrl?: string | null }) {
+export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitchenUrl = null }: { initial: KitchenState; initialWeather: Weather | null; betaUrl?: string | null; betaKitchenUrl?: string | null }) {
+  const beta = Boolean(betaKitchenUrl);
   const [state, setState] = useState<KitchenState>(initial);
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
   const [mode, setMode] = useState<ViewMode>('ambient');
@@ -425,6 +426,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
   }, []);
 
   const openGeminiOverlay = useCallback(() => {
+    if (beta) return showToast('Gemini is disconnected in Beta.');
     setGeminiStampedAt(
       new Date().toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -434,7 +436,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
       }),
     );
     setGeminiOpen(true);
-  }, []);
+  }, [beta, showToast]);
 
   const applyVoiceCommandIfTimer = useCallback((text: string) => {
     const lower = text.toLowerCase();
@@ -502,13 +504,14 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
 
   const refresh = useCallback(async () => {
     await refreshKitchen();
+    if (beta) return;
     try {
       const sr = await fetch('/api/spotify', { cache: 'no-store' });
       if (sr.ok) setSpotify(await sr.json());
     } catch {}
-  }, [refreshKitchen]);
+  }, [beta, refreshKitchen]);
 
-  useCozylaKiosk(refresh);
+  useCozylaKiosk(refresh, !beta);
 
   const act = useCallback(async (action: KioskAction) => {
     try {
@@ -522,8 +525,9 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
         return;
       }
     } catch {}
+    if (beta) return showToast('Could not confirm the save. Refresh the Beta kitchen before retrying.');
     setState((cur) => applyOptimisticAction(cur, action));
-  }, []);
+  }, [beta, showToast]);
 
   const decideOrder = useCallback(async (id: string, approve: boolean) => {
     try {
@@ -537,6 +541,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
         return;
       }
     } catch {}
+    if (beta) return showToast('Could not confirm the Beta cart decision. Refresh before retrying.');
     setState((cur) => ({
       ...cur,
       orders: cur.orders.map((o) => (o.id === id ? { ...o, status: approve ? 'approved' : 'rejected' } : o)),
@@ -557,9 +562,10 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
           ]
         : cur.backlog,
     }));
-  }, []);
+  }, [beta, showToast]);
 
   const actSpotify = useCallback(async (op: 'play' | 'pause' | 'next', query?: string) => {
+    if (beta) return showToast('Spotify is disconnected in Beta.');
     try {
       const r = await fetch('/api/spotify', {
         method: 'POST',
@@ -581,7 +587,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
       }
       if (j.state) setSpotify(j.state);
     } catch {}
-  }, []);
+  }, [beta, showToast]);
 
   // 1 Hz Clock + Rotary Timer tick + Dinner Hub Broiler Timer tick
   useEffect(() => {
@@ -592,9 +598,9 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
         for (const tm of cur) {
           if (tm.pausedRemaining === undefined && tm.endsAt <= t.getTime() && !firedTimers.current.has(tm.id)) {
             firedTimers.current.add(tm.id);
-            wakeCozylaScreen();
+            if (!beta) wakeCozylaScreen();
             chime();
-            if (isFullyKiosk()) speakOnCozyla(`${tm.label} is done`);
+            if (!beta && isFullyKiosk()) speakOnCozyla(`${tm.label} is done`);
           }
         }
         return cur;
@@ -609,9 +615,10 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [broilRunning, showToast]);
+  }, [beta, broilRunning, showToast]);
 
   const refreshWeather = useCallback(async () => {
+    if (beta) return;
     try {
       const r = await fetch('/api/weather', { cache: 'no-store' });
       if (r.ok) {
@@ -630,7 +637,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
         setWeather(parseOpenMeteoResponse(await r2.json()));
       }
     } catch {}
-  }, []);
+  }, [beta]);
 
   // Supabase Realtime broadcast subscription + fallback poll
   useEffect(() => {
@@ -638,7 +645,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
       refreshWeather();
     }
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const sb = browserSupabase();
+    const sb = beta ? null : browserSupabase();
     const channel = sb
       ?.channel('kitchen')
       .on('broadcast', { event: 'db_change' }, () => {
@@ -657,7 +664,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
       clearInterval(poll);
       clearInterval(wx);
     };
-  }, [initialWeather, refresh, refreshKitchen, refreshWeather]);
+  }, [beta, initialWeather, refresh, refreshKitchen, refreshWeather]);
 
   const playNpr = useCallback(() => {
     if (!nprRef.current) nprRef.current = new Audio(NPR_URL);
@@ -823,6 +830,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
   };
 
   const startCaptureMealDictation = () => {
+    if (beta) return showToast('Type the meal name in Beta.');
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       showToast('Voice dictation not available in this browser — type or tap a chip below');
@@ -884,7 +892,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
   const activeMealTitle = d.recipe_name?.trim() || 'Charcuterie Board';
 
   useEffect(() => {
-    if (d.status === 'unclaimed' || isCapturingMeal) return;
+    if (beta || d.status === 'unclaimed' || isCapturingMeal) return;
     let cancelled = false;
     fetch(`/api/dinner-tips?meal=${encodeURIComponent(activeMealTitle)}&mode=tips`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -909,7 +917,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
     return () => {
       cancelled = true;
     };
-  }, [d.status, activeMealTitle, isStructuredRecipeView, isCapturingMeal]);
+  }, [beta, d.status, activeMealTitle, isStructuredRecipeView, isCapturingMeal]);
 
   const unstructuredDetails =
     liveDinnerTips && liveDinnerTips.mealTitle.toLowerCase() === activeMealTitle.toLowerCase()
@@ -1869,7 +1877,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
                           <button
                             className="hw-btn"
                             style={{ width: '100%', padding: '6px 10px', fontSize: '0.72rem' }}
-                            onClick={() => setMode('bento')}
+                            onClick={() => beta ? window.location.assign('/beta/groceries') : setMode('bento')}
                           >
                             + Add Item
                           </button>
@@ -3914,7 +3922,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
                               key={spot.name}
                               type="button"
                               onClick={() => {
-                                showToast(`Ordering ${spot.name} (${spot.sub})...`);
+                                showToast(beta ? 'Beta does not send takeout orders.' : `Ordering ${spot.name} (${spot.sub})...`);
                               }}
                               style={{
                                 flex: 1,
@@ -4806,7 +4814,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
                     <button
                       type="button"
                       className="ceramic-well font-mono"
-                      onClick={() => launchGreenlightOnCozyla()}
+                      onClick={() => beta ? showToast('Greenlight is disconnected in Beta.') : launchGreenlightOnCozyla()}
                       title="Open Greenlight App"
                       style={{
                         padding: '6px 14px',
@@ -5148,6 +5156,13 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
           }
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {betaKitchenUrl && (
+              <>
+                <span className="dock-tab"><strong>Beta kitchen</strong></span>
+                <a className="dock-tab" href="/beta/groceries" style={{ minHeight: 56 }}>Groceries</a>
+                <a className="dock-tab" href={betaKitchenUrl} target="_top" referrerPolicy="no-referrer" style={{ minHeight: 56 }}>← Back to kitchen</a>
+              </>
+            )}
             {betaUrl && (
               <a className="dock-tab" href={betaUrl} target="_top" referrerPolicy="no-referrer" rel="noreferrer" style={{ minHeight: 56 }}>
                 <span className="material-symbols-outlined" aria-hidden="true">science</span>
@@ -5241,6 +5256,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null }: { initia
               title="Sleep Display"
               aria-label="Sleep Display"
               onClick={() => {
+                if (beta) return showToast('Display power is managed by the normal kitchen.');
                 try {
                   window.fully?.turnScreenOff?.(true);
                 } catch {}

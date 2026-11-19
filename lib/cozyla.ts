@@ -149,8 +149,9 @@ export function launchGreenlightOnCozyla() {
 /**
  * Cozyla Calendar+ 24" + Fully Kiosk Browser lifecycle hook.
  */
-export function useCozylaKiosk(onWakeRefresh: () => void) {
+export function useCozylaKiosk(onWakeRefresh: () => void, enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
     let wakeLock: any = null;
     const acquireWakeLock = async () => {
       try {
@@ -199,5 +200,5 @@ export function useCozylaKiosk(onWakeRefresh: () => void) {
         wakeLock?.release?.();
       } catch {}
     };
-  }, [onWakeRefresh]);
+  }, [enabled, onWakeRefresh]);
 }

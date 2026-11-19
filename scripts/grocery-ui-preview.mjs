@@ -20,7 +20,12 @@ const ports = container?.HostConfig?.PortBindings?.['5432/tcp'];
 if (container?.Config?.Labels?.['home-console.scope'] !== 'grocery-agent-development' || !container.State.Running
   || ports?.length !== 1 || ports[0].HostIp !== '127.0.0.1' || ports[0].HostPort !== '55432') throw new Error('Dedicated synthetic database is not ready');
 const env = groceryUiEnvironment(process.env, names, config);
-const port = process.argv.includes('--beta') ? '3005' : '3004';
+const beta = process.argv.includes('--beta');
+if (beta) {
+  const { ensureBetaKitchen } = await import('./beta-kitchen-db.mjs');
+  await ensureBetaKitchen(config, host, dockerEnv);
+}
+const port = beta ? '3005' : '3004';
 const app = spawn(process.execPath, [path.join(root,'node_modules/next/dist/bin/next'),'dev','--hostname','127.0.0.1','--port',port], {
   cwd:root, env, stdio:'inherit', windowsHide:true,
 });

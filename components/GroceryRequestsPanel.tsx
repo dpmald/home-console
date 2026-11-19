@@ -296,10 +296,13 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
       <header className={styles.header}>
         <div><p className={styles.eyebrow}>Household groceries</p><h2 id={titleId}>Saturday’s list</h2>
           <p className={styles.subtitle}>{description ?? 'Save requests here. Claude picks them up for the Saturday cart.'}</p></div>
-        <button type="button" className={styles.close} disabled={busy} onClick={onClose}
-          aria-label={embedded ? 'Back to Beta' : 'Close grocery list'}>
-          {embedded ? 'Back to Beta' : 'Close'} <span aria-hidden="true">{embedded ? '←' : '×'}</span>
-        </button>
+        {embedded
+          ? <a className={styles.close} href={busy ? undefined : '/beta'} aria-disabled={busy} aria-label="Back to Beta">
+              Back to Beta <span aria-hidden="true">←</span>
+            </a>
+          : <button type="button" className={styles.close} disabled={busy} onClick={onClose} aria-label="Close grocery list">
+              Close <span aria-hidden="true">×</span>
+            </button>}
       </header>
       {toolbar && <div className={styles.toolbar}>{toolbar}</div>}
       <div className={styles.messages}>

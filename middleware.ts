@@ -59,6 +59,10 @@ export function middleware(req: NextRequest) {
   if (req.cookies.get(COOKIE)?.value === token) return NextResponse.next();
   if (req.headers.get('authorization') === `Bearer ${token}`) return NextResponse.next();
 
+  if (beta && process.env.NODE_ENV === 'production' && req.method === 'GET'
+      && (pathname === '/' || pathname === '/beta' || pathname.startsWith('/beta/') || pathname === '/guide')) {
+    return NextResponse.redirect(new URL('/unlock', req.url), { headers: { 'Cache-Control': 'private, no-store' } });
+  }
   return new NextResponse('Locked — open /?key=YOUR_KIOSK_ACCESS_TOKEN once on this device.', { status: 401 });
 }
 

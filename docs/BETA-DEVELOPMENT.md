@@ -1,111 +1,60 @@
-# Beta area and stable kitchen
+# The Beta kitchen
 
-The stable kitchen and Beta are separate running applications. The stable
-launcher branch (`codex/beta-launcher`, based on main `39a227f`) adds only a
-configuration-controlled navigation link. It imports no experimental components,
-changes no database schema, and keeps Daniela's kitchen behavior intact.
+Beta runs the same kitchen board as the family display, with its own database, device sign-in and Claude credential. Use **Groceries** in the kitchen dock to open Saturday’s list. **Back to Beta** returns to the full board. **Back to kitchen** leaves Beta.
 
-The beta branch (`codex/beta-area`) contains the grocery work and a dedicated
-`/beta` hub. `/beta/groceries` uses the existing durable grocery request UI.
-Every beta page has a persistent **Back to kitchen** link, including when a child
-feature errors. The grocery page also has **Back to Beta**. This first beta
-feature is touch-operated; the broader kitchen voice tools are not enabled here.
-The Beta and Back to kitchen links navigate the top-level tab so the normal
-preview wrapper never becomes nested inside another preview.
+| Where you open the kitchen | Where edits go | Who reads the list |
+| --- | --- | --- |
+| Local private preview on port 3001 | Local copy of household data | Normal preview |
+| Local Beta on port 3005 | Legion’s isolated Beta database | Local development tools |
+| [Hosted Beta](https://home-console-beta.vercel.app/beta) | Dedicated hosted Beta database | The Home Console Beta connector in Claude |
 
-## Local operation
+Use [hosted groceries](https://home-console-beta.vercel.app/beta/groceries) for items Claude should pick up with Legion asleep or off. Local fixtures and earlier simulated receipts stay on Legion. The shared board starts with the repository’s chore templates. Kitchen state is initialized in Beta as needed. No production data import is scheduled.
 
-- Normal private-data preview: `http://localhost:3001/` (application on 3000).
-- Existing legacy grocery preview: `http://localhost:3004/`, unchanged.
-- New beta application: `http://localhost:3005/beta`.
-- Existing Claude development connector: unchanged, on its separate MCP server
-  and tunnel. Both grocery UIs access the same isolated grocery test database;
-  neither accesses the normal kitchen's private household database.
+## Claude and device access
 
-In the beta checkout, install dependencies with `npm ci`. Use the already
-configured, ignored `.env.grocery-dev.local` for the dedicated database on
-`127.0.0.1:55432/home_console_grocery_dev`. Do not copy production configuration.
-For a new developer machine, the existing `npm run db:groceries` setup creates
-an isolated local database; it is not a hosted migration command.
+- Add a custom connector named **Home Console Beta** with the URL `https://home-console-beta.vercel.app/api/mcp`. Choose API key or header authentication. Add the **Authorization** request header with the value `Bearer <the Beta connector key>`, including one space. The MCP endpoint exposes `list_pending` and `record_request_progress`.
+- On Warren’s Windows account, the local helper `%LOCALAPPDATA%\HomeConsole\HostedBeta\Copy-ClaudeHeader.ps1` copies the complete header value. Paste it directly into Claude’s connector settings. Use `Copy-DeviceKey.ps1` for the separate device key and paste it into the hosted kitchen’s unlock form. These files read Windows user-encrypted credentials.
+- Attach the connector to the intended Claude task in its connector settings. Creating a connector at the account level does not establish that an existing scheduled task has it. For a first read, ask Claude to call `list_pending` with a fresh run ID and report the names and quantities only. That call records a snapshot. The menu, Instacart cart, checkout and task schedule are separate operations.
+- Supabase holds groceries and their run receipts. The device authenticates to the kitchen, and Claude authenticates to the MCP endpoint. Neither client needs the Beta database server key.
 
-Run `npm run dev:beta`. Open the normal preview on localhost:3001 and click
-**Beta**. On the first visit to the local Beta hub, the kitchen's local session
-lets Beta set its own grocery development cookie. For direct access from a new
-browser, use the local sign-in URL printed by the Beta launcher. Hosted Beta
-devices still use a separate sign-in.
+## Local development
 
-The Windows login task currently retains its existing normal and legacy grocery
-preview configuration. A new beta startup entry has not been installed. Do not
-claim beta will restart at login until that entry has been installed and checked.
+Use `codex/beta-area`. Install dependencies with `npm ci`. On a fresh machine, `npm run db:groceries` creates the isolated development database. On Legion the existing database and agent receipts are reused. `npm run dev:beta` verifies the labelled Docker database at `127.0.0.1:55432/home_console_grocery_dev`, starts its dedicated PostgREST service on loopback port 55433, then serves the app on port 3005. The private preview uses a different database. The ignored local configuration can set `HOME_CONSOLE_HOSTED_BETA_URL` to show a link from local groceries to the shared hosted list.
 
-## Isolation and hosted configuration
+The Beta homepage uses the shared kitchen queries and actions. The Beta grocery screen uses the same Beta database. Calendar synchronization, Slack notifications, cron routes and real shopping callbacks are disconnected. A failed kitchen or grocery write must surface on the screen. Add experiments in this deployment, keep external actions explicitly scoped, and check new routes against the Beta allowlist in `lib/beta-deployment.ts`.
 
-The beta launcher clears inherited app credentials, validates the dedicated local
-database/container, binds only to loopback and disables external integrations.
-The beta homepage redirects to the hub before loading kitchen data or weather.
-Middleware allows only the beta screens, grocery API and MCP API on a beta host;
-calendar, Slack, cron, Spotify, voice and normal kitchen APIs return 404 there.
-Device routes fail closed without their kiosk credential; MCP authenticates with
-its independent bearer key. With beta mode disabled, beta screens and the new
-grocery/MCP APIs return 404.
+Run `npm run test:beta`, `npm run test:groceries`, `npm run typecheck` and `node scripts/beta-http-check.mjs`. For a local production build, stop only this checkout’s dev server before `npm run build:grocery-check`. Both commands use its .next directory.
 
-For a future hosted beta project:
+## Hosting and releases
 
-1. Use a separate deployment and Supabase project with reviewed migrations and
-   its own device/MCP credentials. Set `HOME_CONSOLE_BETA_SUPABASE_URL` and
-   `HOME_CONSOLE_BETA_SUPABASE_SERVICE_ROLE_KEY` for that separate project. Beta
-   refuses to fall back to ordinary Supabase settings and rejects a matching
-   ordinary URL or service key when those settings are also present. Still verify
-   the intended project identity; different variable names alone cannot prove it.
-2. Set `HOME_CONSOLE_BETA_DEPLOYMENT=1` only on that beta deployment and
-   `HOME_CONSOLE_KITCHEN_URL` to the normal kitchen's public HTTPS URL.
-3. Set `HOME_CONSOLE_BETA_URL` on the stable deployment to the beta HTTPS URL.
-   These navigation URLs cannot include credentials, query strings or fragments.
-4. Leave local development database/mode variables unset on hosted deployments.
-   Authenticate the beta device independently once; the stable device token is
-   not forwarded. Attach a separate Claude connector only after hosted verification.
-5. Use the stable launcher change independently of the experimental branch.
-   Do not merge the entire beta branch into main just to enable the button.
+The hosted Beta is the Vercel Hobby project `thewarrenterror-8694/home-console-beta` and Supabase project `warpssbaylfualwroqvo` in the separate **Home Console Beta** organization. On the Supabase Free plan, a low-activity project can be paused. [Supabase project pausing](https://supabase.com/docs/guides/platform/free-project-pausing)
 
-No Vercel deployment, hosted schema change, real cart action or Saturday-task
-change is part of this local implementation. The normal main deployment workflow
-and `git.deploymentEnabled=false` setting are unchanged. Existing user test items
-and their receipts are preserved.
+Set these Vercel environment variables in that Beta project’s production environment only. The configuration contains no family integration keys.
 
-## Verification
+| Variable | Purpose |
+| --- | --- |
+| `HOME_CONSOLE_BETA_DEPLOYMENT` | Set to `1` |
+| `HOME_CONSOLE_KITCHEN_URL` | Public return URL for the family kitchen |
+| `HOME_CONSOLE_BETA_SUPABASE_URL` | Canonical HTTPS origin of the Beta database |
+| `HOME_CONSOLE_BETA_SUPABASE_SERVICE_ROLE_KEY` | Beta database server credential |
+| `KIOSK_ACCESS_TOKEN` | Beta device credential |
+| `HOME_CONSOLE_GROCERY_AGENT_KEY` | Separate Claude bearer credential |
+| `NEXT_PUBLIC_FAMILY_TIMEZONE` | `America/New_York` |
 
-`npm run test:beta`, `npm run test:groceries`, `npm run typecheck` and
-`npm run build:grocery-check` cover URL safety, server route separation, device
-authentication, regression behavior and compilation. Run the build with this
-checkout's dev server stopped; it shares `.next` output.
+Release Beta from a reviewed commit on the Beta branch. From that checkout in PowerShell:
 
-`node scripts/beta-http-check.mjs` checks the running beta's screens and API
-separation without writing requests or contacting external services. Browser
-acceptance is normal kitchen -> Beta -> Open groceries -> Back to Beta ->
-Back to kitchen; check the visible header at landscape sizes, reload, and a
-grocery read failure. These are beta-shell checks, not evidence of real Instacart
-or physical Cozyla voice operation.
+```powershell
+$betaStage = node scripts/stage-hosted-beta.mjs
+Push-Location -LiteralPath $betaStage
+try {
+    npx.cmd --yes vercel@66.2.0 link --project home-console-beta --scope thewarrenterror-8694 --yes
+    if ($LASTEXITCODE) { throw 'Beta project link failed' }
+    $project = Get-Content -Raw .vercel/project.json | ConvertFrom-Json
+    if ($project.projectId -ne 'prj_sePAOMx5IjmxYGExqhvhEsDD3V2f') { throw 'Unexpected Vercel project' }
+    npx.cmd --yes vercel@66.2.0 deploy --prod --scope thewarrenterror-8694 --yes
+} finally {
+    Pop-Location
+}
+```
 
-November 17 local verification:
-
-- Refreshed main is still `39a227f`; its kitchen changes are included.
-- Seven beta tests, 29 grocery tests, TypeScript and the isolated build passed.
-- The normal private preview's seven safety checks and TypeScript passed; its
-  running browser view shows the 56px Beta link pointing to port 3005.
-- The actual Beta hub components were rendered to static HTML and visually
-  inspected at 1920x1080. Both navigation controls are visible. This is layout
-  evidence, not a running-app navigation test.
-- After Warren explicitly approved the separate startup, beta started on port
-  3005. The normal preview, legacy grocery preview and Claude connector remained
-  running with their existing process IDs.
-- Live HTTP checks passed: authenticated screens and grocery reads work, device
-  cookies cannot authenticate MCP, and normal kitchen integrations return 404.
-- Live Edge checks passed at 1920x1080 and 1280x720: the one-time local sign-in,
-  normal kitchen -> Beta -> groceries, reload, Back to Beta, and Back to kitchen.
-  A preview-frame nesting bug found during this check was fixed with top-level
-  navigation. The final round trip returns to exactly one preview wrapper.
-- A browser-injected grocery read failure showed the error while keeping Back
-  to kitchen usable. Existing test requests loaded; these checks made no grocery
-  API writes and used no real carts or external integrations.
-
-![Running local Beta hub](images/beta-hub-live.png)
+The staging script copies tracked app source from the working tree and uses `vercel.beta.json`, which has no family cron jobs. Source deployment excludes environment files, the Git repository, local databases and workstation credentials. Schema changes go to the explicit Beta project ref after reviewing a migration dry run. The family app keeps its independent GitHub Actions release to main.

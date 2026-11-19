@@ -12,6 +12,7 @@ export function getBetaDatabaseConfiguration(environment: Environment = process.
   if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== '/') {
     throw new Error('Invalid beta database URL.');
   }
+  if (parsed.hostname === 'oovlsrfczswrmnmhqbpt.supabase.co') throw new Error('Beta must not use the family production project.');
   let stableOrigin: string | undefined;
   if (environment.NEXT_PUBLIC_SUPABASE_URL) {
     try { stableOrigin = new URL(environment.NEXT_PUBLIC_SUPABASE_URL).origin; }

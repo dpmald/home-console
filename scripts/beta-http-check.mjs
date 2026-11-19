@@ -6,15 +6,15 @@ const get = (path, authenticated = false) => fetch(`${origin}${path}`, {
   headers: authenticated ? { Cookie: cookie } : {}, redirect: 'manual', signal: AbortSignal.timeout(15000),
 });
 
-for (const path of ['/beta', '/beta/groceries', '/api/groceries']) {
+for (const path of ['/beta', '/beta/groceries', '/api/groceries', '/api/kiosk']) {
   assert.equal((await get(path)).status, 401, `${path} must require its beta device credential`);
   const response = await get(path, true);
   assert.equal(response.status, 200, path);
-  if (path !== '/api/groceries') assert.match(await response.text(), /Back to kitchen/);
+  if (!path.startsWith('/api/')) assert.match(await response.text(), /Back to kitchen/);
 }
 assert.equal((await get('/api/mcp')).status, 401, 'MCP must require its independent agent credential');
 assert.equal((await get('/api/mcp', true)).status, 401, 'A device cookie must not authenticate MCP');
-for (const path of ['/api/kiosk', '/api/kiosk/order', '/api/weather', '/api/voice/session',
+for (const path of ['/api/weather', '/api/voice/session',
   '/api/voice/tool', '/api/cron/daily-standup', '/api/slack/interactions', '/api/logistics/sync',
   '/api/recipes/context', '/api/spotify', '/api/dinner-tips']) {
   assert.equal((await get(path, true)).status, 404, `${path} must not run on beta`);

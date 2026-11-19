@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { NextRequest } from 'next/server';
 import { getBetaDeployment } from '../lib/beta-deployment';
+import { GET as unlockForm, POST as unlockDevice } from '../app/unlock/route';
 import { middleware } from '../middleware';
 import { getBetaDatabaseConfiguration } from '../lib/beta-database';
 
@@ -13,6 +14,7 @@ test('hosted beta requires dedicated database configuration and rejects copied s
   assert.throws(() => getBetaDatabaseConfiguration({ ...stable, ...beta, HOME_CONSOLE_BETA_SUPABASE_URL: stable.NEXT_PUBLIC_SUPABASE_URL }), /must not share/);
   assert.throws(() => getBetaDatabaseConfiguration({ ...stable, ...beta, NEXT_PUBLIC_SUPABASE_URL: 'https://BETA.example.test:443/' }), /must not share/);
   assert.throws(() => getBetaDatabaseConfiguration({ ...stable, ...beta, HOME_CONSOLE_BETA_SUPABASE_SERVICE_ROLE_KEY: stable.SUPABASE_SERVICE_ROLE_KEY }), /must not share/);
+  assert.throws(() => getBetaDatabaseConfiguration({ ...beta, HOME_CONSOLE_BETA_SUPABASE_URL: 'https://oovlsrfczswrmnmhqbpt.supabase.co' }), /family production/);
   for (const url of ['http://beta.example.test', 'https://user:password@beta.example.test', 'https://beta.example.test/?key=secret']) {
     assert.throws(() => getBetaDatabaseConfiguration({ ...beta, HOME_CONSOLE_BETA_SUPABASE_URL: url }), /Invalid beta database/);
   }
@@ -56,7 +58,8 @@ test('first kitchen visit opens the local Beta hub and issues a separate device 
   assert.equal(visit().status, 401);
   env.KIOSK_ACCESS_TOKEN = settings.KIOSK_ACCESS_TOKEN;
   env.NODE_ENV = 'production';
-  assert.equal(visit().status, 401);
+  assert.equal(new URL(visit().headers.get('location')!).pathname, '/unlock');
+  assert.equal(visit('/api/kiosk').status, 401);
 });
 
 test('beta isolates normal APIs, fails closed for devices, and leaves MCP to its own auth', () => {
@@ -68,10 +71,10 @@ test('beta isolates normal APIs, fails closed for devices, and leaves MCP to its
     process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT = '1';
     process.env.KIOSK_ACCESS_TOKEN = 'synthetic-beta-key';
     const cookie = 'grocery_dev_kiosk_key=synthetic-beta-key';
-    for (const path of ['/api/kiosk', '/api/kiosk/order', '/api/voice/tool', '/api/voice/session', '/api/slack/interactions', '/api/cron/daily-standup', '/api/logistics/sync', '/api/recipes/context', '/api/spotify', '/api/weather', '/api/dinner-tips', '/guide']) {
+    for (const path of ['/api/voice/tool', '/api/voice/session', '/api/slack/interactions', '/api/cron/daily-standup', '/api/logistics/sync', '/api/recipes/context', '/api/spotify', '/api/weather', '/api/dinner-tips']) {
       assert.equal(middleware(req(path, cookie)).status, 404, path);
     }
-    for (const path of ['/', '/beta', '/beta/groceries', '/api/groceries']) {
+    for (const path of ['/', '/beta', '/beta/groceries', '/api/groceries', '/api/kiosk', '/api/kiosk/order', '/guide']) {
       assert.equal(middleware(req(path)).status, 401, path);
       assert.equal(middleware(req(path, 'kiosk_key=synthetic-beta-key')).status, 401, path);
       assert.equal(middleware(req(path, cookie)).headers.get('x-middleware-next'), '1', path);
@@ -87,4 +90,28 @@ test('beta isolates normal APIs, fails closed for devices, and leaves MCP to its
   } finally {
     names.forEach((name, i) => { if (previous[i] === undefined) delete process.env[name]; else process.env[name] = previous[i]; });
   }
+});
+
+test('hosted Beta unlock requires a same-origin device key and sets a host-only device cookie', async (t) => {
+  const env: Record<string, string | undefined> = process.env;
+  for (const [name, value] of Object.entries({ NODE_ENV: 'production', HOME_CONSOLE_BETA_DEPLOYMENT: '1', HOME_CONSOLE_GROCERY_DEVELOPMENT: '', KIOSK_ACCESS_TOKEN: 'beta-device' })) {
+    const previous = env[name];
+    t.after(() => { if (previous === undefined) delete env[name]; else env[name] = previous; });
+    env[name] = value;
+  }
+  const origin = 'https://beta.example.test';
+  const attempt = (body: string, source = origin) => unlockDevice(new NextRequest(origin + '/unlock', {
+    method: 'POST', headers: { origin: source, 'content-type': 'application/x-www-form-urlencoded' }, body,
+  }));
+  assert.equal(unlockForm().status, 200);
+  assert.equal((await attempt('key=wrong')).status, 401);
+  assert.equal((await attempt('key=beta-device', 'https://elsewhere.test')).status, 403);
+  const unlocked = await attempt('key=beta-device');
+  assert.equal(unlocked.status, 303);
+  assert.equal(unlocked.headers.get('location'), origin + '/beta');
+  assert.match(unlocked.headers.get('set-cookie') ?? '', /beta_kiosk_key=beta-device/);
+  assert.match(unlocked.headers.get('set-cookie') ?? '', /HttpOnly/i);
+  assert.match(unlocked.headers.get('set-cookie') ?? '', /Secure/i);
+  env.HOME_CONSOLE_BETA_DEPLOYMENT = '0';
+  assert.equal(unlockForm().status, 404);
 });

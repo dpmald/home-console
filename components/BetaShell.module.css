@@ -1,3 +1,5 @@
+.shell:has(:global(.hearth-canvas)) .header { display: none; }
+.content:has(> :global(.hearth-canvas)) { max-width: none; padding: 0; }
 .shell {
   height: 100dvh;
   width: 100%;
