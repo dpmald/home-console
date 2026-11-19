@@ -29,6 +29,36 @@ test('beta must be explicitly enabled and hosted return links have no local fall
   assert.equal(getBetaDeployment({ ...production, HOME_CONSOLE_KITCHEN_URL: 'https://kitchen.example.test/?key=secret' }).kitchenUrl, null);
 });
 
+test('first kitchen visit opens the local Beta hub and issues a separate device cookie', (t) => {
+  const env: Record<string, string | undefined> = process.env;
+  const settings = { NODE_ENV: 'development', HOME_CONSOLE_BETA_DEPLOYMENT: '1',
+    HOME_CONSOLE_GROCERY_DEVELOPMENT: '1', KIOSK_ACCESS_TOKEN: 'home-console-groceries-local-only' };
+  for (const [name, value] of Object.entries(settings)) {
+    const previous = env[name];
+    t.after(() => { if (previous === undefined) delete env[name]; else env[name] = previous; });
+    env[name] = value;
+  }
+  const session = 'kiosk_key=home-console-local-only';
+  const visit = (path = '/beta', host = 'localhost:3005', cookie = session, method = 'GET') =>
+    middleware(new NextRequest(`http://${host}${path}`, { headers: { host, cookie }, method }));
+  const response = visit();
+  assert.equal(response.headers.get('x-middleware-next'), '1');
+  const issued = response.cookies.get('grocery_dev_kiosk_key');
+  assert.equal(issued?.value, settings.KIOSK_ACCESS_TOKEN);
+  assert.ok(issued?.httpOnly);
+  assert.equal(visit('/beta', 'localhost:3005', session + '; grocery_dev_kiosk_key=' + issued?.value).headers.get('set-cookie'), null);
+  for (const denied of [visit('/api/groceries'), visit('/beta/groceries'), visit('/beta', 'localhost:3004'),
+    visit('/beta', 'beta.example.test'), visit('/beta', 'localhost:3005', ''), visit('/beta', 'localhost:3005', session, 'POST')]) {
+    assert.equal(denied.status, 401);
+    assert.equal(denied.headers.get('set-cookie'), null);
+  }
+  env.KIOSK_ACCESS_TOKEN = 'another-device-key';
+  assert.equal(visit().status, 401);
+  env.KIOSK_ACCESS_TOKEN = settings.KIOSK_ACCESS_TOKEN;
+  env.NODE_ENV = 'production';
+  assert.equal(visit().status, 401);
+});
+
 test('beta isolates normal APIs, fails closed for devices, and leaves MCP to its own auth', () => {
   const names = ['HOME_CONSOLE_BETA_DEPLOYMENT', 'HOME_CONSOLE_GROCERY_DEVELOPMENT', 'KIOSK_ACCESS_TOKEN'] as const;
   const previous = names.map(name => process.env[name]);

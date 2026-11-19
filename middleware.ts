@@ -31,11 +31,21 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Visiting /?key=TOKEN once sets a 1-year HttpOnly cookie and strips ?key from the URL.
-  if (searchParams.get('key') === token) {
+  const keyLogin = searchParams.get('key') === token;
+  // The two protected localhost previews share a hostname. On first entry from
+  // the kitchen, issue Beta's own cookie for the synthetic grocery list.
+  const localKitchenEntry = beta && process.env.NODE_ENV === 'development'
+    && process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1'
+    && token === 'home-console-groceries-local-only'
+    && req.headers.get('host') === 'localhost:3005'
+    && pathname === '/beta' && req.method === 'GET' && !req.nextUrl.search
+    && req.cookies.get(COOKIE)?.value !== token
+    && req.cookies.get('kiosk_key')?.value === 'home-console-local-only';
+  if (keyLogin || localKitchenEntry) {
     const clean = req.nextUrl.clone();
     clean.searchParams.delete('key');
-    const res = NextResponse.redirect(clean);
+    const res = keyLogin ? NextResponse.redirect(clean) : NextResponse.next();
+    res.headers.set('Cache-Control', 'private, no-store');
     res.cookies.set(COOKIE, token, {
       httpOnly: true,
       sameSite: 'lax',

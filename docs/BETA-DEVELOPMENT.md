@@ -28,11 +28,11 @@ configured, ignored `.env.grocery-dev.local` for the dedicated database on
 For a new developer machine, the existing `npm run db:groceries` setup creates
 an isolated local database; it is not a hosted migration command.
 
-Run `npm run dev:beta`. On a browser without the development cookie, open the
-local sign-in URL printed by that launcher once. Device credentials are never
-included in the Beta or Back to kitchen links. Existing local grocery cookies
-remain valid. The normal local launcher enables the Beta link using its existing
-`HOME_CONSOLE_LOCAL_DEVELOPMENT=1` setting.
+Run `npm run dev:beta`. Open the normal preview on localhost:3001 and click
+**Beta**. On the first visit to the local Beta hub, the kitchen's local session
+lets Beta set its own grocery development cookie. For direct access from a new
+browser, use the local sign-in URL printed by the Beta launcher. Hosted Beta
+devices still use a separate sign-in.
 
 The Windows login task currently retains its existing normal and legacy grocery
 preview configuration. A new beta startup entry has not been installed. Do not
