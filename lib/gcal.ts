@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { db } from './supabase/server';
 import { ownerOfCalendar } from './family';
-import { localHour } from './time';
+import { localHour, TZ, zonedTimeToUtc } from './time';
 import type { Assignee, LogisticsType, SourceCalendar } from './types';
 
 const execFileAsync = promisify(execFile);
@@ -105,29 +105,80 @@ export async function updateGoogleCalendarEventDescription(
   }
 }
 
-function parseIcsDate(raw: string): string | null {
+function zonedWallClockToIso(
+  dateISO: string,
+  h = 0,
+  m = 0,
+  s = 0,
+  tz = TZ,
+): string {
+  if (tz === TZ && s === 0) {
+    return zonedTimeToUtc(dateISO, h, m).toISOString();
+  }
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    });
+    const wallMs = (ms: number) => {
+      const o: Record<string, string> = {};
+      for (const p of fmt.formatToParts(new Date(ms))) o[p.type] = p.value;
+      return Date.UTC(+o.year, +o.month - 1, +o.day, +o.hour, +o.minute, +o.second);
+    };
+    const [y, mo, d] = dateISO.split('-').map(Number);
+    const target = Date.UTC(y, mo - 1, d, h, m, s);
+    let guess = target - (wallMs(target) - target);
+    guess = target - (wallMs(guess) - guess);
+    return new Date(guess).toISOString();
+  } catch {
+    return zonedTimeToUtc(dateISO, h, m).toISOString();
+  }
+}
+
+function parseIcsDate(raw: string, propKey = ''): string | null {
   const v = raw.trim();
-  // YYYYMMDDTHHMMSSZ or YYYYMMDD
+  // 1. Explicit UTC: YYYYMMDDTHHMMSSZ
   const mUtc = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
   if (mUtc) {
     return `${mUtc[1]}-${mUtc[2]}-${mUtc[3]}T${mUtc[4]}:${mUtc[5]}:${mUtc[6]}Z`;
   }
+  // Extract optional TZID parameter (e.g. DTSTART;TZID=America/New_York)
+  const tzMatch = propKey.match(/TZID=([^;:]+)/i);
+  const tz = tzMatch ? tzMatch[1].replace(/^"|"$/g, '').trim() : TZ;
+
+  // 2. Local wall-clock datetime: YYYYMMDDTHHMMSS
   const mLocal = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/);
   if (mLocal) {
-    return new Date(`${mLocal[1]}-${mLocal[2]}-${mLocal[3]}T${mLocal[4]}:${mLocal[5]}:${mLocal[6]}`).toISOString();
+    const dateISO = `${mLocal[1]}-${mLocal[2]}-${mLocal[3]}`;
+    return zonedWallClockToIso(dateISO, +mLocal[4], +mLocal[5], +mLocal[6], tz);
   }
+  // 3. All-day date: YYYYMMDD (interpret as midnight in family timezone so date doesn't shift back 1 day in EST)
   const mDay = v.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (mDay) {
-    return `${mDay[1]}-${mDay[2]}-${mDay[3]}T00:00:00Z`;
+    const dateISO = `${mDay[1]}-${mDay[2]}-${mDay[3]}`;
+    return zonedWallClockToIso(dateISO, 0, 0, 0, tz);
   }
   return null;
+}
+
+function normalizeExternalEventId(rawUid: string): string {
+  const clean = rawUid
+    .replace(/^(gcal|ics):/i, '')
+    .replace(/@google\.com$/i, '')
+    .trim();
+  return `gcal:${clean}`;
 }
 
 export async function syncIcsCalendarsIfConfigured(): Promise<void> {
   const rawUrls = process.env.GOOGLE_CALENDAR_ICS_URLS;
   if (!rawUrls) return;
   if (Date.now() - lastSyncAt < SYNC_TTL_MS) return;
-  lastSyncAt = Date.now();
 
   const urls = rawUrls
     .split(',')
@@ -137,24 +188,27 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
 
   const minMs = Date.now() - 2 * 86_400_000;
   const maxMs = Date.now() + 14 * 86_400_000;
+  let anySucceeded = false;
 
   for (const entry of urls) {
     try {
       // Optional prefix format: "warren_outlook|https://..." or "family_google|https://..." or plain URL
-      const [prefix, maybeUrl] = entry.includes('|') ? entry.split('|', 2) : ['daniela_google', entry];
+      const [prefix, maybeUrl] = entry.includes('|') ? entry.split('|', 2) : ['', entry];
       const url = maybeUrl.trim();
       const src: SourceCalendar =
-        prefix === 'warren_outlook' || prefix === 'family_google' || prefix === 'manual'
+        prefix === 'warren_outlook' || prefix === 'family_google' || prefix === 'daniela_google' || prefix === 'manual'
           ? prefix
-          : url.includes('family04106130811563564934')
+          : /family\d+(%40|@)group\.calendar\.google\.com/i.test(url) || urls.length === 1
             ? 'family_google'
             : 'daniela_google';
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) continue;
+      anySucceeded = true;
       const text = (await res.text()).replace(/\r?\n[ \t]/g, '');
       const blocks = text.split('BEGIN:VEVENT').slice(1);
       const parsed: {
         external_event_id: string;
+        legacy_ics_id: string;
         source_calendar: SourceCalendar;
         title: string;
         start_time: string;
@@ -175,13 +229,14 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
         for (const line of lines) {
           const colon = line.indexOf(':');
           if (colon < 0) continue;
-          const k = line.slice(0, colon).toUpperCase();
+          const rawKey = line.slice(0, colon);
+          const k = rawKey.toUpperCase();
           const val = line.slice(colon + 1);
           if (k === 'UID') uid = val.trim();
           else if (k.startsWith('SUMMARY')) summary = val.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, ' ').trim();
           else if (k.startsWith('DESCRIPTION')) description = val.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, ' ').trim();
-          else if (k.startsWith('DTSTART')) dtStart = parseIcsDate(val) ?? '';
-          else if (k.startsWith('DTEND')) dtEnd = parseIcsDate(val) ?? '';
+          else if (k.startsWith('DTSTART')) dtStart = parseIcsDate(val, rawKey) ?? '';
+          else if (k.startsWith('DTEND')) dtEnd = parseIcsDate(val, rawKey) ?? '';
           else if (k === 'STATUS') status = val.trim().toUpperCase();
         }
         if (!uid || !summary || !dtStart || status === 'CANCELLED') continue;
@@ -189,7 +244,8 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
         if (Number.isNaN(startMs) || startMs < minMs || startMs > maxMs) continue;
         const endIso = dtEnd || new Date(startMs + 3_600_000).toISOString();
         parsed.push({
-          external_event_id: `ics:${uid}`,
+          external_event_id: normalizeExternalEventId(uid),
+          legacy_ics_id: `ics:${uid}`,
           source_calendar: src,
           title: summary,
           start_time: dtStart,
@@ -199,7 +255,9 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
       }
 
       if (!parsed.length) continue;
-      const ids = parsed.map((p) => p.external_event_id);
+      const ids = Array.from(
+        new Set(parsed.flatMap((p) => [p.external_event_id, p.legacy_ics_id])),
+      );
       const { data: existing } = await db()
         .from('family_logistics')
         .select('external_event_id, source_calendar, title, start_time, end_time, assigned_parent, logistics_type, description')
@@ -211,7 +269,8 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
 
       const rows = parsed
         .map((e) => {
-          const prev = byExt.get(e.external_event_id);
+          const prev = byExt.get(e.external_event_id) ?? byExt.get(e.legacy_ics_id);
+          const canonicalId = prev?.external_event_id ?? e.external_event_id;
           const type = prev?.logistics_type ?? classify(e.title, e.start_time, e.end_time);
           const assigned =
             prev && prev.assigned_parent !== 'unassigned'
@@ -220,6 +279,7 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
           const desc = prev?.description || e.description || null;
           const unchanged =
             prev &&
+            prev.external_event_id === canonicalId &&
             prev.title === e.title &&
             prev.source_calendar === e.source_calendar &&
             prev.logistics_type === type &&
@@ -229,7 +289,7 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
             sameInstant(prev.end_time, e.end_time);
           if (unchanged) return null;
           return {
-            external_event_id: e.external_event_id,
+            external_event_id: canonicalId,
             source_calendar: e.source_calendar,
             title: e.title,
             start_time: e.start_time,
@@ -246,5 +306,9 @@ export async function syncIcsCalendarsIfConfigured(): Promise<void> {
         await db().from('family_logistics').upsert(rows, { onConflict: 'external_event_id' });
       }
     } catch {}
+  }
+
+  if (anySucceeded) {
+    lastSyncAt = Date.now();
   }
 }
