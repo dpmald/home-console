@@ -2,17 +2,67 @@ name: Deploy Kitchen Console to Vercel
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number from Dotty
+        required: true
+        type: string
+      head_sha:
+        description: Reviewed commit
+        required: true
+        type: string
+      receipt_id:
+        description: GitHub comment identifying Dotty's review message
+        required: true
+        type: string
 
-env:
-  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+permissions:
+  contents: read
 
 jobs:
-  deploy:
+  approval:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'dpmald/home-console'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: dotty-merge-${{ inputs.pr_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      merge_sha: ${{ steps.merge.outputs.merge_sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: merge
+        run: node .github/scripts/dotty-pr.mjs merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOTTY_SLACK_BOT_TOKEN: ${{ secrets.DOTTY_SLACK_BOT_TOKEN }}
+          DOTTY_CHANNEL_ID: ${{ vars.DOTTY_CHANNEL_ID }}
+          DOTTY_BOT_USER_ID: ${{ vars.DOTTY_BOT_USER_ID }}
+          DOTTY_APPROVER_ID: ${{ vars.DOTTY_APPROVER_ID }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          RECEIPT_ID: ${{ inputs.receipt_id }}
+
+  deploy:
+    needs: approval
+    if: ${{ !cancelled() && (github.event_name == 'push' || (needs.approval.result == 'success' && needs.approval.outputs.merge_sha != '')) }}
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.approval.outputs.merge_sha || github.sha }}
+          persist-credentials: false
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest

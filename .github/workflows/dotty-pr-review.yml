@@ -1,0 +1,37 @@
+name: Dotty PR review
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, edited]
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: dotty-pr-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    # Every invocation scans all eligible PRs, including after coalesced events.
+    if: github.repository == 'dpmald/home-console' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # This job handles secrets. Always run the trusted base, never a PR checkout.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: node .github/scripts/dotty-pr.mjs scan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOTTY_SLACK_BOT_TOKEN: ${{ secrets.DOTTY_SLACK_BOT_TOKEN }}
+          DOTTY_CHANNEL_ID: ${{ vars.DOTTY_CHANNEL_ID }}
+          DOTTY_BOT_USER_ID: ${{ vars.DOTTY_BOT_USER_ID }}
+          DOTTY_APPROVER_ID: ${{ vars.DOTTY_APPROVER_ID }}
