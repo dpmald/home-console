@@ -2,8 +2,8 @@
 
 On the Cozyla, open the [family kitchen](https://home-console-pied.vercel.app/) and
 tap **Beta** in the bottom dock. This production hostname links to the
-[shared Beta](https://home-console-beta.vercel.app/beta) by default. The first visit
-asks for the separate Beta device key. Inside Beta, tap **Back to kitchen** to return.
+[shared Beta](https://home-console-beta.vercel.app/beta) by default. In public device
+mode it opens immediately. Inside Beta, tap **Back to kitchen** to return.
 
 A valid public HTTPS URL in `HOME_CONSOLE_BETA_URL` overrides the default.
 Set the value to `off` to hide the link. Other hosted kitchens show the link
