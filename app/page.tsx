@@ -7,6 +7,7 @@ import type { KitchenState } from '@/lib/types';
 import { getBetaDestination } from '@/lib/beta-navigation.mjs';
 import { isBetaDeployment } from '@/lib/beta-deployment';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,5 +27,6 @@ export default async function HomePage() {
     weather = await getWeather();
   } catch {}
 
-  return <KioskBoard initial={state} initialWeather={weather} betaUrl={getBetaDestination()} />;
+  const host = (await headers()).get('host');
+  return <KioskBoard initial={state} initialWeather={weather} betaUrl={getBetaDestination(process.env, host)} />;
 }
