@@ -2,10 +2,23 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getBetaDestination, parseConsoleUrl } from '../lib/beta-navigation.mjs';
 
-test('unconfigured stable kitchens have no beta destination, including production with a stale local flag', () => {
+test('unconfigured kitchens on other hosts have no beta destination, including production with a stale local flag', () => {
   assert.equal(getBetaDestination({}), null);
   assert.equal(getBetaDestination({ NODE_ENV: 'production', HOME_CONSOLE_LOCAL_DEVELOPMENT: '1' }), null);
   assert.equal(getBetaDestination({ NODE_ENV: 'development' }), null);
+});
+
+test('the family kitchen opens hosted Beta by default only on its production hostname', () => {
+  const host = 'home-console-pied.vercel.app';
+  const production = { NODE_ENV: 'production' };
+  assert.equal(getBetaDestination(production, host), 'https://home-console-beta.vercel.app/beta');
+  assert.equal(getBetaDestination({ NODE_ENV: 'development' }, host), null);
+  for (const other of ['localhost:3000', 'preview.vercel.app', 'home-console-beta.vercel.app', host + '.example']) {
+    assert.equal(getBetaDestination(production, other), null);
+  }
+  assert.equal(getBetaDestination({ ...production, HOME_CONSOLE_BETA_URL: 'https://beta.example/beta' }, host),
+    'https://beta.example/beta');
+  assert.equal(getBetaDestination({ ...production, HOME_CONSOLE_BETA_URL: 'off' }, host), null);
 });
 
 test('explicit local development uses the separate beta server and permits loopback destinations', () => {
