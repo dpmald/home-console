@@ -4,6 +4,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { db } from './supabase/server';
+import { isBetaDeployment } from './beta-deployment';
 import { ownerOfCalendar } from './family';
 import { localHour, TZ, zonedTimeToUtc } from './time';
 import type { Assignee, LogisticsType, SourceCalendar } from './types';
@@ -63,6 +64,7 @@ export async function updateGoogleCalendarEventDescription(
   description: string,
   calendarId: string = FAMILY_CALENDAR_ID,
 ): Promise<boolean> {
+  if (isBetaDeployment() || process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1') return false;
   const rawId = externalEventId
     .replace(/^(gcal|ics):/, '')
     .replace(/@google\.com$/, '')
@@ -176,6 +178,7 @@ function normalizeExternalEventId(rawUid: string): string {
 }
 
 export async function syncIcsCalendarsIfConfigured(): Promise<void> {
+  if (isBetaDeployment() || process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1') return;
   const rawUrls = process.env.GOOGLE_CALENDAR_ICS_URLS;
   if (!rawUrls) return;
   if (Date.now() - lastSyncAt < SYNC_TTL_MS) return;

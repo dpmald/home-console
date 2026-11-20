@@ -8,18 +8,26 @@ import { refreshDinnerMessages } from '@/lib/slack/sync';
 import { todayISO } from '@/lib/time';
 import type { KioskAction } from '@/lib/types';
 
+import { isBetaDeployment } from '@/lib/beta-deployment';
+import { requireKioskRequest } from '@/lib/kiosk-auth';
+
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const denied = isBetaDeployment() && requireKioskRequest(req);
+  if (denied) return denied;
   const date = todayISO();
   try {
     return NextResponse.json(await getKitchenState(date));
   } catch {
+    if (isBetaDeployment()) return NextResponse.json({ error: 'Beta kitchen data is unavailable.' }, { status: 503 });
     return NextResponse.json(demoKitchenState(date));
   }
 }
 
 export async function POST(req: NextRequest) {
+  const denied = isBetaDeployment() && requireKioskRequest(req, true);
+  if (denied) return denied;
   const date = todayISO();
   const a = (await req.json()) as KioskAction;
   let touchedSlack = false;
@@ -70,6 +78,6 @@ export async function POST(req: NextRequest) {
       break;
   }
 
-  if (touchedSlack) after(() => refreshDinnerMessages(date));
+  if (touchedSlack && !isBetaDeployment()) after(() => refreshDinnerMessages(date));
   return NextResponse.json(await getKitchenState(date));
 }

@@ -10,18 +10,32 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:groceries": "node --import tsx --test tests/grocery*.test.ts",
+    "db:groceries": "node scripts/grocery-dev-setup.mjs",
+    "dev:groceries": "node --import tsx scripts/grocery-dev-server.ts",
+    "dev:grocery-ui": "node scripts/grocery-ui-preview.mjs",
+    "dev:beta": "node scripts/grocery-ui-preview.mjs --beta",
+    "test:beta": "node --import tsx --test tests/beta-deployment.test.ts && node --test tests/beta-navigation.test.mjs",
+    "test:grocery-flow-db": "node --import tsx scripts/grocery-flow-check.ts",
+    "build:grocery-check": "node scripts/grocery-safe-build.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@supabase/postgrest-js": "2.119.0",
     "@supabase/supabase-js": "^2.49.0",
     "next": "^15.3.0",
+    "pg": "^8.23.1",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.0"
   }
 }
