@@ -129,5 +129,3 @@ def search_results(artifacts):
                         collect(value[key])
     collect(artifacts)
     return found
-
-
