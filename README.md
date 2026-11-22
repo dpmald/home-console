@@ -38,7 +38,7 @@ See [testing and PR checks](docs/TESTING.md) for unit, database and browser cove
 
 ### Shared household grocery requests
 
-Open **Dinner Hub → Shared grocery list** on the family display, or **Groceries** on Beta. Both open the hosted list. Unlock the device once to add an item and quantity. **Pending** means the list has accepted a request. **In cart** means the worker verified the shared cart. Recipe preferences apply to meals Claude picks. Warren checks out in Instacart. See [Beta device access and configuration](docs/BETA-DEVELOPMENT.md).
+Open **Dinner Hub → Shared grocery list** on the family display, or **Groceries** on Beta. Unlock the browser once, then enter an item and quantity. The worker checks every two minutes while Legion is awake, signed in and online. **Pending** means the list accepted the request. **In cart** shows the product and package count Instacart confirmed at the selected store. Recipe preferences apply to meals Claude picks. Warren checks out in Instacart. See [Beta device access and configuration](docs/BETA-DEVELOPMENT.md) and [worker setup](scripts/grocery-cart-poller/README.md).
 
 ### 3. Warren's Saturday Recipe Agent
 - **Before picking recipes (optional):**
