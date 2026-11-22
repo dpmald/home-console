@@ -12,8 +12,16 @@ declare
   res jsonb;
   run_label text;
   initial_status text;
+  app_user text;
   product jsonb := '{"product_id":"test-turkey","name":"Synthetic turkey","size":"8 oz","quantity":1}';
 begin
+  foreach app_user in array array['anon','authenticated','service_role'] loop
+    if has_table_privilege(app_user,'public.grocery_cart_actor_scope','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+      or has_function_privilege(app_user,'public.grocery_cart_set_actor(text)','EXECUTE')
+      or has_function_privilege(app_user,'public.grocery_agent_progress_impl(jsonb)','EXECUTE')
+      or has_function_privilege(app_user,'public.grocery_trusted_device_mutate_impl(jsonb)','EXECUTE')
+      then raise exception 'Cart actor table or private implementation accessible to %',app_user; end if;
+  end loop;
   if has_function_privilege('anon','public.grocery_trusted_device_mutate(jsonb)','execute')
     or has_function_privilege('authenticated','public.grocery_trusted_device_mutate(jsonb)','execute')
     then raise exception 'Household retry RPC is public'; end if;
@@ -78,6 +86,8 @@ begin
       'operation_id',run_label||'-retry-complete','revision',2,'outcome','in_cart','product',product,
       'worker_token',res->>'worker_token','claim_token',res->>'claim_token'));
   end loop;
+  if exists(select 1 from public.grocery_cart_actor_scope s where s.backend_pid=pg_backend_pid()
+    and s.transaction_id=pg_current_xact_id()) then raise exception 'Actor leaked out of a wrapper'; end if;
 end;
 $$;
 rollback;

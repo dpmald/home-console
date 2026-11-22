@@ -78,7 +78,7 @@ begin
     'name','Edited synthetic item','quantity','3','notes',null));
   res := public.grocery_agent_progress(preparation || jsonb_build_object('run_id',label||'-next','request_id',id_b,'operation_id',label||'-stale'));
   if res->>'code' is distinct from 'revision_conflict' then raise exception 'Edited quantity accepted: %',res; end if;
-  perform set_config('home_console.grocery_cart_actor','device',true);
+  perform public.grocery_cart_set_actor('device');
   insert into public.grocery_items(name,quantity,added_by)
     select 'Synthetic backlog item '||n,'1','fixture' from generate_series(1,101) n;
   snapshot := public.grocery_agent_list_pending(label||'-backlog');

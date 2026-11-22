@@ -22,9 +22,8 @@ revoke all on function public.grocery_keep_household_cart_check() from public, a
 create trigger grocery_keep_household_cart_check before update of requires_reconciliation on public.grocery_agent_attempts
   for each row execute function public.grocery_keep_household_cart_check();
 
-create or replace function public.grocery_trusted_device_mutate(p_action jsonb)
-returns jsonb language plpgsql security definer set search_path = pg_catalog
-  set home_console.grocery_cart_actor = 'device' as $$
+create or replace function public.grocery_trusted_device_mutate_impl(p_action jsonb)
+returns jsonb language plpgsql set search_path = pg_catalog as $$
 declare
   item public.grocery_items%rowtype;
   result jsonb;
@@ -87,8 +86,7 @@ begin
   return public.grocery_device_list();
 end;
 $$;
-revoke all on function public.grocery_trusted_device_mutate(jsonb) from public, anon, authenticated;
-grant execute on function public.grocery_trusted_device_mutate(jsonb) to service_role;
+revoke all on function public.grocery_trusted_device_mutate_impl(jsonb) from public, anon, authenticated, service_role;
 create or replace function public.grocery_device_list()
 returns jsonb language sql security definer set search_path = pg_catalog as $$
   select jsonb_build_object('ok',true,'items',coalesce(jsonb_agg(

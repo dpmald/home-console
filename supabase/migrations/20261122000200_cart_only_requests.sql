@@ -64,9 +64,8 @@ $$;
 revoke all on function public.grocery_agent_list_pending(text) from public, anon, authenticated;
 grant execute on function public.grocery_agent_list_pending(text) to service_role;
 
-create or replace function public.grocery_agent_progress(p_operation jsonb)
-returns jsonb language plpgsql security definer set search_path = pg_catalog
-  set home_console.grocery_cart_actor = 'agent' as $$
+create function public.grocery_agent_progress_impl(p_operation jsonb)
+returns jsonb language plpgsql set search_path = pg_catalog as $$
 declare
   v_op text;
   v_phase text;
@@ -347,6 +346,20 @@ begin
   v_result := v_result || jsonb_build_object('queue_policy','authorized-revision-v1');
   insert into public.grocery_agent_operations(operation_id,payload,response) values(v_op,p_operation,v_result);
   return v_result;
+end;
+$$;
+revoke all on function public.grocery_agent_progress_impl(jsonb) from public, anon, authenticated, service_role;
+
+create or replace function public.grocery_agent_progress(p_operation jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $$
+declare
+  previous_actor text;
+  result jsonb;
+begin
+  previous_actor := public.grocery_cart_set_actor('agent');
+  result := public.grocery_agent_progress_impl(p_operation);
+  perform public.grocery_cart_set_actor(previous_actor);
+  return result;
 end;
 $$;
 revoke all on function public.grocery_agent_progress(jsonb) from public, anon, authenticated;

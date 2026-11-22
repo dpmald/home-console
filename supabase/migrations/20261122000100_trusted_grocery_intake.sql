@@ -3,18 +3,44 @@
 alter table public.grocery_items add column cart_authorized_revision integer
   check (cart_authorized_revision is null or cart_authorized_revision = revision);
 
-create function public.grocery_protect_cart_request()
-returns trigger language plpgsql set search_path = pg_catalog as $$
+-- Scoped markers are visible only to the migration owner. Wrapper calls restore
+-- the previous actor before returning. A raised error rolls back their writes.
+create table public.grocery_cart_actor_scope (
+  backend_pid integer not null,
+  transaction_id xid8 not null,
+  actor text not null check (actor in ('device','agent')),
+  primary key (backend_pid,transaction_id)
+);
+alter table public.grocery_cart_actor_scope enable row level security;
+revoke all on public.grocery_cart_actor_scope from public, anon, authenticated, service_role;
+
+create function public.grocery_cart_set_actor(p_actor text)
+returns text language plpgsql set search_path=pg_catalog as $$
 declare
-  actor text := current_setting('home_console.grocery_cart_actor', true);
+  previous_actor text;
+  backend integer := pg_backend_pid();
+  tx xid8 := pg_current_xact_id();
 begin
-  if tg_op = 'DELETE' then
-    if old.cart_authorized_revision is not null and current_user <>
-        (select tableowner from pg_catalog.pg_tables where schemaname='public' and tablename='grocery_items') then
-      raise exception 'Cancel a confirmed request on the household grocery list.' using errcode = '42501';
-    end if;
-    return old;
+  select s.actor into previous_actor from public.grocery_cart_actor_scope s
+    where s.backend_pid=backend and s.transaction_id=tx;
+  if p_actor is null then
+    delete from public.grocery_cart_actor_scope s where s.backend_pid=backend and s.transaction_id=tx;
+  else
+    insert into public.grocery_cart_actor_scope(backend_pid,transaction_id,actor) values(backend,tx,p_actor)
+      on conflict(backend_pid,transaction_id) do update set actor=excluded.actor;
   end if;
+  return previous_actor;
+end;
+$$;
+revoke all on function public.grocery_cart_set_actor(text) from public, anon, authenticated, service_role;
+
+create function public.grocery_protect_cart_request()
+returns trigger language plpgsql security definer set search_path = pg_catalog as $$
+declare
+  actor text;
+begin
+  select s.actor into actor from public.grocery_cart_actor_scope s
+    where s.backend_pid=pg_backend_pid() and s.transaction_id=pg_current_xact_id_if_assigned();
   if actor = 'device' then
     new.cart_authorized_revision := new.revision;
   elsif tg_op = 'INSERT' then
@@ -32,13 +58,27 @@ end;
 $$;
 -- PostgreSQL runs same-kind triggers by name. Stamp the final revision after
 -- grocery_request_revision has applied its content/status transition rules.
-create trigger grocery_trusted_revision before insert or update or delete on public.grocery_items
+create trigger grocery_trusted_revision before insert or update on public.grocery_items
   for each row execute function public.grocery_protect_cart_request();
 revoke all on function public.grocery_protect_cart_request() from public, anon, authenticated;
 
-create function public.grocery_trusted_device_mutate(p_action jsonb)
-returns jsonb language plpgsql security definer set search_path = pg_catalog
-  set home_console.grocery_cart_actor = 'device' as $$
+-- Keep the effective caller's identity for owner-only maintenance deletes.
+create function public.grocery_protect_cart_delete()
+returns trigger language plpgsql set search_path=pg_catalog as $$
+begin
+  if old.cart_authorized_revision is not null and current_user <>
+        (select tableowner from pg_catalog.pg_tables where schemaname='public' and tablename='grocery_items') then
+    raise exception 'Cancel a confirmed request on the household grocery list.' using errcode = '42501';
+  end if;
+  return old;
+end;
+$$;
+revoke all on function public.grocery_protect_cart_delete() from public, anon, authenticated;
+create trigger grocery_trusted_delete before delete on public.grocery_items
+  for each row execute function public.grocery_protect_cart_delete();
+
+create function public.grocery_trusted_device_mutate_impl(p_action jsonb)
+returns jsonb language plpgsql set search_path = pg_catalog as $$
 declare
   item public.grocery_items%rowtype;
   result jsonb;
@@ -67,6 +107,20 @@ begin
   end if;
   update public.grocery_items set cart_authorized_revision=revision where id=item.id;
   return public.grocery_device_list();
+end;
+$$;
+revoke all on function public.grocery_trusted_device_mutate_impl(jsonb) from public, anon, authenticated, service_role;
+
+create function public.grocery_trusted_device_mutate(p_action jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $$
+declare
+  previous_actor text;
+  result jsonb;
+begin
+  previous_actor := public.grocery_cart_set_actor('device');
+  result := public.grocery_trusted_device_mutate_impl(p_action);
+  perform public.grocery_cart_set_actor(previous_actor);
+  return result;
 end;
 $$;
 revoke all on function public.grocery_trusted_device_mutate(jsonb) from public, anon, authenticated;
