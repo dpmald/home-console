@@ -375,6 +375,8 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
   const [state, setState] = useState<KitchenState>(initial);
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
   const [mode, setMode] = useState<ViewMode>('ambient');
+  const [moreOpen, setMoreOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
   const [now, setNow] = useState<Date>(() => new Date());
   const [timers, setTimers] = useState<Timer[]>([]);
@@ -972,6 +974,16 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
       ? `SPOTIFY: ${(spotify.track || 'PLAYING').toUpperCase()}`
       : 'AUDIO STANDBY • NPR / SPOTIFY';
 
+  const currentView = mode === 'dinner' ? dinnerView : mode;
+  useEffect(() => {
+    contentRef.current?.scrollTo(0, 0);
+  }, [currentView]);
+
+  function openDockView(view: ViewMode) {
+    setMoreOpen(false);
+    setMode(view);
+  }
+
   return (
     <div className="hearth-canvas">
       {/* Ambient dot-pattern & warm terracotta/cobalt glow */}
@@ -1026,6 +1038,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
           </header>
         )}
 
+        <div className="hearth-content" ref={contentRef}>
         {/* ════════════════════════════════════════════════════════════════════
             VIEW 1: CLEAN 10-FOOT AMBIENT STANDBY HEARTH VIEW (Matches Stitch Ambient Design)
             ════════════════════════════════════════════════════════════════════ */}
@@ -1040,21 +1053,11 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
               paddingBottom: 8,
             }}
           >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '55fr 45fr',
-                gap: 24,
-                minHeight: 500,
-                maxHeight: 720,
-                height: '76vh',
-              }}
-            >
+            <div className="ambient-grid">
               {/* Left Primary Glanceable Card: Clean Giant Clock + Date + Outdoor Temp + Conditional Schedule Callout */}
               <div
-                className="ceramic-card"
+                className="ceramic-card glance-card"
                 style={{
-                  padding: '44px 48px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
@@ -1067,8 +1070,8 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 <div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
                     <span
+                      className="glance-clock"
                       style={{
-                        fontSize: 'clamp(96px, 9.2vw, 138px)',
                         fontWeight: 800,
                         letterSpacing: '-0.045em',
                         lineHeight: 0.9,
@@ -1215,7 +1218,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 <div
                   className="ceramic-card"
                   style={{
-                    padding: '24px 28px',
+                    padding: 'var(--board-card-padding, 24px 28px)',
                     flex: activeTimer || state.groceries.length > 0 || state.events.length > 0 ? '0 0 auto' : 1,
                     display: 'flex',
                     flexDirection: 'column',
@@ -1295,7 +1298,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                           </div>
                         ) : (
                           <div
-                            className="ceramic-well"
+                            className="phone-stack ceramic-well"
                             style={{
                               marginTop: 18,
                               padding: '16px 18px',
@@ -1357,9 +1360,10 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
 
                       {/* 2x2 Chef Assignment Tactile Grid (Sized for 24" Touch Display) */}
                       <div
+                        className="ambient-decisions"
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
+                          gridTemplateColumns: 'var(--board-columns, 1fr 1fr)',
                           gap: 14,
                           marginTop: 18,
                           flex: state.backlog.length === 0 ? 1 : '0 0 auto',
@@ -1799,7 +1803,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   <div
                     className="ceramic-card"
                     style={{
-                      padding: '20px 24px',
+                      padding: 'var(--board-card-padding, 20px 24px)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 14,
@@ -1845,7 +1849,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       style={{
                         display: 'grid',
                         gridTemplateColumns:
-                          state.groceries.length > 0 && state.events.length > 0 ? '1fr 1fr' : '1fr',
+                          state.groceries.length > 0 && state.events.length > 0 ? 'var(--board-columns, 1fr 1fr)' : '1fr',
                         gap: 12,
                       }}
                     >
@@ -1941,6 +1945,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
         {mode === 'dinner' && (
           <div
             id="bentoMainGrid"
+            className="dinner-layout"
             style={{
               flex: 1,
               minHeight: 0,
@@ -1954,7 +1959,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
             <section
               key={dinnerView}
               aria-label="Dinner guide"
-              className="ceramic-card"
+              className="ceramic-card dinner-guide"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -1963,7 +1968,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 borderRadius: 18,
-                padding: '20px 24px',
+                padding: 'var(--board-card-padding, 20px 24px)',
                 border: '1px solid var(--border)',
                 background: 'var(--surface)',
                 overflowX: 'hidden',
@@ -1991,9 +1996,10 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 <>
                   {/* Top Banner: Chef Selected — What's on the Menu? */}
                   <div
+                    className="phone-wrap"
                     style={{
                       borderRadius: 16,
-                      padding: '20px 24px',
+                      padding: 'var(--board-card-padding, 20px 24px)',
                       background: 'var(--warm-banner-bg)',
                       border: '2px solid var(--warm-border)',
                       boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
@@ -2088,7 +2094,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   {/* Middle Card: Dish Name Input + Voice Dictation + Quick Chips */}
                   <div
                     style={{
-                      padding: '18px 22px',
+                      padding: 'var(--board-card-padding, 18px 22px)',
                       borderRadius: 16,
                       background: 'var(--surface-tint)',
                       border: '1px solid var(--border)',
@@ -2121,7 +2127,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 10 }}>
+                    <div className="phone-stack" style={{ display: 'flex', gap: 10 }}>
                       <input
                         type="text"
                         value={captureMealInput}
@@ -2208,7 +2214,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
+                      gridTemplateColumns: 'var(--board-columns, 1fr 1fr)',
                       gap: 16,
                       flex: '1 0 auto',
                       paddingTop: 12,
@@ -2409,7 +2415,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       zIndex: 1,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="phone-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span
                           className="font-mono"
@@ -2501,6 +2507,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                     </div>
 
                     <div
+                      className="phone-stack"
                       style={{
                         display: 'flex',
                         alignItems: 'baseline',
@@ -2521,7 +2528,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       </h1>
 
                       <div
-                        className="font-mono"
+                        className="phone-wrap recipe-facts font-mono"
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -2587,7 +2594,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   <div
                     style={{
                       borderRadius: 16,
-                      padding: '20px 24px',
+                      padding: 'var(--board-card-padding, 20px 24px)',
                       background: 'var(--warm-surface)',
                       border: '2px solid var(--warm-border)',
                       boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
@@ -2660,7 +2667,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         paddingTop: 8,
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="phone-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <button
                           type="button"
                           onClick={toggleReadStepAloud}
@@ -2802,7 +2809,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
+                      gridTemplateColumns: 'var(--board-columns, 1fr 1fr)',
                       gap: 16,
                       flex: 1,
                       minHeight: '12rem',
@@ -3020,7 +3027,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   <div
                     style={{
                       borderRadius: 16,
-                      padding: '20px 24px',
+                      padding: 'var(--board-card-padding, 20px 24px)',
                       background: 'var(--warm-banner-bg)',
                       border: '2px solid var(--warm-border)',
                       boxShadow: '0 1px 2px rgba(40, 25, 15, 0.03)',
@@ -3072,7 +3079,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="phone-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <button
                           type="button"
                           onClick={() => {
@@ -3162,7 +3169,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '7fr 5fr',
+                      gridTemplateColumns: 'var(--board-columns, 7fr 5fr)',
                       gap: 16,
                       flex: '1 0 auto',
                       paddingTop: 12,
@@ -3375,9 +3382,10 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                     </div>
 
                     <div
+                      className="dinner-decisions"
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gridTemplateColumns: 'var(--decision-columns, repeat(4, 1fr))',
                         gap: 12,
                       }}
                     >
@@ -3491,7 +3499,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '7fr 5fr',
+                      gridTemplateColumns: 'var(--board-columns, 7fr 5fr)',
                       gap: 16,
                       flex: '1 0 auto',
                       paddingTop: 12,
@@ -3556,6 +3564,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       >
                         {/* Recipe Card 1 */}
                         <div
+                          className="phone-stack"
                           style={{
                             flex: 1,
                             padding: '14px 18px',
@@ -3625,6 +3634,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
 
                         {/* Recipe Card 2 */}
                         <div
+                          className="phone-stack"
                           style={{
                             flex: 1,
                             padding: '14px 18px',
@@ -3706,6 +3716,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
 
                         {/* Recipe Card 3 */}
                         <div
+                          className="phone-stack"
                           style={{
                             flex: 1,
                             padding: '14px 18px',
@@ -3976,7 +3987,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
               id="ultraSlimRightRail"
               aria-label="Dinner shortcuts"
               style={{
-                width: 224,
+                width: 'var(--shortcut-width, 224px)',
                 flexShrink: 0,
                 display: 'flex',
                 flexDirection: 'column',
@@ -4404,7 +4415,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
               flex: 1,
               minHeight: 0,
               display: 'grid',
-              gridTemplateColumns: mode === 'timeline' ? '78fr 22fr' : '7fr 5fr',
+              gridTemplateColumns: mode === 'timeline' ? 'var(--board-columns, 78fr 22fr)' : 'var(--board-columns, 7fr 5fr)',
               gap: 18,
               overflow: 'hidden',
               transition: 'grid-template-columns 0.3s ease',
@@ -4416,7 +4427,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
               <section
                 className="ceramic-card"
                 style={{
-                  padding: '18px 22px',
+                  padding: 'var(--board-card-padding, 18px 22px)',
                   flex: 1,
                   minHeight: 0,
                   display: 'flex',
@@ -4426,6 +4437,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 }}
               >
                 <div
+                  className="phone-wrap"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -4522,6 +4534,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                     const timeStr = isAllDay(ev.start_time, ev.end_time) ? 'ALL DAY' : fmtEventTime(ev.start_time, eventDate);
                     return (
                       <div
+                        className="phone-wrap"
                         key={ev.id}
                         style={{
                           display: 'flex',
@@ -4611,7 +4624,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                     flexShrink: 0,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div className="phone-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div
                         style={{
@@ -4787,7 +4800,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
               <div
                 className="ceramic-card"
                 style={{
-                  padding: '18px 22px',
+                  padding: 'var(--board-card-padding, 18px 22px)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -5148,66 +5161,76 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
           </div>
         )}
 
+        </div>
+
         {/* ── Bottom Hardware Navigation Dock (Stationary tabs across all modes + 48px utility controls) ── */}
         <footer
-          className="hearth-dock"
-          style={
-            mode === 'ambient'
-              ? {
-                  borderTop: '1px solid var(--border-subtle)',
-                  paddingTop: 18,
-                  marginTop: 18,
-                }
-              : undefined
-          }
+          className={mode === 'ambient' ? 'hearth-dock ambient-dock' : 'hearth-dock'}
+          data-more-open={moreOpen}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <nav className="dock-actions" aria-label="Kitchen views and tools">
+            <button
+              className={`dock-tab dock-view ${mode === 'ambient' ? 'active' : ''}`}
+              aria-current={mode === 'ambient' ? 'page' : undefined}
+              onClick={() => openDockView('ambient')}
+            >
+              <span aria-hidden="true" className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'ambient' ? '#fff' : 'var(--terracotta)' }}>
+                home
+              </span>
+              <span className="dock-wide-label">Ambient</span>
+              <span className="dock-phone-label">Today</span>
+            </button>
+
+            <button
+              className={`dock-tab dock-view ${mode === 'dinner' ? 'active' : ''}`}
+              aria-current={mode === 'dinner' ? 'page' : undefined}
+              onClick={() => openDockView('dinner')}
+            >
+              <span aria-hidden="true" className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'dinner' ? '#fff' : 'var(--terracotta)' }}>
+                restaurant
+              </span>
+              <span className="dock-wide-label">Dinner Hub</span>
+              <span className="dock-phone-label">Dinner</span>
+            </button>
+
+            <button
+              className={`dock-tab dock-view ${mode === 'bento' || mode === 'timeline' ? 'active' : ''}`}
+              aria-current={mode === 'bento' || mode === 'timeline' ? 'page' : undefined}
+              onClick={() => openDockView('bento')}
+            >
+              <span aria-hidden="true" className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'bento' || mode === 'timeline' ? '#fff' : 'var(--cobalt)' }}>
+                checklist
+              </span>
+              <span className="dock-wide-label">Chores &amp; Schedule ({doneChores}/{state.chores.length})</span>
+              <span className="dock-phone-label">Family</span>
+            </button>
+
+            <button
+              type="button"
+              className="dock-tab dock-more"
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen(!moreOpen)}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">more_horiz</span>
+              <span>More</span>
+            </button>
+
             {betaKitchenUrl && (
               <>
-                <span className="dock-tab"><strong>Beta kitchen</strong></span>
-                <a className="dock-tab" href="/beta/groceries" style={{ minHeight: 56 }}>Groceries</a>
-                <a className="dock-tab" href={betaKitchenUrl} target="_top" referrerPolicy="no-referrer" style={{ minHeight: 56 }}>← Back to kitchen</a>
+                <span className="dock-tab dock-extra"><strong>Beta kitchen</strong></span>
+                <a className="dock-tab dock-extra" href="/beta/groceries" style={{ minHeight: 56 }}>Groceries</a>
+                <a className="dock-tab dock-extra" href={betaKitchenUrl} target="_top" referrerPolicy="no-referrer" style={{ minHeight: 56 }}>← Back to kitchen</a>
               </>
             )}
             {betaUrl && (
-              <a className="dock-tab" href={betaUrl} target="_top" referrerPolicy="no-referrer" rel="noreferrer" style={{ minHeight: 56 }}>
+              <a className="dock-tab dock-extra" href={betaUrl} target="_top" referrerPolicy="no-referrer" rel="noreferrer" style={{ minHeight: 56 }}>
                 <span className="material-symbols-outlined" aria-hidden="true">science</span>
                 <span>Beta</span>
               </a>
             )}
             <button
-              className={`dock-tab ${mode === 'ambient' ? 'active' : ''}`}
-              onClick={() => setMode('ambient')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'ambient' ? '#fff' : 'var(--terracotta)' }}>
-                home
-              </span>
-              <span>Ambient</span>
-            </button>
-
-            <button
-              className={`dock-tab ${mode === 'dinner' ? 'active' : ''}`}
-              onClick={() => setMode('dinner')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'dinner' ? '#fff' : 'var(--terracotta)' }}>
-                restaurant
-              </span>
-              <span>Dinner Hub</span>
-            </button>
-
-            <button
-              className={`dock-tab ${mode === 'bento' || mode === 'timeline' ? 'active' : ''}`}
-              onClick={() => setMode('bento')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: mode === 'bento' || mode === 'timeline' ? '#fff' : 'var(--cobalt)' }}>
-                checklist
-              </span>
-              <span>Chores &amp; Schedule ({doneChores}/{state.chores.length})</span>
-            </button>
-
-            <button
-              className="dock-tab"
-              onClick={() => openGeminiOverlay()}
+              className="dock-tab dock-extra"
+              onClick={() => { setMoreOpen(false); openGeminiOverlay(); }}
               title="Engage Gemini Voice"
             >
               <GeminiSparkIcon size={18} />
@@ -5215,7 +5238,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
             </button>
 
             <button
-              className="dock-tab"
+              className="dock-tab dock-extra"
               onClick={nprPlaying ? stopNpr : playNpr}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
@@ -5225,7 +5248,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
             </button>
 
             <button
-              className="dock-tab"
+              className="dock-tab dock-extra"
               onClick={() => actSpotify(spotify.playing ? 'pause' : 'play')}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--cobalt)' }}>
@@ -5235,9 +5258,9 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 {spotify.playing ? `Spotify: ${spotify.track?.slice(0, 16) || 'Playing'}` : 'Spotify'}
               </span>
             </button>
-          </div>
+          </nav>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="dock-utilities">
             <ThemeToggle defaultTheme="light" />
             <a
               href="/guide"

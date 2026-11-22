@@ -655,3 +655,127 @@ select {
 .btn.red { background: var(--danger-surface); border-color: var(--danger-border); color: var(--danger-text); }
 .btn.ghost { background: transparent; box-shadow: none; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* The wall display keeps its fixed frame and independently scrolling panels. */
+.hearth-content { display: contents; }
+.ambient-grid {
+  display: grid;
+  grid-template-columns: 55fr 45fr;
+  gap: 24px;
+  min-height: 500px;
+  max-height: 720px;
+  height: 76vh;
+}
+.glance-card { padding: 44px 48px; }
+.glance-clock { font-size: clamp(96px, 9.2vw, 138px); }
+.dock-actions, .dock-utilities {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dock-actions { flex-wrap: wrap; }
+.ambient-dock { border-top-color: var(--border-subtle); margin-top: 18px; padding-top: 18px; }
+.dock-more, .dock-phone-label { display: none; }
+
+@media (max-width: 760px), (max-width: 960px) and (max-height: 500px) {
+  .hearth-canvas {
+    height: 100dvh;
+    padding: 0;
+    --board-card-padding: 16px;
+    --board-columns: minmax(0, 1fr);
+    --decision-columns: repeat(2, minmax(0, 1fr));
+    --shortcut-width: 100%;
+  }
+  .hearth-shell {
+    gap: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    backdrop-filter: none;
+  }
+  .hearth-topbar {
+    justify-content: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .hearth-topbar > div { flex-wrap: wrap; justify-content: center; }
+  .hearth-content {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 12px max(12px, env(safe-area-inset-right)) 16px max(12px, env(safe-area-inset-left));
+    overflow-wrap: break-word;
+  }
+  .ambient-grid {
+    grid-template-columns: var(--board-columns);
+    gap: 12px;
+    min-height: 0;
+    max-height: none;
+    height: auto;
+  }
+  .glance-card { padding: 20px; }
+  .glance-clock { font-size: clamp(52px, 15vw, 74px); }
+  .dinner-layout { flex-direction: column; }
+  .phone-wrap { flex-wrap: wrap; gap: 8px; }
+  .phone-stack { flex-direction: column; align-items: stretch !important; }
+  .phone-stack > button { align-self: flex-start; }
+  .recipe-facts { max-width: 100%; }
+  .dinner-decisions > button { flex-direction: column; padding: 10px !important; }
+  .ambient-decisions > button { min-height: 64px !important; padding: 10px 14px !important; }
+  .dinner-guide { gap: 12px; }
+  .hearth-content button { max-width: 100%; }
+  .hearth-content button, .hearth-content input { min-height: 44px; }
+  .hearth-content input { min-width: 0; }
+  .hearth-content .material-symbols-outlined,
+  .hearth-dock .material-symbols-outlined {
+    width: 1em;
+    flex: none;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .hearth-dock {
+    display: block;
+    max-height: 48dvh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 6px max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    background: var(--surface-tint);
+  }
+  .dock-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .dock-view, .dock-more {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-height: 52px;
+    padding: 4px;
+    border-radius: 12px;
+    font-size: .76rem;
+  }
+  .dock-tab.active { text-transform: none; letter-spacing: normal; }
+  .dock-wide-label, .dock-extra, .dock-utilities { display: none; }
+  .dock-phone-label { display: inline; }
+  .hearth-dock[data-more-open="true"] .dock-extra {
+    display: flex;
+    grid-column: span 2;
+    order: 1;
+    justify-content: center;
+    padding: 7px;
+  }
+  .hearth-dock[data-more-open="true"] .dock-utilities {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 2px;
+  }
+  .dock-utilities [aria-label="Sleep Display"] { display: none; }
+  .gemini-voice-overlay-backdrop { padding: 10px; }
+  .gemini-voice-card { max-height: calc(100dvh - 20px); overflow: auto; padding: 16px; }
+  .gemini-eq-pill { display: none; }
+}

@@ -2,6 +2,8 @@
 
 Unified **24" Cozyla wall console** + **Slack-first home organization** for **Daniela, Warren, and Wesley**.
 
+On iPhone, open the family kitchen in Safari and use **Share → Add to Home Screen**. Enable **Open as Web App** if offered. The phone uses the same site and household data as the wall display. Use **Today**, **Dinner**, and **Family** in the bottom bar. **More** opens the other kitchen controls.
+
 The [Beta kitchen](docs/BETA-DEVELOPMENT.md) runs the shared board and experimental grocery list against its own database. The family display links to Beta.
 
 See [testing and PR checks](docs/TESTING.md) for unit, database and browser coverage. For the grocery connector, see the [implementation plan](docs/GROCERY-FLOW-PLAN.md) and [local development guide](docs/LOCAL-DEVELOPMENT.md).
