@@ -108,6 +108,38 @@ test('rechecks the reaction, channel, message, sender and receipt before merging
   }
 });
 
+test('Slack display labels and Block Kit approval messages survive readback', async () => {
+  const { io, state, input } = fixture();
+  await scan(io);
+  approve(state);
+  const msg = state.messages[0].message;
+  const review = msg.text.replace('<@U3>', '<@U3|daniela>');
+  msg.text = '';
+  msg.blocks = [
+    { type: 'section', text: { type: 'plain_text', text: state.pr.title } },
+    { type: 'section', text: { type: 'mrkdwn', text: review } },
+  ];
+  await scan(io);
+  assert.equal(state.dispatches.length, 1);
+  for (const changed of [review.replace('U3|daniela', 'U4|daniela'), review.replace(sha, 'c'.repeat(40)),
+    review.replace('PR #7', 'PR #9'), review + ' edited']) {
+    msg.blocks[1].text.text = changed;
+    assert.equal(await mergeApproved(io, input), undefined);
+    assert.equal(state.merges.length, 0);
+  }
+  msg.blocks[1].text.text = review;
+  assert.equal(await mergeApproved(io, input), mergeSha);
+});
+
+test('Slack can add the approver display label to a text-only readback', async () => {
+  const { io, state, input } = fixture();
+  await scan(io);
+  approve(state);
+  const msg = state.messages[0].message;
+  msg.text = msg.text.replace('<@U3>', '<@U3|daniela>');
+  assert.equal(await mergeApproved(io, input), mergeSha);
+});
+
 test('respects GitHub mergeability, closed PRs, other authors, forks and other base branches', async () => {
   const { io, state, input } = fixture();
   await scan(io);
