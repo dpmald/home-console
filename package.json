@@ -18,7 +18,10 @@
     "dev:beta": "node scripts/grocery-ui-preview.mjs --beta",
     "test:beta": "node --import tsx --test tests/beta-deployment.test.ts && node --test tests/beta-navigation.test.mjs",
     "test:grocery-flow-db": "node --import tsx scripts/grocery-flow-check.ts",
-    "build:grocery-check": "node scripts/grocery-safe-build.mjs"
+    "build:grocery-check": "node scripts/grocery-safe-build.mjs",
+    "test": "node --import tsx --test tests/*.test.ts tests/beta-navigation.test.mjs .github/scripts/*.test.mjs",
+    "test:integration": "node scripts/test-beta.mjs",
+    "test:context": "node --import tsx scripts/check-context.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
@@ -35,6 +38,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "playwright-core": "1.65.1",
     "tsx": "^4.23.15",
     "typescript": "^5.8.0"
   }

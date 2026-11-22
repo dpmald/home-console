@@ -2,14 +2,9 @@
 
 Unified **24" Cozyla wall console** + **Slack-first home organization** for **Daniela, Warren, and Wesley**.
 
-The separate [Beta area](docs/BETA-DEVELOPMENT.md) contains experimental groceries
-and a persistent Back to kitchen button. The stable kitchen only needs the small
-launcher change on `codex/beta-launcher`; do not merge experiments to enable it.
+The [Beta kitchen](docs/BETA-DEVELOPMENT.md) runs the shared board and experimental grocery list against its own database. The family display links to Beta.
 
-For the grocery-request feature, start with [the implementation plan and verification](docs/GROCERY-FLOW-PLAN.md)
-and [isolated local development](docs/LOCAL-DEVELOPMENT.md). These document the touchscreen/voice
-request list, Claude MCP contract, synthetic preview and production rollout prerequisites.
-The original hosted setup below does not activate the new grocery RPCs by itself.
+See [testing and PR checks](docs/TESTING.md) for unit, database and browser coverage. For the grocery connector, see the [implementation plan](docs/GROCERY-FLOW-PLAN.md) and [local development guide](docs/LOCAL-DEVELOPMENT.md).
 
 ---
 

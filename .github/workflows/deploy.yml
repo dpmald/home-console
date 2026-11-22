@@ -31,6 +31,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
+      actions: read
     outputs:
       merge_sha: ${{ steps.merge.outputs.merge_sha }}
     steps:

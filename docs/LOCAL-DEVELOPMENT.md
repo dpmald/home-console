@@ -37,11 +37,11 @@ Validation commands:
 npm run test:groceries
 npm run typecheck
 npm run test:grocery-flow-db
-node --import tsx scripts/grocery-ui-smoke.ts
+npm run test:integration
 npm run build:grocery-check
 ```
 
-The HTTP smoke needs the port 3004 server. Stop this worktree's development server
+The [integration suite](TESTING.md) starts its own disposable Beta server and database. Stop this worktree's development server
 before the production build because both use .next. Database tests use rollback
 fixtures and a disposable synthetic database, never production. They do not prove
 hosted PostgREST, Supabase Realtime, physical Cozyla audio or Instacart operations.

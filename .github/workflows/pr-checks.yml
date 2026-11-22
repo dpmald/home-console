@@ -1,0 +1,69 @@
+name: Kitchen PR checks
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+permissions:
+  contents: read
+concurrency:
+  group: kitchen-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: Unit tests, types and project guides
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run test:context
+  integration:
+    name: Beta database, HTTP and dinner reload
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+  build:
+    name: Offline build and browser regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:grocery-check
+      # Includes the Dinner Hub touch regression when PR #6 joins the tree.
+      - run: node --test tests/*.test.mjs
+  required:
+    name: Kitchen quality gate
+    runs-on: ubuntu-latest
+    needs: [fast, integration, build]
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Require all three jobs to pass
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: jq -e 'length == 3 and all(. == "success")' <<< "$RESULTS"

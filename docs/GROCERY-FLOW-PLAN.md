@@ -134,7 +134,7 @@ and icons. Browser audio/assets can still use the network.
 npm run test:groceries
 npm run typecheck
 npm run test:grocery-flow-db
-node --import tsx scripts/grocery-ui-smoke.ts   # while port 3004 is running
+npm run test:integration                       # starts a disposable Beta
 npm run build:grocery-check                  # with this worktree's dev server stopped
 ```
 

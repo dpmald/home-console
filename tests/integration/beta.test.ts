@@ -1,0 +1,80 @@
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { execFileSync, fork } from 'node:child_process';
+import test from 'node:test';
+import { chromium } from 'playwright-core';
+import { checkGroceryFlow } from '../../scripts/grocery-ui-smoke';
+
+test('disposable Beta kitchen', { timeout: 240000 }, async t => {
+  const database = new URL(process.env.HOME_CONSOLE_PR_DATABASE_URL || '');
+  assert.equal(database.host, '127.0.0.1:55442');
+  assert.equal(database.pathname, '/home_console_pr_test');
+  assert.equal(database.href, process.env.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL);
+  const deviceKey = process.env.KIOSK_ACCESS_TOKEN!;
+  const server = fork('tests/integration/server.mjs', { execArgv: [], silent: false });
+  const exited = once(server, 'exit');
+  t.after(async () => {
+    if (server.exitCode === null && server.signalCode === null) server.kill();
+    await exited;
+  });
+  const origin = await Promise.race([
+    once(server, 'message').then(([value]) => String(value)),
+    exited.then(() => { throw new Error('Beta test server exited before startup'); }),
+  ]);
+
+  await t.test('Beta screens and API boundaries', () => {
+    execFileSync(process.execPath, ['scripts/beta-http-check.mjs', new URL(origin).port], {
+      stdio: 'inherit', env: { ...process.env, HOME_CONSOLE_PR_DEVICE_KEY: deviceKey },
+    });
+  });
+
+  await t.test('device add, retry, agent completion and list readback through real HTTP routes', () =>
+    checkGroceryFlow(origin, deviceKey, process.env.HOME_CONSOLE_GROCERY_AGENT_KEY!));
+
+  await t.test('a touch claim keeps the same cook and recipe after a page reload', async t => {
+    const browser = await chromium.launch({ channel: 'chrome' });
+    t.after(() => browser.close());
+    const page = await browser.newPage({ hasTouch: true, viewport: { width: 1280, height: 720 } });
+    await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    const login = await page.goto(origin + '/beta?key=' + deviceKey);
+    assert.equal(login?.status(), 200);
+    const state = async () => {
+      const response = await page.request.get(origin + '/api/kiosk');
+      assert.equal(response.status(), 200);
+      return (await response.json()).dinner;
+    };
+    assert.equal((await state()).chef, 'unclaimed');
+    await page.getByRole('button', { name: /Dinner Hub/ }).last().tap();
+    await page.getByRole('button', { name: /Warren.s cooking/i }).tap();
+    const meal = 'Synthetic dinner for the reload test';
+    await page.getByPlaceholder(/Charcuterie Board/).fill(meal);
+    const saved = page.waitForResponse(r => r.url() === origin + '/api/kiosk' && r.request().method() === 'POST');
+    await page.getByRole('button', { name: /Open Step-by-Step Recipe/ }).tap();
+    const response = await saved;
+    assert.equal(response.status(), 200, 'claim must be accepted by the API');
+    assert.equal((await response.json()).dinner.chef, 'warren');
+    assert.equal((await page.reload())?.status(), 200);
+    await page.getByText('WARREN LEAD', { exact: true }).waitFor();
+    await page.getByText(meal, { exact: true }).first().waitFor();
+    const dinner = await state();
+    assert.equal(dinner.chef, 'warren');
+    assert.equal(dinner.recipe_name, meal);
+    assert.equal(dinner.status, 'planned');
+    assert.equal(dinner.claimed_via, 'kiosk');
+  });
+
+  await t.test('a held proposal adds nothing and a repeated approval adds the recipe only once', async () => {
+    const { proposeCart, decideProposal } = await import('../../lib/cart');
+    const { listBacklog } = await import('../../lib/domain');
+    const input = { recipes: [{ name: 'Synthetic soup', ingredients: [{ name: 'carrot' }] }],
+      include_household_requests: false };
+    const held = (await proposeCart(input)).proposal;
+    assert.equal(held.status, 'pending');
+    assert.equal((await decideProposal(held.id, false, 'fixture')).status, 'rejected');
+    assert.equal((await decideProposal(held.id, true, 'fixture')).status, 'rejected');
+    assert.deepEqual(await listBacklog(), []);
+    const next = (await proposeCart(input)).proposal;
+    for (let i = 0; i < 2; i++) assert.equal((await decideProposal(next.id, true, 'fixture')).status, 'approved');
+    assert.deepEqual((await listBacklog()).map(row => row.source_proposal_id), [next.id]);
+  });
+});

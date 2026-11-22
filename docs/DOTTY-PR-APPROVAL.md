@@ -15,7 +15,7 @@ When Warren opens a pull request from a branch in this repository into `main`, D
 
 ## How the merge is verified
 
-The Actions job uses the workflow and scripts from the base branch. It records Dotty’s Slack message timestamp on the PR, then reads that message again immediately before merging. The message must be in the configured channel, from Dotty, for this PR, commit and review round, with Daniela’s reaction still present. GitHub also checks that the head commit matches when accepting the merge.
+The Actions job uses the workflow and scripts from the base branch. It records Dotty’s Slack message timestamp on the PR, then reads that message again immediately before merging. The message must be in the configured channel, from Dotty, for this PR, commit and review round, with Daniela’s reaction still present. Dotty requires a successful Kitchen PR checks run for this PR, reviewed commit and target revision. GitHub checks that the head commit still matches when accepting the merge. See [Testing Home Console](TESTING.md) for the manual merge requirement.
 
 Pushes to `main` continue to use the existing Vercel deployment. GitHub suppresses push workflows for merges made using its built-in Actions token, so Dotty dispatches the deployment workflow explicitly. That workflow verifies the approval, merges, and passes the resulting commit to its Vercel job. [GitHub workflow triggering rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)
 

@@ -10,7 +10,9 @@ main before starting; check open PRs before overlapping work. Coordinate edits t
 KioskBoard, globals.css, shared types/domain, package files and migrations. Preserve
 other contributors' changes; do not force-push a shared branch.
 
-For this feature read docs/GROCERY-FLOW-PLAN.md, docs/LOCAL-DEVELOPMENT.md and the
+For test setup, merge checks and context review, follow [Testing Home Console](TESTING.md).
+
+For the grocery feature read docs/GROCERY-FLOW-PLAN.md, docs/LOCAL-DEVELOPMENT.md and the
 MCP contract/tool schema. Start with synthetic data, run focused checks and share
 the feature branch for review. Screenshots must contain only synthetic data when
 committed to this public repository.

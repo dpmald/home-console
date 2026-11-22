@@ -48,6 +48,15 @@ async function reacted(io, state) {
   return approved(data, state.ts, io.config, state.text);
 }
 
+async function checksPassed(io, pr) {
+  const path = '/actions/workflows/pr-checks.yml/runs?event=pull_request&head_sha=' + pr.head.sha;
+  const { workflow_runs: runs } = await io.gh(path);
+  // GitHub lists newest runs first. An older success cannot clear a later failure or rerun.
+  const latest = runs.find(run => run.head_sha === pr.head.sha && run.head_repository?.full_name === repo &&
+    run.pull_requests.some(link => link.number === pr.number && link.base.sha === pr.base.sha));
+  return latest?.status === 'completed' && latest.conclusion === 'success';
+}
+
 export async function scan(io) {
   const pulls = await io.pages('/pulls?state=open&base=main');
   const failures = [];
@@ -69,7 +78,7 @@ export async function scan(io) {
         await io.gh('/issues/' + pr.number + '/comments', 'POST', {
           body: '<!-- ' + state.key + ' ' + sent.ts + ' -->\n' + note + ' in Slack for ' + pr.head.sha + '.',
         });
-      } else if (!pr.draft && await reacted(io, state)) {
+      } else if (!pr.draft && await reacted(io, state) && await checksPassed(io, pr)) {
         await io.gh('/actions/workflows/deploy.yml/dispatches', 'POST', {
           ref: 'main', inputs: {
             pr_number: String(pr.number), head_sha: pr.head.sha, receipt_id: String(state.receipt.id),
@@ -90,6 +99,7 @@ export async function mergeApproved(io, { number, sha, receiptId }) {
   if (!eligible(pr) || pr.draft || pr.head.sha !== sha) return;
   const state = await review(pr, io);
   if (!state.receipt || String(state.receipt.id) !== receiptId || !await reacted(io, state)) return;
+  if (!await checksPassed(io, pr)) return;
   if (pr.mergeable !== true || pr.mergeable_state !== 'clean') {
     throw Error('GitHub has not cleared PR #' + number + ' for merging: ' + pr.mergeable_state);
   }

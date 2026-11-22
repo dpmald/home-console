@@ -9,8 +9,10 @@ const config = { channel: 'C1', bot: 'U2', approver: 'U3' };
 
 function fixture() {
   const pr = { number: 7, title: 'Kitchen change', state: 'open', user: { login: 'warrenmacdonald' },
-    base: { ref: 'main', repo }, head: { sha, repo }, draft: false, mergeable: true, mergeable_state: 'clean' };
-  const state = { pr, events: [], comments: [], messages: [], dispatches: [], merges: [] };
+    base: { ref: 'main', sha: 'b'.repeat(40), repo }, head: { sha, repo }, draft: false, mergeable: true, mergeable_state: 'clean' };
+  const run = { head_sha: sha, head_repository: repo, pull_requests: [{ number: 7, base: { sha: pr.base.sha } }],
+    status: 'completed', conclusion: 'success' };
+  const state = { pr, runs: [run], events: [], comments: [], messages: [], dispatches: [], merges: [] };
   const io = {
     config,
     async pages(path) {
@@ -20,7 +22,9 @@ function fixture() {
       assert.fail(path);
     },
     async gh(path, method, body) {
-      if (path === '/issues/7/comments' && method === 'POST') {
+      if (path.startsWith('/actions/workflows/pr-checks.yml/runs?event=pull_request&head_sha=')) {
+        return { workflow_runs: state.runs };
+      } else if (path === '/issues/7/comments' && method === 'POST') {
         state.comments.push({ id: state.comments.length + 1, user: { login: 'github-actions[bot]' }, ...body });
       } else if (path === '/actions/workflows/deploy.yml/dispatches' && method === 'POST') {
         state.dispatches.push(body);
@@ -140,4 +144,21 @@ test('a concurrent push rejected by GitHub produces no deploy SHA', async () => 
     return gh(path, method, body);
   };
   await assert.rejects(mergeApproved(io, input), /409/);
+});
+
+test('Slack approval waits for this PR and commit to pass, including a recheck immediately before merge', async () => {
+  for (const change of [
+    s => { s.runs = []; }, s => { s.runs.unshift({ ...s.runs[0], conclusion: 'failure' }); },
+    s => { s.runs[0].status = 'in_progress'; }, s => { s.runs[0].head_sha = 'c'.repeat(40); },
+    s => { s.runs[0].pull_requests[0].number = 99; }, s => { s.pr.base.sha = 'd'.repeat(40); },
+  ]) {
+    const { io, state, input } = fixture();
+    await scan(io);
+    approve(state);
+    change(state);
+    await scan(io);
+    assert.deepEqual(state.dispatches, []);
+    assert.equal(await mergeApproved(io, input), undefined);
+    assert.deepEqual(state.merges, []);
+  }
 });
