@@ -11,6 +11,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test:dinner-scroll": "npm run build:grocery-check && node --test tests/dinner-scroll.test.mjs",
     "test:groceries": "node --import tsx --test tests/grocery*.test.ts",
     "db:groceries": "node scripts/grocery-dev-setup.mjs",
     "dev:groceries": "node --import tsx scripts/grocery-dev-server.ts",
@@ -35,6 +36,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "playwright-core": "^1.65.1",
     "tsx": "^4.23.15",
     "typescript": "^5.8.0"
   }
