@@ -28,8 +28,23 @@ test('disposable Beta kitchen', { timeout: 240000 }, async t => {
     });
   });
 
-  await t.test('device add, retry, agent completion and list readback through real HTTP routes', () =>
-    checkGroceryFlow(origin, deviceKey, process.env.HOME_CONSOLE_GROCERY_AGENT_KEY!));
+  await t.test('the grocery screen accepts a typed item and refreshes verified cart results automatically', async t => {
+    const browser = await chromium.launch({ channel: 'chrome' });
+    t.after(() => browser.close());
+    const page = await browser.newPage({ hasTouch: true, viewport: { width: 1920, height: 1080 } });
+    await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    assert.equal((await page.goto(origin + '/beta/groceries?key=' + deviceKey))?.status(), 200);
+    await page.getByLabel('Item name').fill('Synthetic household turkey');
+    await page.getByLabel('Quantity', { exact: true }).fill('1');
+    await page.getByRole('button', { name: 'Add to shared list' }).tap();
+    await page.getByRole('listitem').filter({ hasText: 'Synthetic household turkey' }).getByText('Pending').waitFor();
+
+    await checkGroceryFlow(origin, deviceKey, process.env.HOME_CONSOLE_GROCERY_AGENT_KEY!);
+    const verified = page.getByRole('listitem').filter({ hasText: 'SIMULATED-MILK' });
+    // The display shows the matched product name, package and count, while IDs stay internal.
+    await page.getByText(/Morton Williams Supermarket.*Synthetic milk \(1 carton\) × 2/).waitFor({ timeout: 20000 });
+    assert.equal(await verified.count(), 0);
+  });
 
   await t.test('a touch claim keeps the same cook and recipe after a page reload', async t => {
     const browser = await chromium.launch({ channel: 'chrome' });

@@ -36,6 +36,10 @@ See [testing and PR checks](docs/TESTING.md) for unit, database and browser cove
 3. Invite `@antigravity` to `#logistics`, `#food`, and `#calendar`.
 4. Copy Daniela's and Warren's Slack Member IDs into `SLACK_USER_DANIELA` and `SLACK_USER_WARREN`.
 
+### Shared household grocery requests
+
+Open **Dinner Hub → Shared grocery list** on the family display, or **Groceries** on Beta. Unlock the browser once, then enter an item and quantity. The worker checks every two minutes while Legion is awake, signed in and online. **Pending** means the list accepted the request. **In cart** shows the product and package count Instacart confirmed at the selected store. Recipe preferences apply to meals Claude picks. Warren checks out in Instacart. See [Beta device access and configuration](docs/BETA-DEVELOPMENT.md) and [worker setup](scripts/grocery-cart-poller/README.md).
+
 ### 3. Warren's Saturday Recipe Agent
 - **Before picking recipes (optional):**
   `GET /api/recipes/context` with `Authorization: Bearer $RECIPE_AGENT_API_KEY` → returns current `fridge_backlog` + `household_requests`.
@@ -57,7 +61,7 @@ See [testing and PR checks](docs/TESTING.md) for unit, database and browser cove
     ]
   }
   ```
-- Poll `GET /api/recipes/proposals/:id` (or set `RECIPE_AGENT_CALLBACK_URL`) and only place the grocery order when `status === "approved"`.
+- Poll `GET /api/recipes/proposals/:id` (or set `RECIPE_AGENT_CALLBACK_URL`) to observe the meal proposal decision. Warren handles checkout.
 
 ### 4. n8n Calendar Bridge (Warren's Outlook + Daniela's Google Calendar)
 Create an n8n workflow running every 10 minutes:

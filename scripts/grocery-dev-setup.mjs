@@ -76,9 +76,13 @@ try {
     } catch (error) { await client.query('rollback'); throw error; }
   }
   if (process.argv.includes('--seed')) {
+    await client.query('begin');
+    await client.query("insert into public.grocery_cart_actor_scope(backend_pid,transaction_id,actor) values(pg_backend_pid(),pg_current_xact_id(),'device')");
     await client.query(`insert into public.grocery_items(id,name,quantity,added_by,notes) values
       ('00000000-0000-4000-8000-000000000101','Synthetic test milk','2 packages','Development fixture','Synthetic request; never use a real cart'),
       ('00000000-0000-4000-8000-000000000102','Synthetic test paper towels',null,'Development fixture','Synthetic request; never use a real cart') on conflict(id) do nothing`);
+    await client.query('delete from public.grocery_cart_actor_scope where backend_pid=pg_backend_pid() and transaction_id=pg_current_xact_id()');
+    await client.query('commit');
   }
   console.log('Dedicated grocery database ready at 127.0.0.1:55432. Synthetic data only.');
   console.log('Credential file: .env.grocery-dev.local (ignored by Git; values not printed).');

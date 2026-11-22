@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { kioskCookieName } from './lib/kiosk-cookie';
-import { isBetaDeployment, isBetaPathAllowed } from './lib/beta-deployment';
+import { isBetaDeployment, isBetaPathAllowed, isPublicHostedBeta } from './lib/beta-deployment';
 
 export function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
@@ -13,6 +13,14 @@ export function middleware(req: NextRequest) {
   }
   // MCP uses its dedicated agent credential, never a device cookie.
   if (pathname === '/api/mcp') return NextResponse.next();
+  if (isPublicHostedBeta()) {
+    if (req.method === 'GET' && req.nextUrl.searchParams.has('key')) {
+      const clean = req.nextUrl.clone();
+      clean.searchParams.delete('key');
+      return NextResponse.redirect(clean, { headers: { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' } });
+    }
+    return NextResponse.next();
+  }
   const COOKIE = kioskCookieName();
   const token = process.env.KIOSK_ACCESS_TOKEN;
   if (!token && (beta || pathname.startsWith('/api/groceries') || pathname.startsWith('/api/voice'))) {

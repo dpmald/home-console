@@ -6,7 +6,8 @@ import test from 'node:test';
 import { chromium } from 'playwright-core';
 
 // Run with npm run test:dinner-scroll, using the offline build and installed Chrome.
-test('Dinner Hub accepts touch swipes on the guide, shortcuts and nested recipe lists', async (t) => {
+test('the kitchen supports Dinner Hub touch navigation and opens shared grocery requests on the configured Beta', async (t) => {
+  process.env.NODE_ENV = 'production';
   for (const [, name] of readFileSync('.env.example', 'utf8').matchAll(/^([A-Z][A-Z0-9_]*)=/gm)) {
     process.env[name] = '';
   }
@@ -54,6 +55,9 @@ test('Dinner Hub accepts touch swipes on the guide, shortcuts and nested recipe 
 
   await page.goto(origin);
   await page.getByRole('button', { name: /Dinner Hub/ }).last().tap();
+  const listLink = page.getByRole('link', { name: 'Shared grocery list' });
+  const expectedListUrl = 'https://beta.example.test/beta/groceries';
+  assert.equal(await rail.getByRole('link', { name: 'Shared grocery list' }).getAttribute('href'), expectedListUrl);
   const dockY = (await dock.boundingBox()).y;
   await swipeUp(guide);
   assert.equal(await top(rail), 0);
@@ -82,4 +86,25 @@ test('Dinner Hub accepts touch swipes on the guide, shortcuts and nested recipe 
   assert.equal(await top(guide), 0);
   await swipeUp(guide);
   assert.equal((await dock.boundingBox()).y, dockY);
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto(origin);
+  await dock.getByRole('button', { name: /Chores & Schedule/ }).tap();
+  const pantry = page.getByText(/^Kitchen-only pantry list/);
+  const pantryItem = page.getByRole('textbox', { name: 'Kitchen pantry item' });
+  assert.equal(await pantryItem.isVisible(), false);
+  await pantry.tap();
+  assert.equal(await pantryItem.count(), 0);
+  assert.equal(await listLink.getAttribute('target'), '_top');
+  assert.equal(await listLink.getAttribute('referrerpolicy'), 'no-referrer');
+  await page.route(expectedListUrl, route => route.fulfill({ contentType: 'text/html', body: '<h1>Beta grocery fixture</h1>' }));
+  await listLink.tap();
+  await page.waitForURL(expectedListUrl);
+
+  // Disabling Beta still leaves the regular pantry form usable.
+  process.env.HOME_CONSOLE_BETA_URL = 'off';
+  await page.goto(origin);
+  await dock.getByRole('button', { name: /Chores & Schedule/ }).tap();
+  assert.equal(await listLink.count(), 0);
+  assert.equal(await pantryItem.isVisible(), true);
 });

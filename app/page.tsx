@@ -28,5 +28,7 @@ export default async function HomePage() {
   } catch {}
 
   const host = (await headers()).get('host');
-  return <KioskBoard initial={state} initialWeather={weather} betaUrl={getBetaDestination(process.env, host)} />;
+  const betaUrl = getBetaDestination(process.env, host);
+  return <KioskBoard initial={state} initialWeather={weather} betaUrl={betaUrl}
+    allowPantryEntry={!betaUrl && (process.env.NODE_ENV !== 'production' || process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1')} />;
 }

@@ -1,6 +1,6 @@
 // Server-side execution of voice tool calls.
 import {
-  addBacklogItem, addGrocery, assignLogistics, claimDinner, cookFromBacklog, fuzzyFind,
+  addBacklogItem, assignLogistics, claimDinner, cookFromBacklog, fuzzyFind,
   getKitchenState, listBacklog, listChores, eventsForDate, markDinnerCooked, setBacklogStatus,
   setNotTonight, toggleChore,
 } from '../domain';
@@ -31,7 +31,7 @@ export async function executeVoiceTool(name: string, args: Record<string, any>):
           .filter((e) => e.logistics_type !== 'general')
           .map((e) => `${fmtTime(e.start_time)} ${e.title} — ${e.assigned_parent === 'unassigned' ? 'NO OWNER' : NAMES[e.assigned_parent]}`),
         conflicts: s.conflicts.map((c) => c.message),
-        grocery_list: s.groceries.map((g) => g.name),
+        kitchen_pantry: s.groceries.map((g) => g.name),
       });
     }
 
@@ -76,11 +76,6 @@ export async function executeVoiceTool(name: string, args: Record<string, any>):
         added_by: 'voice',
       });
       return ok({ ok: true, added: item.recipe_or_item_name }, true);
-    }
-
-    case 'add_grocery_item': {
-      const g = await addGrocery(String(args.name), args.quantity ? String(args.quantity) : null, 'voice');
-      return ok({ ok: true, added: g.name, note: "Added to Saturday's list. Checkout remains manual." });
     }
 
     case 'set_chore_done': {

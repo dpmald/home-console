@@ -141,7 +141,6 @@ export default function InteractiveGuidePage() {
                 ['“Set a 12 minute pasta timer”', 'Starts a countdown that chimes and speaks when done'],
                 ['“Warren is cooking the salmon tonight”', 'Claims dinner + links the salmon backlog item'],
                 ['“I can’t cook tonight”', 'Marks you as “Not tonight” in Slack and on the wall'],
-                ['“Add paper towels to the shopping cart”', 'Adds to Next Grocery Order for Saturday’s cart'],
                 ['“We cooked the lemon pasta”', 'Clears it from the fridge backlog'],
                 ['“Daniela has the soccer pickup”', 'Assigns the pickup and clears the conflict banner'],
                 ['“Check off make bed for Wesley”', 'Marks Wesley’s chore complete for today'],
@@ -153,6 +152,9 @@ export default function InteractiveGuidePage() {
                   </div>
                 </div>
               ))}
+              <p className="row-meta" style={{ marginTop: 12 }}>
+                For shared Instacart requests, open <strong>Dinner Hub → Shared grocery list</strong> and enter the item and quantity. Check the list for the cart receipt.
+              </p>
             </div>
           </div>
         )}

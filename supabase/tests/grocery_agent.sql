@@ -2,6 +2,8 @@
 -- Requires 0001 and 0004 (and the bootstrap on plain PostgreSQL). All fixtures
 -- are rolled back; no external integration is called.
 begin;
+insert into public.grocery_cart_actor_scope(backend_pid,transaction_id,actor)
+  values(pg_backend_pid(),pg_current_xact_id(),'device');
 do $$
 declare
   prefix text := 'test-' || gen_random_uuid()::text;

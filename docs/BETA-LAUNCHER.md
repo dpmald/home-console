@@ -2,8 +2,7 @@
 
 On the Cozyla, open the [family kitchen](https://home-console-pied.vercel.app/) and
 tap **Beta** in the bottom dock. This production hostname links to the
-[shared Beta](https://home-console-beta.vercel.app/beta) by default. The first visit
-asks for the separate Beta device key. Inside Beta, tap **Back to kitchen** to return.
+[shared Beta](https://home-console-beta.vercel.app/beta) by default. Public Beta viewing opens directly. Grocery entry uses the separate Beta device key once per browser. Inside Beta, tap **Back to kitchen** to return.
 
 A valid public HTTPS URL in `HOME_CONSOLE_BETA_URL` overrides the default.
 Set the value to `off` to hide the link. Other hosted kitchens show the link
@@ -25,6 +24,11 @@ features and return link. Provision its device login independently; never put
 the stable kiosk key in the Beta URL. Configure the beta build's return target
 to the normal kitchen's public address. This launcher alone does not create,
 deploy or authenticate the beta app.
+
+For shared Instacart requests, tap **Shared grocery list** in **Dinner Hub** or
+**Chores & Schedule**. This opens the grocery screen on the configured Beta
+host. The family kitchen's **Kitchen-only pantry list** shows its previously saved
+items. New shared requests use the hosted form. Both entry points use the same device-authorized requests and cart receipts. Enabling public viewing leaves grocery changes restricted. Family production voice can forward newly spoken requests to the same fixed Beta endpoint when the stable server has `HOME_CONSOLE_SHARED_GROCERY_DEVICE_KEY` set to the Beta device key. Without it, voice points to the shared form.
 
 Check the destination rules with:
 
