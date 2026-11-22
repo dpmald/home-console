@@ -36,7 +36,8 @@ if (values.item) {
     console.log('Latest matching request:', match.name, '×', match.quantity, '·', state);
     if (match.result?.product_name) {
       console.log('Recorded retailer result:', match.result.retailer, '·', match.result.product_name,
-        match.result.product_size || '', '×', match.result.product_quantity ?? '?');
+        match.result.product_size || '', '×', match.result.product_quantity ?? '?',
+        match.result.product_quantity_type === 'weight' ? '· sold by weight' : '');
     }
     if (match.result?.reason) console.log('Reason:', match.result.reason);
     if (state !== 'in_cart' || !match.result?.product_name || !(match.result.product_quantity > 0)) process.exitCode = 1;

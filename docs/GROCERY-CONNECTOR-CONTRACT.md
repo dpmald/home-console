@@ -6,6 +6,8 @@ The family kitchen and hosted Beta link to one shared grocery list. Once a brows
 
 For a name such as "turkey" and a quantity of one, use the retailer's first matching product and add one package. Preserve any variety, brand, or size the household specifies. For an explicit size, use the provider's product search to identify the requested package before adding. Record the product and quantity the provider actually confirmed. Surface unavailable products and uncertain results on the originating console row. A lost response is grounds to reconcile the original cart before any further addition.
 
+The retailer can return a quantity marked as sold by weight without a package size or weight unit. Show the reported quantity and selling basis. Name a weight unit only when the provider supplies it.
+
 Use Wegmans when its cart already contains items. If a successful read shows it empty, use Morton Williams Supermarket. Keep the chosen store for the run. An unreadable Wegmans cart cannot establish that it is empty. The provider identifies the retailer and cart contents. The Instacart family account controls which carts its members can see.
 
 Only a household-authorized revision may start a new cart addition. Older public requests can be confirmed individually on the list. The checkout and order proposal approval workflows remain separate. The hosted list can receive requests while the worker is offline and displays **In cart** only when there is a recorded cart result.
