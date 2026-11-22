@@ -6,7 +6,7 @@ $target = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Home
 $null = New-Item -Path $target -ItemType Directory -Force
 $python = (Get-Command pythonw.exe -ErrorAction Stop).Source
 if (!(Test-Path -LiteralPath $QueueHelper -PathType Leaf)) { throw 'Supply the approved queue helper path.' }
-foreach ($file in 'grocery_worker.py','provider.py','Read-QueueUtf8.ps1') {
+foreach ($file in 'grocery_worker.py','provider.py','Read-QueueUtf8.ps1','recover_receipt.py') {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $target $file) -Force
 }
 Copy-Item -LiteralPath $QueueHelper -Destination (Join-Path $target 'Invoke-GroceryCartQueue.ps1') -Force

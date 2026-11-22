@@ -28,6 +28,14 @@ The computer must be awake, online and signed in under the configured user. Wind
 
 The queue helper encrypts its operation journal with Windows DPAPI. The worker also saves provider cart-line evidence under `receipts` using current-user DPAPI. Exact queue operations can be replayed after a lost acknowledgement. Never replay an external cart mutation after a timeout. Reconcile provider evidence with the original request and retailer. Only product-line data, retailer name and diagnostic field names belong in the private receipt.
 
+After a decoder update, an operator can record a verified saved reply against its original unresolved claim. Run the following in the installed worker directory with the original run ID. The command reports the remaining wait if the original claim still has its lease. Repeat this same command after that interval or after an interrupted acknowledgement.
+
+```powershell
+python -B .\recover_receipt.py <original-cart-run-id>
+```
+
+Recovery reads the encrypted before-and-after cart evidence on the computer and records confirmed per-request quantity changes through the Home Console queue. Instacart supplies the selling method for weighted items. A reported weight selling method does not establish a package size or weight unit. The worker preserves exact fractional cart quantities when comparing evidence.
+
 ## Isolated checks
 
 Run `python -B -m unittest -v test_grocery_worker` in this directory on Windows. The tests use an in-memory provider and queue, temporary files, and Windows DPAPI. A live automated-shopping check requires a real authorized grocery addition and evidence from the provider response.

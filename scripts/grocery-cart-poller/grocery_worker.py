@@ -11,6 +11,7 @@ import time
 import uuid
 from ctypes import wintypes
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 from provider import Provider, ProviderError, read_cart, search_results, stamp
@@ -59,7 +60,7 @@ def private_blob(value, decrypt=False):
 
 
 def save_private(path, value):
-    write_atomic(path, private_blob(json.dumps(value, ensure_ascii=False).encode("utf-8")))
+    write_atomic(path, private_blob(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8")))
 
 
 def load_private(path):
@@ -157,7 +158,7 @@ def tokens(text):
 
 
 def receipts(before, after, groups):
-    remaining = {pid: line["quantity"] - before.get(pid, {}).get("quantity", 0)
+    remaining = {pid: Decimal(str(line["quantity"])) - Decimal(str(before.get(pid, {}).get("quantity", 0)))
                  for pid, line in after.items()}
     remaining = {pid: qty for pid, qty in remaining.items() if qty}
     if any(pid not in after for pid in before) or any(qty < 0 for qty in remaining.values()):
@@ -191,18 +192,41 @@ def get_cart(provider, store):
     return read_cart(provider.call("cart", {"retailer_name": store}), store)
 
 
-def finalize(journal, path):
-    if journal.get("raw") is None:
-        return False
+def queue_line(line, weighted, count=None):
+    quantity = line["quantity"] if count is None else count
+    if not isinstance(quantity, int):
+        if not weighted or Decimal(str(float(quantity))) != Decimal(str(quantity)):
+            raise ValueError("Home Console cannot record this fractional cart quantity exactly.")
+        quantity = float(quantity)
+    if not 0 <= quantity <= 100:
+        raise ValueError("The existing cart quantity exceeds the supported range.")
+    evidence = {"product_id": line["product_id"], "name": line["name"], "quantity": quantity}
+    kind = line.get("quantity_type")
+    if line.get("size"):
+        evidence["size"] = line["size"]
+    elif not weighted:
+        evidence["size"] = {"weight": "sold by weight", "each": "each"}.get(kind, "size not provided")
+    if weighted and kind == "weight":
+        evidence["quantity_type"] = kind
+    return evidence
+
+
+def verified_reply(journal):
     try:
         raw = journal["raw"]
         data = raw.get("structuredContent") or {}
         if raw.get("isError") or data.get("tool") != "cart":
             raise ProviderError("Unconfirmed cart response.")
         after = read_cart(data["artifacts"], journal["store"])
-        verified = receipts(journal["before"], after, journal["groups"])
+        return receipts(journal["before"], after, journal["groups"])
     except (KeyError, TypeError, ValueError, ProviderError):
-        verified = {}
+        return {}
+
+
+def finalize(journal, path):
+    if journal.get("raw") is None:
+        return False
+    verified = verified_reply(journal)
     for key, group in journal["groups"].items():
         for row in group["rows"]:
             if row["id"] in journal["completed"]:
@@ -210,8 +234,8 @@ def finalize(journal, path):
             if key in verified:
                 line = verified[key]
                 complete(journal["run"], row, journal["store"], "in_cart",
-                         product={**line, "quantity": row["count"]}, observed_at=journal["reply_at"],
-                         reason=f'Added {row["count"]} package(s) for this request. Instacart now shows {line["quantity"]} in this cart line.')
+                         product=queue_line(line, journal.get("weighted_observations", False), row["count"]), observed_at=journal["reply_at"],
+                         reason=f'Added the requested quantity of {row["count"]}. Instacart now shows {line["quantity"]} for this item.')
             else:
                 complete(journal["run"], row, journal["store"], "needs_attention",
                          reason="Instacart’s reply did not identify an unambiguous product and quantity change. The addition will not be repeated.")
@@ -220,7 +244,7 @@ def finalize(journal, path):
     return True
 
 
-def shop(run, rows, provider, journal_dir):
+def shop(run, rows, provider, journal_dir, weighted=False):
     # An earlier prepared add is never sent again, including after a crash or an edited row.
     new = []
     for row in rows:
@@ -238,8 +262,9 @@ def shop(run, rows, provider, journal_dir):
         pid = expected.get("product_id")
         baseline = {p["product_id"]: p["quantity"] for p in (old.get("intent") or {}).get("observed_cart", [])}
         fields = {"recovery_attempt_id": old["attempt_id"]}
-        if pid in observed and observed[pid]["quantity"] == baseline.get(pid, 0) + expected.get("quantity", 0):
-            complete(run, row, old["retailer"], "already_in_cart", product=observed[pid], **fields)
+        if pid in observed and Decimal(str(observed[pid]["quantity"])) == Decimal(str(baseline.get(pid, 0))) + expected.get("quantity", 0):
+            complete(run, row, old["retailer"], "already_in_cart",
+                     product=queue_line(observed[pid], weighted, expected["quantity"]), **fields)
         else:
             result = complete(run, row, old["retailer"], "needs_attention",
                               reason="A previous add was interrupted. The original cart could not confirm it safely.", **fields)
@@ -270,7 +295,7 @@ def shop(run, rows, provider, journal_dir):
             selected = None
             if size:
                 choices = search_results(provider.call("search_products", {"retailer_name": store, "query": query}))
-                selected = next((p for p in choices.values() if measure(p["size"]) == size), None)
+                selected = next((p for p in choices.values() if measure(p.get("size", "")) == size), None)
                 if not selected:
                     raise ValueError("Instacart returned no product with the requested package size.")
             key = "sku:" + selected["product_id"] if selected else "query:" + query.casefold()
@@ -287,6 +312,11 @@ def shop(run, rows, provider, journal_dir):
         selected = group["selected"]
         pid = group["product_id"]
         base_qty = before.get(pid, {}).get("quantity", 0)
+        if not isinstance(base_qty, int):
+            for row in group["rows"]:
+                complete(run, row, store, "needs_attention",
+                         reason="The existing item has a fractional quantity. Instacart accepts only whole quantities for this product update.")
+            continue
         if group["count"] + base_qty > 100:
             for row in group["rows"]:
                 complete(run, row, store, "needs_attention", reason="The combined quantity exceeds the supported cart quantity.")
@@ -296,10 +326,16 @@ def shop(run, rows, provider, journal_dir):
         for row in group["rows"]:
             relevant = ([before[pid]] if pid in before else []) if selected else [
                 p for p in before.values() if tokens(group["query"]) & tokens(p["name"])]
+            try:
+                relevant = [queue_line(p, weighted) for p in relevant]
+            except ValueError:
+                complete(run, row, store, "needs_attention",
+                         reason="A matching cart line has a quantity that Home Console cannot record as a baseline. No addition was attempted.")
+                continue
             if len(relevant) > 20:
                 complete(run, row, store, "needs_attention", reason="Too many existing cart lines match this request.")
                 continue
-            intended = {"product": {**selected, "quantity": row["count"]}} if selected else {
+            intended = {"product": queue_line(selected, weighted, row["count"])} if selected else {
                 "quick_add": {"query": group["query"], "quantity": row["count"]}}
             claim = write_progress(run, row, store, "prepare", observed_at=read_at,
                                    observed_cart=relevant, cart_action_id=action, **intended)
@@ -325,7 +361,8 @@ def shop(run, rows, provider, journal_dir):
     if updates:
         args["item_updates"] = updates
     path = journal_dir / (run + ".dpapi")
-    journal = {"run": run, "store": store, "before": before, "groups": prepared, "completed": [], "raw": None}
+    journal = {"run": run, "store": store, "before": before, "groups": prepared, "completed": [],
+               "weighted_observations": weighted, "raw": None}
     save_private(path, journal)
     if min(expires) <= time.time() + 10:
         return
@@ -388,7 +425,7 @@ def poll(provider_factory, held, journal_dir):
         pending_file.unlink(missing_ok=True)
         return "provider_unavailable"
     try:
-        shop(run, ready, provider, journal_dir)
+        shop(run, ready, provider, journal_dir, snapshot.get("weighted_observations") is True)
     finally:
         provider.close()
     pending_file.unlink(missing_ok=True)

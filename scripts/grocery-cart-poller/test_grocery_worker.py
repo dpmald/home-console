@@ -1,10 +1,12 @@
 import json
+from decimal import Decimal
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import grocery_worker as worker
+import recover_receipt as recovery
 from provider import ProviderError, read_cart
 
 
@@ -36,6 +38,75 @@ class Fixture:
 
 
 class GroceryWorkerTests(unittest.TestCase):
+    def test_actual_weight_shape_with_fractional_existing_lines(self):
+        weighted = lambda pid, name, qty: {"product_id":pid,"name":name,"quantity":qty,"quantity_type":"weight"}
+        other = weighted("17","Seasonal fruit",Decimal("0.5"))
+        expected = weighted("44","Sliced turkey",Decimal("1.0"))
+        fixture = Fixture([other], [other, expected])
+        log = []
+        def progress(run, item, store, phase, **fields):
+            log.append(fields)
+            return {"ok":True,"may_add":True,"lease_expires_at":"2099-01-01T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(worker, "write_progress", side_effect=progress):
+            worker.shop("cart-weight", [row("one")], fixture, Path(tmp))
+            receipt = log[-1]["product"]
+            self.assertEqual(receipt, {"product_id":"44","name":"Sliced turkey","quantity":1,"size":"sold by weight"})
+            self.assertEqual(fixture.changes[0]["quick_add_search_queries"], [{"query":"Turkey","quantity":1}])
+            self.assertNotIn("package",log[-1]["reason"])
+            before = weighted("44","Sliced turkey",Decimal("0.3"))
+            after = weighted("44","Sliced turkey",Decimal("1.3"))
+            worker.shop("cart-fraction", [row("two")], Fixture([before],[after]), Path(tmp), weighted=True)
+            self.assertEqual(log[-2]["observed_cart"][0]["quantity"], 0.3)
+            self.assertEqual(log[-1]["product"], {"product_id":"44","name":"Sliced turkey","quantity":1,"quantity_type":"weight"})
+            self.assertEqual(worker.load_private(Path(tmp)/"cart-fraction.dpapi")["before"]["44"]["quantity"],"0.3")
+            guessed = {**expected,"quantity_type":"other"}
+            missing = read_cart({"retailer":{"name":"Wegmans"},"cart":{"items":[guessed]}},"Wegmans")["44"]
+            self.assertEqual(worker.queue_line(missing,False)["size"],"size not provided")
+            guessed["quantity_type"] = "each"
+            each = read_cart({"retailer":{"name":"Wegmans"},"cart":{"items":[guessed]}},"Wegmans")["44"]
+            self.assertEqual(worker.queue_line(each,False)["size"],"each")
+            for bad in [0, -0.5, True, "nan", "Infinity"]:
+                with self.assertRaises(ProviderError):
+                    read_cart({"retailer":{"name":"Wegmans"},"cart":{"items":[{**expected,"quantity":bad}]}},"Wegmans")
+
+    def test_recover_saved_weighted_reply_only_for_original_claim(self):
+        request = row("one")
+        claim = {"attempt_id":"old","run_id":"cart-proof","retailer":"Wegmans","revision":1,
+                 "requires_reconciliation":True,"lease_expires_at":"2000-01-01T00:00:00Z",
+                 "intent":{"quick_add":{"query":"Turkey","quantity":1}}}
+        request.update(current_status="needs_attention", attempts=[claim])
+        store = "Wegmans"
+        group = {"product_id":None,"query":"Turkey","count":1,"rows":[{"id":"one","revision":1,"count":1}]}
+        raw = {"structuredContent":{"tool":"cart","artifacts":{"retailer":{"name":store},"cart":{"items":[
+            {"product_id":"44","name":"Test poultry","quantity":1.0,"quantity_type":"weight"}]}}}}
+        journal = {"run":"cart-proof","store":store,"before":{},"groups":{"query:turkey":group},"raw":raw,
+                   "reply_at":"2026-11-22T15:00:00Z","completed":["one"]}
+        snapshots = []
+        def snapshot(action, run):
+            self.assertEqual(action,"List")
+            snapshots.append(run)
+            return {"ok":True,"run_id":run,"weighted_observations":True,"requests":[request]}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(recovery, "helper", side_effect=snapshot), patch.object(
+                recovery,"write_progress",return_value={"ok":True}) as complete:
+            path = Path(tmp)
+            worker.save_private(path/"cart-proof.dpapi",journal)
+            claim["retailer"] = "Other"
+            self.assertEqual(recovery.reconcile("cart-proof",path)["skipped"],1)
+            claim["retailer"] = store
+            with patch.object(recovery.time,"time",return_value=0):
+                self.assertGreater(recovery.reconcile("cart-proof",path)["retry_after_seconds"],0)
+            self.assertFalse(complete.called)
+            self.assertEqual(recovery.reconcile("cart-proof",path)["recorded"],1)
+            evidence = complete.call_args.kwargs
+            self.assertEqual(evidence["recovery_attempt_id"],"old")
+            self.assertEqual(evidence["observed_at"],journal["reply_at"])
+            self.assertEqual(evidence["product"]["quantity"],1)
+            request["attempts"] = [{"run_id":snapshots[-1],"retailer":store,"outcome":"already_in_cart",
+                                    "evidence":{"product":evidence["product"],"recovery_attempt_id":"old"}}]
+            self.assertEqual(recovery.reconcile("cart-proof",path)["already_recorded"],1)
+            complete.assert_called_once()
+            self.assertEqual(len(set(snapshots)),1)
+
     def test_held_untrusted_empty_and_attention_never_start_provider(self):
         with tempfile.TemporaryDirectory() as tmp:
             create = Mock(side_effect=AssertionError("unexpected provider"))

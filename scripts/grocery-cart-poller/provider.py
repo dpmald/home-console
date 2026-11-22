@@ -5,6 +5,7 @@ import subprocess
 import threading
 import time
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 
 class ProviderError(Exception):
@@ -37,7 +38,7 @@ class Provider:
     def read(self):
         try:
             for line in self.proc.stdout:
-                self.messages.put(json.loads(line))
+                self.messages.put(json.loads(line, parse_float=Decimal))
         finally:
             self.messages.put(None)
 
@@ -92,13 +93,25 @@ def product(item, cart):
     pid = detail.get("product_id", detail.get("id"))
     name = detail.get("name", detail.get("product_name"))
     size = detail.get("size", detail.get("size_text"))
-    qty = item.get("quantity") if cart else 1
+    kind = item.get("quantity_type", detail.get("quantity_type"))
+    value = item.get("quantity") if cart else 1
+    try:
+        qty = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
     if (not isinstance(pid, (str, int)) or isinstance(pid, bool) or not str(pid).strip()
             or not isinstance(name, str) or not name.strip()
-            or not isinstance(size, str) or not size.strip()
-            or type(qty) is not int or not 1 <= qty <= 100):
+            or not qty.is_finite() or qty <= 0):
         return None
-    return {"product_id": str(pid), "name": name, "size": size, "quantity": qty}
+    # Fractional cart totals stay exact in the private journal. Prepare and mutation
+    # parameters still honor their individual numeric schemas.
+    amount = int(qty) if qty == qty.to_integral_value() else str(qty)
+    line = {"product_id": str(pid), "name": name, "quantity": amount}
+    if isinstance(size, str) and size.strip():
+        line["size"] = size
+    if kind in ("weight", "each"):
+        line["quantity_type"] = kind
+    return line
 
 
 def read_cart(artifacts, retailer):
