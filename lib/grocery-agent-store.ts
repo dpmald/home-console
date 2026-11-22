@@ -9,7 +9,7 @@ export async function groceryAgentRpc(name: RpcName, args: Record<string, unknow
   const developmentUrl = process.env.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL;
   if (developmentUrl) {
     if (process.env.NODE_ENV === 'production') throw new Error('Development database is disabled in production');
-    const connectionString = validateGroceryDevelopmentDatabase(developmentUrl);
+    const connectionString = validateGroceryDevelopmentDatabase(developmentUrl, developmentUrl === process.env.HOME_CONSOLE_PR_DATABASE_URL);
     localPool ??= new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5000, statement_timeout: 10000 });
     // RPC name is a closed union, and values are always parameters.
     const queries = {

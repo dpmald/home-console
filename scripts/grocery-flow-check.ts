@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import pg from 'pg';
 import { validateGroceryDevelopmentDatabase } from '../lib/grocery-dev-isolation.mjs';
 
-const config=Object.fromEntries(readFileSync('.env.grocery-dev.local','utf8').split(/\r?\n/).filter(l=>/^[A-Z_]+=/.test(l)).map(l=>{const i=l.indexOf('=');return[l.slice(0,i),l.slice(i+1)];}));
-const connectionString=validateGroceryDevelopmentDatabase(config.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL);
+const fixtureUrl = process.env.HOME_CONSOLE_PR_DATABASE_URL;
+const config = fixtureUrl ? {} : Object.fromEntries(readFileSync('.env.grocery-dev.local', 'utf8')
+  .split(/\r?\n/).filter(line => /^[A-Z_]+=/.test(line))
+  .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+const connectionString = validateGroceryDevelopmentDatabase(fixtureUrl ?? config.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL, Boolean(fixtureUrl));
 const client=new pg.Client({connectionString,connectionTimeoutMillis:5000,statement_timeout:15000});
 const rpc=async(name:string,value?:unknown)=>{
   const queries:Record<string,string>={device:'select public.grocery_device_mutate($1::jsonb) as result',list:'select public.grocery_device_list() as result',pending:'select public.grocery_agent_list_pending($1::text) as result',progress:'select public.grocery_agent_progress($1::jsonb) as result'};
@@ -62,7 +65,10 @@ try {
   const fresh=new pg.Client({connectionString:freshUrl.href,connectionTimeoutMillis:5000,statement_timeout:15000});
   try {
     await fresh.connect();
-    for(const file of ['supabase/tests/grocery_agent_bootstrap.sql','supabase/migrations/0001_init.sql','supabase/migrations/0002_broadcast_actual_changes.sql','supabase/migrations/0003_chore_fields_and_broadcast_dedup.sql','supabase/migrations/0004_allow_family_google_calendar.sql','supabase/migrations/20261116000100_grocery_agent.sql','supabase/migrations/20261116000200_grocery_lease_diagnostics.sql','supabase/migrations/20261116000300_grocery_display.sql'])await fresh.query(readFileSync(file,'utf8'));
+    await fresh.query(readFileSync('supabase/tests/grocery_agent_bootstrap.sql', 'utf8'));
+    for (const name of readdirSync('supabase/migrations').filter(name => name.endsWith('.sql')).sort()) {
+      await fresh.query(readFileSync('supabase/migrations/' + name, 'utf8'));
+    }
     assert.deepEqual((await fresh.query('select public.grocery_device_list() as result')).rows[0].result.items,[]);
     console.log('PASS: fresh canonical migration history, including calendar and grocery migrations.');
   } finally {await fresh.end();await client.query(`drop database "${database}"`);}

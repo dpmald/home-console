@@ -17,13 +17,19 @@ Use [hosted groceries](https://home-console-beta.vercel.app/beta/groceries) for 
 - Attach the connector to the intended Claude task in its connector settings. Creating a connector at the account level does not establish that an existing scheduled task has it. For a first read, ask Claude to call `list_pending` with a fresh run ID and report the names and quantities only. That call records a snapshot. The menu, Instacart cart, checkout and task schedule are separate operations.
 - Supabase holds groceries and their run receipts. The device authenticates to the kitchen, and Claude authenticates to the MCP endpoint. Neither client needs the Beta database server key.
 
+## Beta API routes
+
+<!-- beta-api:start -->
+The board reads and writes `/api/kiosk` and `/api/kiosk/order`. The device grocery list uses `/api/groceries`. The agent uses `/api/mcp` with its own credential.
+<!-- beta-api:end -->
+
 ## Local development
 
-Use `codex/beta-area`. Install dependencies with `npm ci`. On a fresh machine, `npm run db:groceries` creates the isolated development database. On Legion the existing database and agent receipts are reused. `npm run dev:beta` verifies the labelled Docker database at `127.0.0.1:55432/home_console_grocery_dev`, starts its dedicated PostgREST service on loopback port 55433, then serves the app on port 3005. The private preview uses a different database. The ignored local configuration can set `HOME_CONSOLE_HOSTED_BETA_URL` to show a link from local groceries to the shared hosted list.
+Install dependencies with `npm ci`. On a fresh machine, `npm run db:groceries` creates the isolated development database. On Legion the existing database and agent receipts are reused. `npm run dev:beta` verifies the labelled Docker database at `127.0.0.1:55432/home_console_grocery_dev`, starts its dedicated PostgREST service on loopback port 55433, then serves the app on port 3005. The private preview uses a different database. The ignored local configuration can set `HOME_CONSOLE_HOSTED_BETA_URL` to show a link from local groceries to the shared hosted list.
 
 The Beta homepage uses the shared kitchen queries and actions. The Beta grocery screen uses the same Beta database. Calendar synchronization, Slack notifications, cron routes and real shopping callbacks are disconnected. A failed kitchen or grocery write must surface on the screen. Add experiments in this deployment, keep external actions explicitly scoped, and check new routes against the Beta allowlist in `lib/beta-deployment.ts`.
 
-Run `npm run test:beta`, `npm run test:groceries`, `npm run typecheck` and `node scripts/beta-http-check.mjs`. For a local production build, stop only this checkout’s dev server before `npm run build:grocery-check`. Both commands use its .next directory.
+For a fresh database and a browser claim/reload check, run the [integration suite](TESTING.md). For a running preview, run `npm run test:beta`, `npm run test:groceries`, `npm run typecheck` and `node scripts/beta-http-check.mjs`. For a local production build, stop only this checkout’s dev server before `npm run build:grocery-check`. Both commands use its .next directory.
 
 ## Hosting and releases
 

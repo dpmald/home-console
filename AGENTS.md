@@ -36,7 +36,7 @@ Direct instructions from the person requesting the work take precedence over the
 - Keep server credentials on the server. Never commit .env.local, tokens, or real private family data; this repository was public when these instructions were prepared.
 - Use isolated development data for integration checks. Do not run migrations or external notifications against production as part of ordinary local tests.
 - Add new migration files for schema changes once migrations have been applied; do not silently rewrite deployed migration history.
-- Preserve migration 0002's row-level broadcasts and unchanged-update suppression, plus migration 0003's per-table transaction deduplication and chore fields. Statement-level notifications on initialization upserts caused a verified kiosk refresh loop. With the isolated database running, npm run test:local-db checks actual-change broadcasts and deduplication. After fetching new migrations, use npm run db:migrate with the app stopped to upgrade only the verified local database.
+- Preserve migration 0002's row-level broadcasts and unchanged-update suppression, plus migration 0003's per-table transaction deduplication and chore fields. Statement-level notifications on initialization upserts caused a verified kiosk refresh loop. Run `npm run test:integration` for the disposable database regression.
 - Distinguish demo behavior from production failures. Do not hide failed persistence behind a success state or replace live data with unlabeled demo data.
 - For display changes, consult stitch_family_kitchen_command_center/warm_hearth_hub/DESIGN.md and the adjacent HTML references. Preserve readable landscape layouts, touch targets, and ambient/bento/timeline modes.
 
@@ -47,8 +47,10 @@ The repository declares Node >=20 and uses npm with package-lock.json.
 ```sh
 npm ci
 npm run db:groceries
-npm run dev:grocery-ui
-npm run test:groceries
+npm run dev:beta
+npm test
+npm run test:integration
+npm run test:context
 npm run typecheck
 npm run build:grocery-check
 ```
@@ -56,7 +58,7 @@ npm run build:grocery-check
 - The source has a demo fallback when Supabase is unavailable. That is useful for layout work, but does not verify persistence or integrations.
 - Read docs/LOCAL-DEVELOPMENT.md for the synthetic grocery preview on port 3004. Warren's older private-data preview on port 3001 is a separate checkout/stack; do not repoint or upgrade it during grocery work. Do not link a development checkout to hosted Supabase or import production credentials.
 - The private production-to-local data copy is explicitly authorized in its own workflow. Its installed refresher must be reviewed before adopting the new grocery schema; see docs/GROCERY-FLOW-PLAN.md. Do not bypass its schema, trigger or foreign-key protections.
-- No automated test suite or CI workflow existed at the initial collaboration setup. Do not report tests as passing unless you actually ran them.
+- Read the [testing guide](docs/TESTING.md) for the required PR checks. Report checks actually run and update affected guides alongside behavior changes.
 - Add focused tests for meaningful behavioral changes; documentation-only changes do not need application tests.
 - For UI changes, inspect the rendered display at the intended landscape size and check relevant interactions when runtime access permits.
 - Finish with the change, validation results, any blocked checks, and the exact branch/commit or uncommitted state needed for a handoff.

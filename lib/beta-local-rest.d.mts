@@ -1,1 +1,1 @@
-export function localBetaRestCredentials(databaseUrl: string): { jwtSecret: string; password: string; token: string };
+export function localBetaRestCredentials(databaseUrl: string): { restUrl: string; jwtSecret: string; password: string; token: string };

@@ -22,3 +22,12 @@ test('external credential destination must match the exact approved tunnel', () 
   assert.throws(() => validateGrocerySmokeEndpoint('https://unapproved-fixture.trycloudflare.com/mcp', approved));
   assert.throws(() => validateGrocerySmokeEndpoint(approved));
 });
+
+test('the disposable test database and REST pair cannot be confused with the persistent preview', async () => {
+  const { localBetaRestCredentials } = await import('../lib/beta-local-rest.mjs');
+  const fixture = 'postgresql://postgres:test@127.0.0.1:55442/home_console_pr_test';
+  assert.throws(() => validateGroceryDevelopmentDatabase(fixture));
+  assert.equal(localBetaRestCredentials(fixture).restUrl, 'http://127.0.0.1:55443');
+  assert.throws(() => validateGroceryDevelopmentDatabase(fixture.replace('55442', '55432')));
+  assert.throws(() => validateGroceryDevelopmentDatabase(fixture.replace('home_console_pr_test', 'home_console_grocery_dev')));
+});

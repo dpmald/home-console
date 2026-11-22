@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 
-const origin = 'http://127.0.0.1:3005';
-const cookie = 'grocery_dev_kiosk_key=home-console-groceries-local-only';
+const port = Number(process.argv[2] ?? 3005);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Expected a local Beta port');
+const origin = 'http://localhost:' + port;
+const cookie = 'grocery_dev_kiosk_key=' + (process.env.HOME_CONSOLE_PR_DEVICE_KEY ?? 'home-console-groceries-local-only');
 const get = (path, authenticated = false) => fetch(`${origin}${path}`, {
   headers: authenticated ? { Cookie: cookie } : {}, redirect: 'manual', signal: AbortSignal.timeout(15000),
 });

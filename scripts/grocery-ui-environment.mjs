@@ -1,6 +1,6 @@
 import { validateGroceryDevelopmentDatabase } from '../lib/grocery-dev-isolation.mjs';
 
-export function groceryUiEnvironment(inherited, names, config) {
+export function groceryUiEnvironment(inherited, names, config, allowTestDatabase = false) {
   const blocked = new Set([...names, 'NODE_ENV', 'NEXT_TELEMETRY_DISABLED',
     'SUPABASE_ACCESS_TOKEN', 'SUPABASE_DB_PASSWORD', 'HOME_CONSOLE_GROCERY_DEVELOPMENT',
     'HOME_CONSOLE_GROCERY_AGENT_KEY', 'HOME_CONSOLE_GROCERY_DEV_DATABASE_URL',
@@ -15,6 +15,6 @@ export function groceryUiEnvironment(inherited, names, config) {
     HOME_CONSOLE_GROCERY_DEVELOPMENT: '1', NEXT_PUBLIC_FAMILY_TIMEZONE: 'America/New_York',
     KIOSK_ACCESS_TOKEN: 'home-console-groceries-local-only',
     HOME_CONSOLE_GROCERY_AGENT_KEY: config.HOME_CONSOLE_GROCERY_AGENT_KEY,
-    HOME_CONSOLE_GROCERY_DEV_DATABASE_URL: validateGroceryDevelopmentDatabase(config.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL),
+    HOME_CONSOLE_GROCERY_DEV_DATABASE_URL: validateGroceryDevelopmentDatabase(config.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL, allowTestDatabase),
   };
 }

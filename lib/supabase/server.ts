@@ -11,8 +11,8 @@ export function db(): PostgrestClient<any> {
   if (!_db) {
     const beta = isBetaDeployment();
     if (beta && process.env.NODE_ENV === 'development' && process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1') {
-      const { token } = localBetaRestCredentials(process.env.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL || '');
-      _db = new PostgrestClient('http://127.0.0.1:55433', { headers: { Authorization: 'Bearer ' + token } });
+      const { token, restUrl } = localBetaRestCredentials(process.env.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL || '');
+      _db = new PostgrestClient(restUrl, { headers: { Authorization: 'Bearer ' + token } });
       return _db;
     }
     const { url, key } = beta ? getBetaDatabaseConfiguration() : {

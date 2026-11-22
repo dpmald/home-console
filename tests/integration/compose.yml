@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: home_console_pr_test
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    ports:
+      - "127.0.0.1:55442:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d home_console_pr_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 40
+  rest:
+    image: public.ecr.aws/supabase/postgrest:v16.5
+    environment:
+      PGRST_DB_URI: ${PGRST_DB_URI:?}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
+      PGRST_DB_SCHEMAS: public
+    ports:
+      - "127.0.0.1:55443:3000"
