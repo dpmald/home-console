@@ -24,6 +24,11 @@ interface GroceryRequestView {
     product_quantity: number | null;
     reason: string | null;
     requires_reconciliation: boolean;
+    unresolved_attempt?: {
+      attempt_id: string; retailer: string; revision: number; lease_expires_at: string | null;
+      product_name: string | null; product_size: string | null; product_quantity: number | null;
+      request_name: string | null; request_quantity: string | null;
+    } | null;
   } | null;
 }
 interface DraftItem { key: number; name: string; quantity: string; notes: string }
@@ -35,9 +40,30 @@ const LABELS: Record<RequestStatus, string> = {
 };
 const emptyDraft = (key: number): DraftItem => ({ key, name: '', quantity: '', notes: '' });
 function statusLabel(item: GroceryRequestView) {
+  if (item.result?.requires_reconciliation && (item.status === 'needed' || item.status === 'needs_attention')) return 'Cart check needed';
   if (item.status === 'needed' && item.cart_authorized_revision !== item.revision) return 'Needs confirmation';
   if (item.status === 'in_cart' && !['in_cart', 'already_in_cart'].includes(item.result?.outcome ?? '')) return 'Cart receipt unavailable';
   return LABELS[item.status];
+}
+
+function CartCheck({ item, canWrite, busy, onRetry }: {
+  item: GroceryRequestView; canWrite: boolean; busy: boolean; onRetry: (attemptId: string) => void;
+}) {
+  if (!item.result?.requires_reconciliation || !['needed', 'needs_attention'].includes(item.status)) return null;
+  const previous = item.result.unresolved_attempt;
+  if (!previous) return <p className={styles.reconciliation}>The previous cart change needs verification before this request can be retried.</p>;
+  const expires = Date.parse(previous.lease_expires_at ?? '');
+  const active = Number.isFinite(expires) && Date.now() < expires;
+  return <div className={styles.reconciliation}>
+    <p>Check the {previous.retailer} cart for {previous.product_name || previous.request_name || item.name}
+      {previous.product_size && ` (${previous.product_size})`}{previous.product_quantity != null && ` × ${previous.product_quantity}`}.
+      {previous.revision !== item.revision && ` Revision ${previous.revision} requested ${previous.request_name || item.name}, ${previous.request_quantity || '1 package'}.`}</p>
+    {active ? <p>The worker can still finish its attempt. Check again after <time dateTime={previous.lease_expires_at ?? undefined}>
+      {new Date(expires).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</time>.</p> :
+      <p>If the item is there, cancel this request to leave it in the cart. If it is missing, request a retry.</p>}
+    {canWrite && item.cart_authorized_revision === item.revision &&
+      <button type="button" disabled={busy || active} onClick={() => onRetry(previous.attempt_id)}>I checked the cart. Retry missing item</button>}
+  </div>;
 }
 function recoveryStorage(): PendingAddStorage | null {
   try { return window.sessionStorage; } catch { return null; }
@@ -281,7 +307,9 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
             {item.result.product_name && <> · {item.result.product_name}{item.result.product_size && ` (${item.result.product_size})`}
               {item.result.product_quantity != null && ` × ${item.result.product_quantity}`}</>}</p>}
           {item.result?.reason && <p className={styles.detail}>{item.result.reason}</p>}
-          {item.result?.requires_reconciliation && <p className={styles.reconciliation}>Cart check needed. Claude must check the previous attempt before adding this again.</p>}
+          <CartCheck item={item} canWrite={canWrite} busy={busy} onRetry={attemptId => { void save({
+            action: 'retry_missing', id: item.id, revision: item.revision, attempt_id: attemptId,
+          }, 'Your cart check was saved. The request is pending again.'); }} />
           {item.status === 'in_cart' && <p className={styles.hint}>{item.result?.outcome === 'already_in_cart' ? 'Already covered by a cart item. ' : ''}Checkout and delivery are not confirmed.</p>}
           {item.status === 'ordered' && <p className={styles.hint}>This older status does not confirm a purchase or delivery.</p>}
           {canWrite && <div className={styles.actions}>
@@ -294,7 +322,7 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
               <button type="button" disabled={busy} onClick={() => { void setStatus(item, 'got'); }}>Mark received</button>
               <button type="button" disabled={busy} onClick={() => { void setStatus(item, 'cancelled'); }}>Cancel request</button>
             </>}
-            {(item.status === 'needs_attention' || item.status === 'got' || item.status === 'cancelled') &&
+            {((item.status === 'needs_attention' && !item.result?.requires_reconciliation) || item.status === 'got' || item.status === 'cancelled') &&
               <button type="button" disabled={busy} onClick={() => { void setStatus(item, 'needed'); }}>Return to pending</button>}
           </div>}
         </>
@@ -304,7 +332,7 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
 
   const active = items.filter((item) => item.status !== 'got' && item.status !== 'cancelled');
   const history = items.filter((item) => item.status === 'got' || item.status === 'cancelled');
-  const pendingCount = items.filter((item) => item.status === 'needed' && item.cart_authorized_revision === item.revision).length;
+  const pendingCount = items.filter((item) => item.status === 'needed' && item.cart_authorized_revision === item.revision && !item.result?.requires_reconciliation).length;
 
   return (
     <section ref={panel} className={`${styles.panel}${embedded ? ` ${styles.embedded}` : ''}`}

@@ -20,6 +20,14 @@ test('grocery inputs retain quantity and notes as data and reject malformed batc
     assert.equal(groceryAction.safeParse({...input,items}).success,false);
   }
 });
+test('a missing-item retry requires the exact request, revision and prior attempt', () => {
+  const action = { action: 'retry_missing', id: '00000000-0000-4000-8000-000000000010',
+    revision: 2, attempt_id: '00000000-0000-4000-8000-000000000020' };
+  assert.deepEqual(groceryAction.parse(action), action);
+  assert.equal(groceryAction.safeParse({ ...action, attempt_id: undefined }).success, false);
+  assert.equal(groceryAction.safeParse({ ...action, revision: 0 }).success, false);
+  assert.equal(groceryAction.safeParse({ ...action, outcome: 'in_cart' }).success, false);
+});
 test('device auth fails closed and rejects cross-origin cookie writes', () => {
   const old = process.env.KIOSK_ACCESS_TOKEN;
   const req = (headers:Record<string,string> = {}) => new NextRequest('http://localhost:3004/api/groceries',{method:'POST',headers});
