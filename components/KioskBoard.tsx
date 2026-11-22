@@ -886,6 +886,9 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
   const isCapturingMeal =
     pendingChef !== null ||
     (d.status !== 'unclaimed' && isParent(d.chef) && !d.recipe_name?.trim() && !d.linked_backlog_id);
+  const dinnerView = isCapturingMeal ? 'capture'
+    : d.status === 'unclaimed' ? 'choose'
+    : isStructuredRecipeView ? 'recipe' : 'tips';
   const activeCaptureChef: 'daniela' | 'warren' =
     pendingChef ?? (isParent(d.chef) ? d.chef : 'daniela');
   const fallbackUnstructured = getUnstructuredMealDetails(d.recipe_name);
@@ -1949,6 +1952,8 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
           >
             {/* LEFT MAIN CANVAS (~79% width): Planned Cooking Guide OR Undecided Dinner Decision */}
             <section
+              key={dinnerView}
+              aria-label="Dinner guide"
               className="ceramic-card"
               style={{
                 flex: 1,
@@ -1961,7 +1966,8 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 padding: '20px 24px',
                 border: '1px solid var(--border)',
                 background: 'var(--surface)',
-                overflow: 'hidden',
+                overflowX: 'hidden',
+                overflowY: 'auto',
                 position: 'relative',
               }}
             >
@@ -1980,7 +1986,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 }}
               />
 
-              {isCapturingMeal ? (
+              {dinnerView === 'capture' ? (
                 /* ── CAPTURE FLOW: WHAT IS BEING COOKED & IS A RECIPE NEEDED? ── */
                 <>
                   {/* Top Banner: Chef Selected — What's on the Menu? */}
@@ -2204,8 +2210,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       display: 'grid',
                       gridTemplateColumns: '1fr 1fr',
                       gap: 16,
-                      flex: 1,
-                      minHeight: 0,
+                      flex: '1 0 auto',
                       paddingTop: 12,
                       position: 'relative',
                       zIndex: 1,
@@ -2388,7 +2393,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                     </div>
                   </div>
                 </>
-              ) : d.status !== 'unclaimed' && isStructuredRecipeView ? (
+              ) : dinnerView === 'recipe' ? (
                 /* ── STATE A: PLANNED DINNER HAPPY PATH (Structured Cooking & Recipe Focus) ── */
                 <>
                   {/* Top Recipe Header */}
@@ -2800,7 +2805,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       gridTemplateColumns: '1fr 1fr',
                       gap: 16,
                       flex: 1,
-                      minHeight: 0,
+                      minHeight: '12rem',
                       paddingTop: 4,
                       position: 'relative',
                       zIndex: 1,
@@ -3008,7 +3013,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                     </div>
                   </div>
                 </>
-              ) : d.status !== 'unclaimed' ? (
+              ) : dinnerView === 'tips' ? (
                 /* ── STATE B: CLAIMED DINNER — NO STRUCTURED RECIPE (Photo + Gemini Assembly Tips & Recommendations) ── */
                 <>
                   {/* Top Decision Claimed Banner */}
@@ -3159,8 +3164,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       display: 'grid',
                       gridTemplateColumns: '7fr 5fr',
                       gap: 16,
-                      flex: 1,
-                      minHeight: 0,
+                      flex: '1 0 auto',
                       paddingTop: 12,
                       position: 'relative',
                       zIndex: 1,
@@ -3489,8 +3493,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       display: 'grid',
                       gridTemplateColumns: '7fr 5fr',
                       gap: 16,
-                      flex: 1,
-                      minHeight: 0,
+                      flex: '1 0 auto',
                       paddingTop: 12,
                       position: 'relative',
                       zIndex: 1,
@@ -3971,6 +3974,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
             {/* RIGHT RAIL (~21% width, w-56): Compressed Bento Navigation Rail */}
             <aside
               id="ultraSlimRightRail"
+              aria-label="Dinner shortcuts"
               style={{
                 width: 224,
                 flexShrink: 0,
@@ -3978,6 +3982,8 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 flexDirection: 'column',
                 gap: 10,
                 minHeight: 0,
+                overflowX: 'hidden',
+                overflowY: 'auto',
               }}
             >
               {/* Bento Card 1: UPCOMING */}
