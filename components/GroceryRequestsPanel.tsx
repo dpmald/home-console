@@ -290,9 +290,9 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
             onChange={(event) => setEditing({ ...editing, quantity: event.target.value })} /></label>
           <label className={styles.fullWidth}>Notes<textarea maxLength={500} value={editing.notes} disabled={busy}
             onChange={(event) => setEditing({ ...editing, notes: event.target.value })} /></label>
-          <p className={`${styles.hint} ${styles.fullWidth}`}>Editing an in-cart request asks Claude to review the new request. It does not change the Instacart cart.</p>
+          {item.status === 'in_cart' && <p className={`${styles.hint} ${styles.fullWidth}`}>Saving an edit requests the new quantity in addition to what is already in your cart. To change the existing cart item, open Instacart.</p>}
           <div className={`${styles.actions} ${styles.fullWidth}`}>
-            <button type="submit" className={styles.primary} disabled={busy}>Save changes</button>
+            <button type="submit" className={styles.primary} disabled={busy}>{item.status === 'in_cart' ? 'Submit additional request' : 'Save changes'}</button>
             <button type="button" disabled={busy} onClick={() => setEditing(null)}>Keep original</button>
           </div>
         </form>
@@ -370,7 +370,7 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
           {history.length > 0 && <details className={styles.history}><summary>Received &amp; cancelled · {history.length}</summary><ul className={styles.list}>{history.map(renderItem)}</ul></details>}
         </div>
         {canWrite ? <form className={styles.composer} onSubmit={addRequests}>
-          <div><p className={styles.eyebrow}>Add to the list</p><h3>What do we need?</h3><p className={styles.hint}>One item per row. Leave quantity blank for one package.</p></div>
+          <div><p className={styles.eyebrow}>Add to the list</p><h3>What do we need?</h3><p className={styles.hint}>One item per row. Quantity defaults to 1.</p></div>
           <div className={styles.drafts}>
             {drafts.map((draft, index) => <fieldset className={styles.draft} disabled={busy} key={draft.key}>
               <legend>Item {index + 1}</legend>

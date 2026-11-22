@@ -11,7 +11,7 @@ export function BetaGroceries({ testData, hostedUrl, canWrite, unlockAvailable }
       <div className={styles.pageHeading}>
         <div><p className={styles.eyebrow}>Beta feature</p><h1>Groceries</h1></div>
         <p>{hostedUrl
-          ? <>This list stays on this PC. <a href={hostedUrl} target="_top" referrerPolicy="no-referrer">Open the hosted Beta list for Claude</a></>
+          ? <>This list stays on this PC. <a href={hostedUrl} target="_top" referrerPolicy="no-referrer">Open the shared grocery list</a></>
           : testData ? 'Test requests only · No real shopping' : 'Your shared Beta grocery list'}</p>
       </div>
       <GroceryRequestsPanel embedded canWrite={canWrite} unlockAvailable={unlockAvailable} onClose={() => window.location.assign('/beta')}
