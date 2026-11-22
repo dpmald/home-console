@@ -42,6 +42,9 @@ try {
   assert.deepEqual(tools.tools.map((tool: { name: string }) => tool.name).sort(), ['list_pending', 'record_request_progress']);
   writeFileSync(new URL('../docs/GROCERY-CONNECTOR-TOOLS.json', import.meta.url), `${JSON.stringify(tools, null, 2)}\n`);
   await database.query('insert into public.grocery_items(id,name,quantity,added_by) values($1,$2,$3,$4)', [requestId, 'Synthetic smoke item', '2 packages', 'Automated smoke fixture']);
+  await database.query('select public.grocery_trusted_device_mutate($1::jsonb)', [
+    JSON.stringify({ action: 'authorize', id: requestId, revision: 1 }),
+  ]);
   const pending = await rpc('tools/call', { name: 'list_pending', arguments: { run_id: runId } });
   assert.equal(pending.structuredContent.ok, true);
   const request = pending.structuredContent.requests.find((item: { id: string }) => item.id === requestId);

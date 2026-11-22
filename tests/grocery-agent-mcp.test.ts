@@ -40,6 +40,23 @@ const prepare = () => ({ phase: 'prepare' as const, operation_id: 'prepare-1', r
   request_id: REQUEST_ID, revision: 1, retailer: 'Wegmans' as const, product: PRODUCT,
   observed_cart: [], observed_at: OBSERVED });
 
+test('discovery and dispatch accept a quick-add search before a real SKU is known', async () => {
+  const { handler, calls } = fixture();
+  const listed = await (await handler(request(rpc('tools/list')))).json();
+  assert.ok(listed.result.tools[1].inputSchema.properties.operation.properties.quick_add);
+  const { product, ...base } = prepare();
+  const operation = { ...base, run_id:'cart-synthetic', quick_add:{ query:'turkey', quantity:1 } };
+  const result = await (await handler(request(rpc('tools/call', {
+    name:'record_request_progress', arguments:{ operation },
+  })))).json();
+  assert.equal(result.result.structuredContent.ok, true);
+  assert.deepEqual(calls, [operation]);
+  assert.equal(groceryProgressSchema.safeParse({ ...operation, product }).success, false);
+  assert.equal(groceryProgressSchema.safeParse({ ...operation, quick_add:{query:'turkey', quantity:0} }).success, false);
+  assert.equal(groceryProgressSchema.safeParse({ ...operation, phase:'complete', outcome:'in_cart',
+    worker_token:WORKER_TOKEN, claim_token:CLAIM_TOKEN }).success, false);
+});
+
 test('every method fails closed for missing/wrong/config-unset credentials; query and cookie do not authenticate', async () => {
   const { handler, calls } = fixture();
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']) {
