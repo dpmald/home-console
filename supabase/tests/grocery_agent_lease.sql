@@ -1,7 +1,8 @@
 -- Run only in the dedicated synthetic database, after migrations 0004 and 0005.
 -- No external carts; preserve existing records and roll back every fixture.
 begin;
-set local home_console.grocery_cart_actor = 'device';
+insert into public.grocery_cart_actor_scope(backend_pid,transaction_id,actor)
+  values(pg_backend_pid(),pg_current_xact_id(),'device');
 do $$
 declare
   prefix text := 'lease-test-' || gen_random_uuid()::text;

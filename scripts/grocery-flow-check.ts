@@ -55,7 +55,7 @@ try {
   assert.equal((await client.query("select has_function_privilege('service_role','public.grocery_trusted_device_mutate(jsonb)','EXECUTE') as allowed")).rows[0].allowed,true);
   await client.query('rollback');
   console.log('PASS: durable batch/replay, quantity preservation, invalid batch atomicity, connector prepare/complete/replay, safe display results, stale edit/cancel, snapshots and grants (fixtures rolled back).');
-  for(const file of ['supabase/tests/grocery_agent.sql','supabase/tests/grocery_agent_lease.sql','supabase/tests/grocery_trusted_intake.sql','supabase/tests/grocery_cart_worker.sql']) {
+  for(const file of ['supabase/tests/grocery_agent.sql','supabase/tests/grocery_agent_lease.sql','supabase/tests/grocery_trusted_intake.sql','supabase/tests/grocery_cart_worker.sql','supabase/tests/grocery_household_cart_check.sql']) {
     await client.query(readFileSync(file,'utf8'));
     console.log(`PASS: ${file} (rollback-only).`);
   }
