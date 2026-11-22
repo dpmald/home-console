@@ -120,6 +120,19 @@ class GroceryWorkerTests(unittest.TestCase):
         with self.assertRaises(ProviderError):
             read_cart({"retailer":{"name":"Somewhere else"},"cart":{"items":[]}},"Wegmans")
 
+    def test_stale_ambiguous_reconciliation_is_read_once_per_revision(self):
+        prior = {"attempt_id":"old","retailer":"Wegmans","revision":1,"requires_reconciliation":True}
+        edited = {**row("item"),"revision":2,"current_revision":2,"attempts":[prior]}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(worker,"complete",return_value={
+                "ok":False,"code":"revision_conflict","evidence_recorded":True}):
+            path = Path(tmp)
+            fixture = Fixture([], [])
+            worker.shop("cart-stale", [edited], fixture, path)
+            queue = lambda _,run: {"ok":True,"queue_policy":worker.POLICY,"run_id":run,"requests":[edited]}
+            with patch.object(worker,"helper",side_effect=queue):
+                self.assertEqual(worker.poll(Mock(side_effect=AssertionError("unexpected read")),False,path),"idle")
+            self.assertFalse(worker.recovery_marker({**edited,"revision":3}, prior, path).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,6 @@
 """Two-minute household cart poll. Runtime resources live under the signed-in user's LocalAppData."""
 import ctypes
+import hashlib
 import json
 import os
 import re
@@ -146,6 +147,11 @@ def candidates(snapshot):
             and r.get("revision") == r.get("current_revision") and not r.get("stale")]
 
 
+def recovery_marker(row, attempt, directory):
+    key = f'{row["id"]}/{row["revision"]}/{attempt.get("attempt_id")}'
+    return directory / (hashlib.sha256(key.encode()).hexdigest() + ".reviewed")
+
+
 def tokens(text):
     return {word for word in re.findall(r"[^\W_]+", text.casefold()) if len(word) > 1}
 
@@ -178,6 +184,7 @@ def complete(run, row, store, outcome, **fields):
     result = write_progress(run, row, store, "complete", outcome=outcome, **fields)
     if not result.get("ok") and not result.get("evidence_recorded"):
         raise RuntimeError("Receipt not acknowledged")
+    return result
 
 
 def get_cart(provider, store):
@@ -234,8 +241,11 @@ def shop(run, rows, provider, journal_dir):
         if pid in observed and observed[pid]["quantity"] == baseline.get(pid, 0) + expected.get("quantity", 0):
             complete(run, row, old["retailer"], "already_in_cart", product=observed[pid], **fields)
         else:
-            complete(run, row, old["retailer"], "needs_attention",
-                     reason="A previous add was interrupted. The original cart could not confirm it safely.", **fields)
+            result = complete(run, row, old["retailer"], "needs_attention",
+                              reason="A previous add was interrupted. The original cart could not confirm it safely.", **fields)
+            if result.get("evidence_recorded") and result.get("code") == "revision_conflict":
+                # The newer row remains needed; the kiosk exposes the older claim for household review.
+                write_atomic(recovery_marker(row, old, journal_dir), b"")
     if not new:
         return
     store = STORES[0]
@@ -360,7 +370,8 @@ def poll(provider_factory, held, journal_dir):
         return "queue_unavailable"
     rows = candidates(snapshot)
     ready = [row for row in rows if not any(a.get("requires_reconciliation") and
-             until(a.get("lease_expires_at")) > time.time() for a in row.get("attempts", []))]
+             (until(a.get("lease_expires_at")) > time.time() or recovery_marker(row, a, journal_dir).exists())
+             for a in row.get("attempts", []))]
     if not ready:
         return "idle"
     busy = journal_dir / "busy.json"
