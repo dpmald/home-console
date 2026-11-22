@@ -16,6 +16,10 @@ Use a separate checkout, install dependencies with `npm ci`, and run the command
 
 The grocery test adds a synthetic item through the device API, retries the same save, exercises the connector, then reads the result back. The dinner test submits an actual touchscreen claim and checks the owner and meal after a browser reload. The broadcast regression records calls made by real PostgreSQL triggers to a test implementation of the Realtime transport. Physical Cozyla input, hosted Realtime delivery and provider actions require separate verification.
 
+## Checking the hosted grocery list
+
+Use `node scripts/check-shared-groceries.mjs` after a hosted release to check the family kitchen link and the Beta grocery display and unlock link. Add `--item "item name"` to check the latest matching household request and its recorded product and quantity. This command only reads the live Console. Use a genuinely requested item for a provider test. Re-running the check never changes the cart. Keep household item results out of public CI logs.
+
 ## Merge requirements
 
 Dotty rechecks the successful PR workflow before dispatch and again before merging an approved commit. If the target branch has moved, update the PR branch to get a fresh run. An administrator can also require **Kitchen quality gate** from GitHub Actions in the rules for `main`, with up-to-date branches, to enforce the same requirement for manual merges. After the workflow lands, older open PRs need an update or reopen to trigger their first run.

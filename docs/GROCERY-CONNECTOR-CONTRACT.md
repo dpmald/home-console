@@ -1,4 +1,16 @@
-# Grocery connector: proposed v1 contract and validation
+# Household grocery connector
+
+## Household requests
+
+The family kitchen and hosted Beta link to one shared grocery list. Once a browser is unlocked, submitting a name and a quantity authorizes that request for the cart. A worker processes it independently of Claude's Saturday meal plan. The food rules in that plan apply to ingredients Claude chooses. Warren reviews the retailer cart and checks out.
+
+For a name such as "turkey" and a quantity of one, use the retailer's first matching product and add one package. Preserve any variety, brand, or size the household specifies. For an explicit size, use the provider's product search to identify the requested package before adding. Record the product and quantity the provider actually confirmed. Surface unavailable products and uncertain results on the originating console row. A lost response is grounds to reconcile the original cart before any further addition.
+
+Use Wegmans when its cart already contains items. If a successful read shows it empty, use Morton Williams Supermarket. Keep the chosen store for the run. An unreadable Wegmans cart cannot establish that it is empty. The provider identifies the retailer and cart contents. The Instacart family account controls which carts its members can see.
+
+Only a household-authorized revision may start a new cart addition. Older public requests can be confirmed individually on the list. The checkout and order proposal approval workflows remain separate. The hosted list can receive requests while the worker is offline and displays **In cart** only when there is a recorded cart result.
+
+## Original Saturday integration
 
 November 16 integration update: the same two-tool contract is now integrated on
 `codex/grocery-flow`. See [GROCERY-FLOW-PLAN.md](GROCERY-FLOW-PLAN.md) for the device
@@ -19,7 +31,7 @@ requested on-device price/window approval and purchase for an on-demand workflow
 See `docs/ON-DEMAND-GROCERY-CHECKOUT.md`; that design does not expand these two MCP
 tools into checkout tools or change the Saturday task.
 
-## Confirmed behavior
+## November 15 behavior
 
 - Voice or typed household requests enter the Home Console grocery list.
 - Claude plans exactly two dinners and adds their ingredients plus explicit
