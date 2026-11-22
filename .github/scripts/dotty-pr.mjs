@@ -21,12 +21,24 @@ function textFor(pr, version, approver) {
   return '<@' + approver + '> ' + link + ' · ' + pr.head.sha + '\n' + action + '\nReview ' + version;
 }
 
-export function approved(reply, ts, config, expectedText) {
+function approvalProblem(reply, ts, config, expectedText) {
   const msg = reply.message;
-  return reply.type === 'message' && reply.channel === config.channel && msg?.ts === ts &&
-    msg.user === config.bot && msg.text === expectedText &&
-    !!msg.reactions?.some(r => /^(?:\+1|thumbsup)(?:::skin-tone-[2-6])?$/.test(r.name) &&
-      r.users?.includes(config.approver));
+  if (reply.type !== 'message' || reply.channel !== config.channel || msg?.ts !== ts || msg.user !== config.bot) {
+    return 'the Slack message did not match the recorded channel, timestamp and bot';
+  }
+  // Slack can attach a display label to a mention when returning a message.
+  // Compare the visible approval block that was posted, including its PR, SHA and review round.
+  let text = msg.text;
+  if (msg.blocks) {
+    const [title, body] = msg.blocks;
+    if (msg.blocks.length !== 2 || title?.type !== 'section' || title.text?.type !== 'plain_text' ||
+        body?.type !== 'section' || body.text?.type !== 'mrkdwn') return 'the review message blocks have changed';
+    text = body.text.text;
+  }
+  const normalized = typeof text === 'string' && text.replace(/^<@(U[A-Z0-9]+)\|[^<>|\r\n]+>/, '<@$1>');
+  if (normalized !== expectedText) return 'the displayed approval text differs from the current review';
+  if (!msg.reactions?.some(r => /^(?:\+1|thumbsup)(?:::skin-tone-[2-6])?$/.test(r.name) &&
+      r.users?.includes(config.approver))) return 'the configured approver has no thumbs-up on this message';
 }
 
 async function review(pr, io) {
@@ -45,7 +57,9 @@ async function review(pr, io) {
 
 async function reacted(io, state) {
   const data = await io.slack('reactions.get', { channel: io.config.channel, timestamp: state.ts, full: 'true' });
-  return approved(data, state.ts, io.config, state.text);
+  const reason = approvalProblem(data, state.ts, io.config, state.text);
+  if (reason) console.info('Receipt ' + state.receipt.id + ': ' + reason);
+  return !reason;
 }
 
 export async function scan(io) {
@@ -144,6 +158,7 @@ async function main() {
   const sha = await mergeApproved(io, {
     number: process.env.PR_NUMBER, sha: process.env.HEAD_SHA, receiptId: process.env.RECEIPT_ID,
   });
+  if (!sha) console.info('PR #' + process.env.PR_NUMBER + ' did not meet the current approval conditions. Deployment skipped.');
   if (sha) appendFileSync(process.env.GITHUB_OUTPUT, 'merge_sha=' + sha + '\n');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

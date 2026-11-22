@@ -4,7 +4,7 @@ on:
     branches: [main]
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, edited]
   schedule:
-    - cron: '7,17,27,37,47,57 * * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
 
 permissions:
