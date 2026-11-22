@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { readBoundedBody } from '@/lib/request-body';
 import { safeEqual } from '@/lib/auth';
-import { isBetaDeployment } from '@/lib/beta-deployment';
+import { isBetaDeployment, isPublicHostedBeta } from '@/lib/beta-deployment';
 import { kioskCookieName } from '@/lib/kiosk-cookie';
 
 export const dynamic = 'force-dynamic';
@@ -20,15 +20,16 @@ function form(failed = false) {
   });
 }
 
-function unavailable() {
+function unlockRedirectOrError() {
   if (!isBetaDeployment() || process.env.NODE_ENV !== 'production') return new Response(null, { status: 404 });
+  if (isPublicHostedBeta()) return new Response(null, { status: 303, headers: { Location: '/beta', 'Cache-Control': 'no-store' } });
   if (!process.env.KIOSK_ACCESS_TOKEN) return new Response('Beta device access is unavailable.', { status: 503 });
 }
 
-export function GET() { return unavailable() ?? form(); }
+export function GET() { return unlockRedirectOrError() ?? form(); }
 
 export async function POST(req: NextRequest) {
-  const blocked = unavailable();
+  const blocked = unlockRedirectOrError();
   if (blocked) return blocked;
   if (req.headers.get('origin') !== req.nextUrl.origin) return new Response(null, { status: 403 });
   if (!req.headers.get('content-type')?.startsWith('application/x-www-form-urlencoded')) return form(true);

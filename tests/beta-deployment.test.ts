@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { getBetaDeployment } from '../lib/beta-deployment';
 import { GET as unlockForm, POST as unlockDevice } from '../app/unlock/route';
 import { middleware } from '../middleware';
+import { requireKioskRequest } from '../lib/kiosk-auth';
 import { getBetaDatabaseConfiguration } from '../lib/beta-database';
 
 test('hosted beta requires dedicated database configuration and rejects copied stable credentials', () => {
@@ -114,4 +115,41 @@ test('hosted Beta unlock requires a same-origin device key and sets a host-only 
   assert.match(unlocked.headers.get('set-cookie') ?? '', /Secure/i);
   env.HOME_CONSOLE_BETA_DEPLOYMENT = '0';
   assert.equal(unlockForm().status, 404);
+});
+
+test('public hosted Beta opens the device screens and accepts same-origin device writes without a key', async (t) => {
+  const env: Record<string, string | undefined> = process.env;
+  for (const [name, value] of Object.entries({
+    NODE_ENV: 'production', HOME_CONSOLE_BETA_DEPLOYMENT: '1', HOME_CONSOLE_GROCERY_DEVELOPMENT: '',
+    HOME_CONSOLE_BETA_DEVICE_ACCESS: 'public', KIOSK_ACCESS_TOKEN: '',
+  })) {
+    const original = env[name];
+    t.after(() => { if (original === undefined) delete env[name]; else env[name] = original; });
+    env[name] = value;
+  }
+  const host = 'https://beta.example.test';
+  const req = (path: string, init?: ConstructorParameters<typeof NextRequest>[1]) => new NextRequest(host + path, init);
+  for (const path of ['/', '/guide', '/beta', '/beta/groceries', '/api/groceries', '/api/kiosk', '/api/kiosk/order']) {
+    const response = middleware(req(path));
+    assert.equal(response.headers.get('x-middleware-next'), '1', path);
+    assert.equal(response.headers.get('set-cookie'), null);
+  }
+  assert.equal(unlockForm().headers.get('location'), '/beta');
+  assert.equal((await unlockDevice(req('/unlock', { method: 'POST' }))).headers.get('location'), '/beta');
+  assert.equal(middleware(req('/beta?key=old&view=one')).headers.get('location'), host + '/beta?view=one');
+  for (const path of ['/api/groceries', '/api/kiosk', '/api/kiosk/order']) {
+    assert.equal(requireKioskRequest(req(path)), null);
+    const write = (headers: Record<string, string>) => requireKioskRequest(req(path, { method: 'POST', headers }), true);
+    assert.equal(write({ origin: host }), null);
+    assert.equal(write({})?.status, 403);
+    assert.equal(write({ origin: 'https://elsewhere.test' })?.status, 403);
+    assert.equal(write({ origin: host, 'sec-fetch-site': 'cross-site' })?.status, 403);
+  }
+  assert.equal(middleware(req('/api/voice/session')).status, 404);
+  assert.equal(requireKioskRequest(req('/api/voice/session'))?.status, 503);
+  env.HOME_CONSOLE_GROCERY_DEVELOPMENT = '1';
+  assert.equal(middleware(req('/beta')).status, 503);
+  env.HOME_CONSOLE_BETA_DEPLOYMENT = '0';
+  assert.equal(middleware(req('/beta')).status, 404);
+  assert.equal(requireKioskRequest(req('/api/groceries'))?.status, 503);
 });
