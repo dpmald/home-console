@@ -1,6 +1,6 @@
 # Testing Home Console
 
-Every pull request runs [Kitchen PR checks](../.github/workflows/pr-checks.yml) on its proposed merge with the target branch. The three parallel jobs feed one GitHub status check named **Kitchen quality gate**.
+Every pull request runs [Kitchen PR checks](../.github/workflows/pr-checks.yml) on its proposed merge with the target branch. The parallel jobs feed one GitHub status check named **Kitchen quality gate**. A Windows runner exercises the encrypted queue journal, the cart worker's product and quantity handling, and lost-response recovery using a simulated retailer.
 
 | Command | What it verifies |
 | --- | --- |
