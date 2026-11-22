@@ -1,6 +1,7 @@
 -- Run only in the dedicated synthetic database, after migrations 0004 and 0005.
 -- No external carts; preserve existing records and roll back every fixture.
 begin;
+set local home_console.grocery_cart_actor = 'device';
 do $$
 declare
   prefix text := 'lease-test-' || gen_random_uuid()::text;

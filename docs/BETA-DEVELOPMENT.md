@@ -1,6 +1,6 @@
 # The Beta kitchen
 
-Beta runs the same kitchen board as the family display, with its own database, device sign-in and Claude credential. Use **Groceries** in the kitchen dock to open Saturday’s list. **Back to Beta** returns to the full board. **Back to kitchen** leaves Beta.
+Beta runs the same kitchen board as the family display, with its own database, device sign-in and Claude credential. Use **Groceries** in the kitchen dock to open the shared grocery list. **Back to Beta** returns to the full board. **Back to kitchen** leaves Beta.
 
 | Where you open the kitchen | Where edits go | Who reads the list |
 | --- | --- | --- |
@@ -13,6 +13,7 @@ Use [hosted groceries](https://home-console-beta.vercel.app/beta/groceries) for 
 ## Claude and device access
 
 - Add a custom connector named **Home Console Beta** with the URL `https://home-console-beta.vercel.app/api/mcp`. Choose API key or header authentication. Add the **Authorization** request header with the value `Bearer <the Beta connector key>`, including one space. The MCP endpoint exposes `list_pending` and `record_request_progress`.
+- Public viewing can remain enabled. Saving, confirming, editing, cancelling or reopening a grocery request requires the Beta device key. The unlock form remembers the device for a year. Earlier requests appear as **Needs confirmation** until a household member reviews their current name, quantity and notes and taps **Confirm for cart**.
 - On Warren’s Windows account, the local helper `%LOCALAPPDATA%\HomeConsole\HostedBeta\Copy-ClaudeHeader.ps1` copies the complete header value. Paste it directly into Claude’s connector settings. Use `Copy-DeviceKey.ps1` for the separate device key and paste it into the hosted kitchen’s unlock form. These files read Windows user-encrypted credentials.
 - Attach the connector to the intended Claude task in its connector settings. Creating a connector at the account level does not establish that an existing scheduled task has it. For a first read, ask Claude to call `list_pending` with a fresh run ID and report the names and quantities only. That call records a snapshot. The menu, Instacart cart, checkout and task schedule are separate operations.
 - Supabase holds groceries and their run receipts. The device authenticates to the kitchen, and Claude authenticates to the MCP endpoint. Neither client needs the Beta database server key.
@@ -43,7 +44,8 @@ Set these Vercel environment variables in that Beta project’s production envir
 | `HOME_CONSOLE_KITCHEN_URL` | Public return URL for the family kitchen |
 | `HOME_CONSOLE_BETA_SUPABASE_URL` | Canonical HTTPS origin of the Beta database |
 | `HOME_CONSOLE_BETA_SUPABASE_SERVICE_ROLE_KEY` | Beta database server credential |
-| `KIOSK_ACCESS_TOKEN` | Beta device credential |
+| `HOME_CONSOLE_BETA_DEVICE_ACCESS` | Set to `public` for public viewing and ordinary Beta kitchen actions. |
+| `KIOSK_ACCESS_TOKEN` | Beta device credential for grocery changes and proposal approvals, including in public mode. |
 | `HOME_CONSOLE_GROCERY_AGENT_KEY` | Separate Claude bearer credential |
 | `NEXT_PUBLIC_FAMILY_TIMEZONE` | `America/New_York` |
 

@@ -6,6 +6,7 @@ export const groceryMigrations = [
   'supabase/migrations/20261116000100_grocery_agent.sql',
   'supabase/migrations/20261116000200_grocery_lease_diagnostics.sql',
   'supabase/migrations/20261116000300_grocery_display.sql',
+  'supabase/migrations/20261122000100_trusted_grocery_intake.sql',
 ];
 export const legacyGroceryMigrations = {
   'supabase/migrations/20261116000100_grocery_agent.sql': 'supabase/migrations/0004_grocery_agent.sql',

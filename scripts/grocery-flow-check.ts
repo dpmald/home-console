@@ -11,7 +11,7 @@ const config = fixtureUrl ? {} : Object.fromEntries(readFileSync('.env.grocery-d
 const connectionString = validateGroceryDevelopmentDatabase(fixtureUrl ?? config.HOME_CONSOLE_GROCERY_DEV_DATABASE_URL, Boolean(fixtureUrl));
 const client=new pg.Client({connectionString,connectionTimeoutMillis:5000,statement_timeout:15000});
 const rpc=async(name:string,value?:unknown)=>{
-  const queries:Record<string,string>={device:'select public.grocery_device_mutate($1::jsonb) as result',list:'select public.grocery_device_list() as result',pending:'select public.grocery_agent_list_pending($1::text) as result',progress:'select public.grocery_agent_progress($1::jsonb) as result'};
+  const queries:Record<string,string>={device:'select public.grocery_trusted_device_mutate($1::jsonb) as result',list:'select public.grocery_device_list() as result',pending:'select public.grocery_agent_list_pending($1::text) as result',progress:'select public.grocery_agent_progress($1::jsonb) as result'};
   const args=name==='list'?[]:[name==='pending'?value:JSON.stringify(value)];
   return (await client.query(queries[name],args)).rows[0].result;
 };
@@ -41,6 +41,7 @@ try {
   assert.equal((await rpc('progress',completion)).replayed,true);
   const displayed=await rpc('list');const item=displayed.items.find((i:any)=>i.id===milk);
   assert.equal(item.status,'in_cart');assert.equal(item.result.product_name,'Synthetic milk');assert.equal(item.result.retailer,'Morton Williams Supermarket');
+  assert.equal(item.result.product_size,'carton');assert.equal(item.result.product_quantity,2);
   const visible=JSON.stringify(displayed);assert.equal(visible.includes(prepared.worker_token),false);assert.equal(visible.includes(prepared.claim_token),false);
   const edited=await rpc('device',{action:'edit',id:eggs,revision:1,name:'Synthetic flow eggs',quantity:'two cartons',notes:null});assert.equal(edited.ok,true);
   assert.equal(edited.items.find((i:any)=>i.id===eggs).revision,2);
@@ -50,11 +51,11 @@ try {
   assert.equal((await rpc('list')).items.find((i:any)=>i.id===eggs).status,'cancelled');
   const next=await rpc('pending',`after-${marker}`);assert.equal(next.requests.some((r:any)=>r.id===milk||r.id===eggs),false);
   assert.equal((await client.query("select has_function_privilege('anon','public.grocery_device_list()','EXECUTE') as allowed")).rows[0].allowed,false);
-  assert.equal((await client.query("select has_function_privilege('authenticated','public.grocery_device_mutate(jsonb)','EXECUTE') as allowed")).rows[0].allowed,false);
-  assert.equal((await client.query("select has_function_privilege('service_role','public.grocery_device_mutate(jsonb)','EXECUTE') as allowed")).rows[0].allowed,true);
+  assert.equal((await client.query("select has_function_privilege('authenticated','public.grocery_trusted_device_mutate(jsonb)','EXECUTE') as allowed")).rows[0].allowed,false);
+  assert.equal((await client.query("select has_function_privilege('service_role','public.grocery_trusted_device_mutate(jsonb)','EXECUTE') as allowed")).rows[0].allowed,true);
   await client.query('rollback');
   console.log('PASS: durable batch/replay, quantity preservation, invalid batch atomicity, connector prepare/complete/replay, safe display results, stale edit/cancel, snapshots and grants (fixtures rolled back).');
-  for(const file of ['supabase/tests/grocery_agent.sql','supabase/tests/grocery_agent_lease.sql']) {
+  for(const file of ['supabase/tests/grocery_agent.sql','supabase/tests/grocery_agent_lease.sql','supabase/tests/grocery_trusted_intake.sql','supabase/tests/grocery_cart_worker.sql']) {
     await client.query(readFileSync(file,'utf8'));
     console.log(`PASS: ${file} (rollback-only).`);
   }

@@ -2,6 +2,7 @@
 -- Requires 0001 and 0004 (and the bootstrap on plain PostgreSQL). All fixtures
 -- are rolled back; no external integration is called.
 begin;
+set local home_console.grocery_cart_actor = 'device';
 do $$
 declare
   prefix text := 'test-' || gen_random_uuid()::text;

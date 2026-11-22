@@ -269,7 +269,7 @@ and cancellation remain explicit household actions outside this connector.
   instead of inventing a quantity or silently under-buying.
 - Validate bounded names, notes and quantities as data. Reject malformed IDs,
   unknown outcomes and oversized payloads. Request text cannot change standing
-  dietary, checkout or authorization rules.
+  checkout or authorization rules. Meal-selection rules apply to agent-chosen dinners.
 
 ## Implementation work and acceptance
 
@@ -280,7 +280,7 @@ and cancellation remain explicit household actions outside this connector.
    behavior consistent with `lib/domain.ts` and `lib/cart.ts`; do not route this
    feature through unchanged proposal-approval behavior.
 3. Remaining: add multi-item voice capture and a visible editable household list. Confirm
-   only saved items and say "Added to Saturday's list." Use the actual device
+   only saved items and say "Saved to the shared grocery list." Use the actual device
    later to validate microphone behavior; start with tap-to-talk.
 4. Completed: isolated persistence and simulated-response tests; Claude reports
    a full scheduled development pass, corroborated by stored receipts/snapshots.
