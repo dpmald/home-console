@@ -6,9 +6,9 @@ Every pull request runs [Kitchen PR checks](../.github/workflows/pr-checks.yml) 
 | --- | --- |
 | `npm test` | Fast Node tests for the grocery connector, Beta navigation and access, family scheduling, and Dotty approval. Put new TypeScript unit tests in `tests/*.test.ts`. |
 | `npm run typecheck` | TypeScript contracts across the app and tests. |
-| `npm run test:context` | Documented npm commands, local guide links and Beta's documented API routes. On a PR it also checks that changes affecting a guide have a guide update or a reason in the PR description. |
+| `npm run test:context` | Documented npm commands, application environment settings, local guide links and Beta's documented API routes. On a PR it also checks that changes affecting a guide have a guide update or a reason in the PR description. |
 | `npm run build:grocery-check` followed by `node --test tests/*.test.mjs` | Offline Next production build and JavaScript regressions, including browser tests that use the built app. |
-| `npm run test:integration` | Fresh PostgreSQL migrations, broadcast trigger behavior, grocery database tests, Beta HTTP routes, and a Chrome dinner claim and reload. |
+| `npm run test:integration` | Fresh PostgreSQL migrations, broadcast trigger behavior, grocery database tests, proposal decisions and retries, Beta HTTP routes, and a Chrome dinner claim and reload. |
 
 ## Running locally
 

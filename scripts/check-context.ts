@@ -20,6 +20,16 @@ for (const guide of guides) {
   }
 }
 
+// Direct reads in application code are also the list the offline test launcher needs to scrub.
+const settings = new Set([...read('.env.example').matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map(match => match[1]));
+const runtimeOnly = new Set(['NODE_ENV', 'HOME_CONSOLE_PR_DATABASE_URL']);
+const sources = execFileSync('git', ['ls-files', 'app', 'components', 'lib', 'middleware.ts'], { encoding: 'utf8' });
+for (const file of sources.split(/\r?\n/).filter(path => /\.(mjs|tsx?)$/.test(path))) {
+  for (const [, name] of read(file).matchAll(/\bprocess\.env\.([A-Z][A-Z0-9_]*)/g)) {
+    if (!settings.has(name) && !runtimeOnly.has(name)) errors.push(file + ' reads ' + name + ' missing from .env.example');
+  }
+}
+
 // Compare the guide to actual App Router endpoints filtered through Beta's runtime policy.
 const routeFiles = execFileSync('git', ['ls-files', 'app/api'], { encoding: 'utf8' }).split(/\r?\n/);
 const allowed = routeFiles.filter(name => name.endsWith('/route.ts')).map(name => name.slice(3, -9))

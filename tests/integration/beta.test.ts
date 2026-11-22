@@ -75,6 +75,6 @@ test('disposable Beta kitchen', { timeout: 240000 }, async t => {
     assert.deepEqual(await listBacklog(), []);
     const next = (await proposeCart(input)).proposal;
     for (let i = 0; i < 2; i++) assert.equal((await decideProposal(next.id, true, 'fixture')).status, 'approved');
-    assert.deepEqual((await listBacklog()).map(row => row.source_proposal_id), [next.id]);
+    assert.deepEqual((await listBacklog()).map(row => row.recipe_or_item_name), [input.recipes[0].name]);
   });
 });
