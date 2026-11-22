@@ -57,6 +57,25 @@ test('discovery and dispatch accept a quick-add search before a real SKU is know
     worker_token:WORKER_TOKEN, claim_token:CLAIM_TOKEN }).success, false);
 });
 
+test('weighted cart baselines preserve decimals while additions and receipts keep whole requested units', async () => {
+  const line = { product_id:'synthetic-product', name:'Synthetic produce', quantity_type:'weight', quantity:0.5 };
+  const { product, ...base } = prepare();
+  const intent = { ...base, quick_add:{query:'produce',quantity:1}, observed_cart:[line] };
+  assert.equal(groceryProgressSchema.safeParse(intent).success, true);
+  assert.equal(groceryProgressSchema.safeParse({ ...intent, quick_add:{query:'produce',quantity:0.5} }).success, false);
+  assert.equal(groceryProgressSchema.safeParse({ ...intent, observed_cart:[{ ...line, quantity:-0.5 }] }).success, false);
+  const receipt = { ...base, phase:'complete', observed_cart:undefined, outcome:'in_cart', worker_token:WORKER_TOKEN,
+    claim_token:CLAIM_TOKEN, product:{ ...line, quantity:1 } };
+  assert.equal(groceryProgressSchema.safeParse(receipt).success, true);
+  assert.equal(groceryProgressSchema.safeParse({ ...receipt, product:line }).success, false);
+  assert.equal(groceryProgressSchema.safeParse({ ...receipt, product:{...line, quantity_type:'invented'} }).success, false);
+  for (const version of [undefined, 2]) {
+    const { handler } = fixture({async listPending(){return {ok:true, requests:[], cart_quantity_format:version};}});
+    const reply = await handler(request(rpc('tools/call', {name:'list_pending',arguments:{run_id:'cart-capabilities'}})));
+    assert.equal((await reply.json()).result.structuredContent.weighted_observations, version===2 ? true : undefined);
+  }
+});
+
 test('every method fails closed for missing/wrong/config-unset credentials; query and cookie do not authenticate', async () => {
   const { handler, calls } = fixture();
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']) {

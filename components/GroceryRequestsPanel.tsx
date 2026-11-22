@@ -22,11 +22,13 @@ interface GroceryRequestView {
     product_name: string | null;
     product_size: string | null;
     product_quantity: number | null;
+    product_quantity_type?: 'weight' | null;
     reason: string | null;
     requires_reconciliation: boolean;
     unresolved_attempt?: {
       attempt_id: string; retailer: string; revision: number; lease_expires_at: string | null;
       product_name: string | null; product_size: string | null; product_quantity: number | null;
+      product_quantity_type?: 'weight' | null;
       request_name: string | null; request_quantity: string | null;
     } | null;
   } | null;
@@ -56,7 +58,7 @@ function CartCheck({ item, canWrite, busy, onRetry }: {
   const active = Number.isFinite(expires) && Date.now() < expires;
   return <div className={styles.reconciliation}>
     <p>Check the {previous.retailer} cart for {previous.product_name || previous.request_name || item.name}
-      {previous.product_size && ` (${previous.product_size})`}{previous.product_quantity != null && ` × ${previous.product_quantity}`}.
+      {previous.product_size && ` (${previous.product_size})`}{previous.product_quantity != null && ` × ${previous.product_quantity}`}{previous.product_quantity_type === 'weight' && ' · sold by weight'}.
       {previous.revision !== item.revision && ` Revision ${previous.revision} requested ${previous.request_name || item.name}, ${previous.request_quantity || '1 package'}.`}</p>
     {active ? <p>The worker can still finish its attempt. Check again after <time dateTime={previous.lease_expires_at ?? undefined}>
       {new Date(expires).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</time>.</p> :
@@ -305,7 +307,7 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
           {item.notes && <p className={styles.notes}>{item.notes}</p>}
           {item.result?.retailer && <p className={styles.detail}>{item.result.retailer}
             {item.result.product_name && <> · {item.result.product_name}{item.result.product_size && ` (${item.result.product_size})`}
-              {item.result.product_quantity != null && ` × ${item.result.product_quantity}`}</>}</p>}
+              {item.result.product_quantity != null && ` × ${item.result.product_quantity}`}{item.result.product_quantity_type === 'weight' && ' · sold by weight'}</>}</p>}
           {item.result?.reason && <p className={styles.detail}>{item.result.reason}</p>}
           <CartCheck item={item} canWrite={canWrite} busy={busy} onRetry={attemptId => { void save({
             action: 'retry_missing', id: item.id, revision: item.revision, attempt_id: attemptId,
