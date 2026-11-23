@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { readBoundedBody } from '@/lib/request-body';
 import { safeEqual } from '@/lib/auth';
-import { isBetaDeployment } from '@/lib/beta-deployment';
+import { isBetaDeployment, isPublicHostedBeta } from '@/lib/beta-deployment';
 import { kioskCookieName } from '@/lib/kiosk-cookie';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   try { key = new URLSearchParams(await readBoundedBody(req, 1024)).get('key'); }
   catch { return form(true); }
   if (typeof key !== 'string' || key.length > 256 || !safeEqual(key, process.env.KIOSK_ACCESS_TOKEN!)) return form(true);
-  const response = NextResponse.redirect(new URL('/beta', req.url), 303);
+  const response = NextResponse.redirect(new URL(isPublicHostedBeta() ? '/beta/groceries' : '/beta', req.url), 303);
   response.headers.set('Cache-Control', 'private, no-store');
   response.cookies.set(kioskCookieName(), key, {
     secure: true, httpOnly: true, sameSite: 'lax', path: '/', maxAge: 365 * 86400,

@@ -10,6 +10,7 @@ import type { KioskAction } from '@/lib/types';
 
 import { isBetaDeployment } from '@/lib/beta-deployment';
 import { requireKioskRequest } from '@/lib/kiosk-auth';
+import { getBetaDestination } from '@/lib/beta-navigation.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,14 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   const date = todayISO();
   const a = (await req.json()) as KioskAction;
+  if (a.type === 'add_grocery' || a.type === 'grocery_status') {
+    const beta = getBetaDestination(process.env, req.headers.get('host'));
+    const href = isBetaDeployment() ? '/beta/groceries' : beta && new URL('/beta/groceries', beta).href;
+    if (href || (process.env.NODE_ENV === 'production' && process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT !== '1')) {
+      return NextResponse.json({ error: 'Open Shared grocery list in Dinner Hub to enter or change a request.',
+        grocery_url: href }, { status: 410 });
+    }
+  }
   let touchedSlack = false;
 
   switch (a.type) {

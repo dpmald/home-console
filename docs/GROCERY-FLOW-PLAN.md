@@ -1,5 +1,7 @@
 # Grocery requests: implementation plan and handoff
 
+For the current household request and Saturday meal workflows, read the [grocery connector contract](GROCERY-CONNECTOR-CONTRACT.md) and [Beta kitchen guide](BETA-DEVELOPMENT.md). The November 17 plan below records the original Saturday integration.
+
 Updated November 17, 2026. Integration branch: `codex/grocery-flow`, based on
 `39a227f35a134cde22d10a4d35104df4ba561888` after rebasing onto Daniela's November 16
 navigation and weather update. Production has not been changed.

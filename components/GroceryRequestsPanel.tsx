@@ -13,14 +13,24 @@ interface GroceryRequestView {
   notes: string | null;
   status: RequestStatus;
   revision: number;
+  cart_authorized_revision: number | null;
   created_at: string;
   updated_at: string;
   result?: {
     outcome: string | null;
     retailer: string | null;
     product_name: string | null;
+    product_size: string | null;
+    product_quantity: number | null;
+    product_quantity_type?: 'weight' | null;
     reason: string | null;
     requires_reconciliation: boolean;
+    unresolved_attempt?: {
+      attempt_id: string; retailer: string; revision: number; lease_expires_at: string | null;
+      product_name: string | null; product_size: string | null; product_quantity: number | null;
+      product_quantity_type?: 'weight' | null;
+      request_name: string | null; request_quantity: string | null;
+    } | null;
   } | null;
 }
 interface DraftItem { key: number; name: string; quantity: string; notes: string }
@@ -31,6 +41,32 @@ const LABELS: Record<RequestStatus, string> = {
   got: 'Received', cancelled: 'Cancelled', ordered: 'Legacy order status',
 };
 const emptyDraft = (key: number): DraftItem => ({ key, name: '', quantity: '', notes: '' });
+function statusLabel(item: GroceryRequestView) {
+  if (item.result?.requires_reconciliation && (item.status === 'needed' || item.status === 'needs_attention')) return 'Cart check needed';
+  if (item.status === 'needed' && item.cart_authorized_revision !== item.revision) return 'Needs confirmation';
+  if (item.status === 'in_cart' && !['in_cart', 'already_in_cart'].includes(item.result?.outcome ?? '')) return 'Cart receipt unavailable';
+  return LABELS[item.status];
+}
+
+function CartCheck({ item, canWrite, busy, onRetry }: {
+  item: GroceryRequestView; canWrite: boolean; busy: boolean; onRetry: (attemptId: string) => void;
+}) {
+  if (!item.result?.requires_reconciliation || !['needed', 'needs_attention'].includes(item.status)) return null;
+  const previous = item.result.unresolved_attempt;
+  if (!previous) return <p className={styles.reconciliation}>The previous cart change needs verification before this request can be retried.</p>;
+  const expires = Date.parse(previous.lease_expires_at ?? '');
+  const active = Number.isFinite(expires) && Date.now() < expires;
+  return <div className={styles.reconciliation}>
+    <p>Check the {previous.retailer} cart for {previous.product_name || previous.request_name || item.name}
+      {previous.product_size && ` (${previous.product_size})`}{previous.product_quantity != null && ` × ${previous.product_quantity}`}{previous.product_quantity_type === 'weight' && ' · sold by weight'}.
+      {previous.revision !== item.revision && ` Revision ${previous.revision} requested ${previous.request_name || item.name}, ${previous.request_quantity || '1 package'}.`}</p>
+    {active ? <p>The worker can still finish its attempt. Check again after <time dateTime={previous.lease_expires_at ?? undefined}>
+      {new Date(expires).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</time>.</p> :
+      <p>If the item is there, cancel this request to leave it in the cart. If it is missing, request a retry.</p>}
+    {canWrite && item.cart_authorized_revision === item.revision &&
+      <button type="button" disabled={busy || active} onClick={() => onRetry(previous.attempt_id)}>I checked the cart. Retry missing item</button>}
+  </div>;
+}
 function recoveryStorage(): PendingAddStorage | null {
   try { return window.sessionStorage; } catch { return null; }
 }
@@ -44,13 +80,15 @@ async function responseItems(response: Response): Promise<GroceryRequestView[]> 
   return body.items;
 }
 
-export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, embedded = false, description }: {
+export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, embedded = false, description, canWrite, unlockAvailable }: {
   onClose: () => void;
   onChanged?: () => void;
   toolbar?: ReactNode;
   refreshKey?: number;
   embedded?: boolean;
   description?: string;
+  canWrite: boolean;
+  unlockAvailable: boolean;
 }) {
   const titleId = useId();
   const [items, setItems] = useState<GroceryRequestView[]>([]);
@@ -195,7 +233,7 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
       setRecoveryNotice('This browser could not keep a recovery copy. If the save is interrupted, retry without closing or reloading this panel.');
     }
     if (await save({ action: 'add', operation_id: operationId, items: additions },
-      `Added ${additions.length === 1 ? additions[0].name : `${additions.length} items`} to Saturday’s list.`)) {
+      `Saved ${additions.length === 1 ? additions[0].name : `${additions.length} items`} to the shared grocery list.`)) {
       const cleared = clearPendingGroceryAdd(recoveryStorage(), operationId);
       pendingAdd.current = null;
       if (mounted.current) {
@@ -252,9 +290,9 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
             onChange={(event) => setEditing({ ...editing, quantity: event.target.value })} /></label>
           <label className={styles.fullWidth}>Notes<textarea maxLength={500} value={editing.notes} disabled={busy}
             onChange={(event) => setEditing({ ...editing, notes: event.target.value })} /></label>
-          <p className={`${styles.hint} ${styles.fullWidth}`}>Editing an in-cart request asks Claude to review the new request. It does not change the Instacart cart.</p>
+          {item.status === 'in_cart' && <p className={`${styles.hint} ${styles.fullWidth}`}>Saving an edit requests the new quantity in addition to what is already in your cart. To change the existing cart item, open Instacart.</p>}
           <div className={`${styles.actions} ${styles.fullWidth}`}>
-            <button type="submit" className={styles.primary} disabled={busy}>Save changes</button>
+            <button type="submit" className={styles.primary} disabled={busy}>{item.status === 'in_cart' ? 'Submit additional request' : 'Save changes'}</button>
             <button type="button" disabled={busy} onClick={() => setEditing(null)}>Keep original</button>
           </div>
         </form>
@@ -262,24 +300,33 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
         <>
           <div className={styles.itemHeading}>
             <div><h3>{item.name}</h3><p className={styles.quantity}>{item.quantity || '1 package'}</p></div>
-            <span className={`${styles.badge} ${item.status === 'in_cart' || item.status === 'got' ? styles.positive : item.status === 'needs_attention' ? styles.attention : ''}`}>{LABELS[item.status]}</span>
+            <span className={`${styles.badge} ${item.status === 'in_cart' || item.status === 'got' ? styles.positive : item.status === 'needs_attention' ? styles.attention : ''}`}>
+              {statusLabel(item)}
+            </span>
           </div>
           {item.notes && <p className={styles.notes}>{item.notes}</p>}
-          {item.result?.retailer && <p className={styles.detail}>{item.result.retailer}{item.result.product_name ? ` · ${item.result.product_name}` : ''}</p>}
+          {item.result?.retailer && <p className={styles.detail}>{item.result.retailer}
+            {item.result.product_name && <> · {item.result.product_name}{item.result.product_size && ` (${item.result.product_size})`}
+              {item.result.product_quantity != null && ` × ${item.result.product_quantity}`}{item.result.product_quantity_type === 'weight' && ' · sold by weight'}</>}</p>}
           {item.result?.reason && <p className={styles.detail}>{item.result.reason}</p>}
-          {item.result?.requires_reconciliation && <p className={styles.reconciliation}>Cart check needed. Claude must check the previous attempt before adding this again.</p>}
+          <CartCheck item={item} canWrite={canWrite} busy={busy} onRetry={attemptId => { void save({
+            action: 'retry_missing', id: item.id, revision: item.revision, attempt_id: attemptId,
+          }, 'Your cart check was saved. The request is pending again.'); }} />
           {item.status === 'in_cart' && <p className={styles.hint}>{item.result?.outcome === 'already_in_cart' ? 'Already covered by a cart item. ' : ''}Checkout and delivery are not confirmed.</p>}
           {item.status === 'ordered' && <p className={styles.hint}>This older status does not confirm a purchase or delivery.</p>}
-          <div className={styles.actions}>
+          {canWrite && <div className={styles.actions}>
+            {item.status === 'needed' && item.cart_authorized_revision !== item.revision &&
+              <button type="button" disabled={busy} onClick={() => { void save({ action: 'authorize', id: item.id, revision: item.revision },
+                'Request confirmed for the shared cart.'); }}>Confirm for cart</button>}
             {item.status !== 'got' && item.status !== 'cancelled' && <>
               <button type="button" disabled={busy} onClick={() => setEditing({ id: item.id, revision: item.revision,
                 name: item.name, quantity: item.quantity ?? '', notes: item.notes ?? '' })}>Edit</button>
               <button type="button" disabled={busy} onClick={() => { void setStatus(item, 'got'); }}>Mark received</button>
               <button type="button" disabled={busy} onClick={() => { void setStatus(item, 'cancelled'); }}>Cancel request</button>
             </>}
-            {(item.status === 'needs_attention' || item.status === 'got' || item.status === 'cancelled') &&
+            {((item.status === 'needs_attention' && !item.result?.requires_reconciliation) || item.status === 'got' || item.status === 'cancelled') &&
               <button type="button" disabled={busy} onClick={() => { void setStatus(item, 'needed'); }}>Return to pending</button>}
-          </div>
+          </div>}
         </>
       )}
     </li>
@@ -287,15 +334,15 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
 
   const active = items.filter((item) => item.status !== 'got' && item.status !== 'cancelled');
   const history = items.filter((item) => item.status === 'got' || item.status === 'cancelled');
-  const pendingCount = items.filter((item) => item.status === 'needed' || item.status === 'needs_attention').length;
+  const pendingCount = items.filter((item) => item.status === 'needed' && item.cart_authorized_revision === item.revision && !item.result?.requires_reconciliation).length;
 
   return (
     <section ref={panel} className={`${styles.panel}${embedded ? ` ${styles.embedded}` : ''}`}
       role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : true} aria-labelledby={titleId}
       tabIndex={-1} onKeyDown={keyboard} onClick={(event) => event.stopPropagation()}>
       <header className={styles.header}>
-        <div><p className={styles.eyebrow}>Household groceries</p><h2 id={titleId}>Saturday’s list</h2>
-          <p className={styles.subtitle}>{description ?? 'Save requests here. Claude picks them up for the Saturday cart.'}</p></div>
+        <div><p className={styles.eyebrow}>Household groceries</p><h2 id={titleId}>Shared grocery list</h2>
+          <p className={styles.subtitle}>{description}</p></div>
         {embedded
           ? <a className={styles.close} href={busy ? undefined : '/beta'} aria-disabled={busy} aria-label="Back to Beta">
               Back to Beta <span aria-hidden="true">←</span>
@@ -318,12 +365,12 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
             <button type="button" disabled={busy} onClick={() => { void refresh(); }}>Refresh</button></div>
           {!loaded && !loadingError && <p className={styles.empty} role="status">Loading the saved list…</p>}
           {!loaded && loadingError && <p className={styles.empty}>The saved list is unavailable. Your entries below will stay here while you retry.</p>}
-          {loaded && active.length === 0 && <div className={styles.empty}><span aria-hidden="true">＋</span><h3>No open requests</h3><p>Add what the household needs for Saturday.</p></div>}
+          {loaded && active.length === 0 && <div className={styles.empty}><span aria-hidden="true">＋</span><h3>No open requests</h3></div>}
           {active.length > 0 && <ul className={styles.list}>{active.map(renderItem)}</ul>}
           {history.length > 0 && <details className={styles.history}><summary>Received &amp; cancelled · {history.length}</summary><ul className={styles.list}>{history.map(renderItem)}</ul></details>}
         </div>
-        <form className={styles.composer} onSubmit={addRequests}>
-          <div><p className={styles.eyebrow}>Add to the list</p><h3>What do we need?</h3><p className={styles.hint}>One item per row. Leave quantity blank for one package.</p></div>
+        {canWrite ? <form className={styles.composer} onSubmit={addRequests}>
+          <div><p className={styles.eyebrow}>Add to the list</p><h3>What do we need?</h3><p className={styles.hint}>One item per row. Quantity defaults to 1.</p></div>
           <div className={styles.drafts}>
             {drafts.map((draft, index) => <fieldset className={styles.draft} disabled={busy} key={draft.key}>
               <legend>Item {index + 1}</legend>
@@ -343,10 +390,14 @@ export function GroceryRequestsPanel({ onClose, onChanged, toolbar, refreshKey, 
             <button type="button" disabled={busy || drafts.length >= 20} onClick={() => {
               abandonPendingAdd(); setDrafts((rows) => [...rows, emptyDraft(nextDraftKey.current++)]);
             }}>＋ Another item</button>
-            <button type="submit" className={styles.primary} disabled={busy}>{busy ? 'Saving…' : 'Add to Saturday’s list'}</button>
+            <button type="submit" className={styles.primary} disabled={busy}>{busy ? 'Saving…' : 'Add to shared list'}</button>
           </div>
           <p className={styles.hint}>Adding a request does not place an order. Cancelling a request leaves anything already in Instacart untouched.</p>
-        </form>
+        </form> : <div className={styles.composer}>
+          {unlockAvailable ? <><h3>Enable groceries on this device</h3><p>Unlock once with the household device key to add or manage requests.</p>
+            <a className={styles.primary} href="/unlock">Unlock this device</a></> :
+            <p>Grocery entry is unavailable until the household device key is configured.</p>}
+        </div>}
       </div>
     </section>
   );

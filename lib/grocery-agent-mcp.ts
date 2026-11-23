@@ -78,7 +78,12 @@ function createServer(store: GroceryAgentStore, secret: string): McpServer {
     description: GROCERY_LIST_DESCRIPTION,
     inputSchema: z.object({ run_id: groceryRunIdSchema }).strict(),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  }, async ({ run_id }) => executeSafely(() => store.listPending(run_id), secret));
+  }, async ({ run_id }) => executeSafely(async () => {
+    const snapshot = await store.listPending(run_id);
+    return snapshot.ok === true && snapshot.cart_quantity_format === 2
+      ? { ...snapshot, weighted_observations: true }
+      : snapshot;
+  }, secret));
   server.registerTool('record_request_progress', {
     title: 'Home Console grocery request progress',
     description: GROCERY_PROGRESS_DESCRIPTION,

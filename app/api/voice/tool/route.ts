@@ -5,6 +5,7 @@ import { parseGroceryVoiceItems, parseVoiceRequest, VoiceInputError, voiceResult
 import { addGroceryRequests, GroceryRequestError, listGroceryRequests } from '@/lib/grocery-requests';
 import { requireKioskRequest } from '@/lib/kiosk-auth';
 import { readBoundedBody, RequestBodyError } from '@/lib/request-body';
+import { getBetaDestination } from '@/lib/beta-navigation.mjs';
 
 export const dynamic = 'force-dynamic';
 const MAX_BODY = 32 * 1024;
@@ -26,10 +27,32 @@ export async function POST(req: NextRequest) {
       || (process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1' && !GROCERY_VOICE_TOOL_NAMES.has(name))) {
       return failure('That action is not available here.', 400);
     }
+    if (GROCERY_VOICE_TOOL_NAMES.has(name) && process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT !== '1') {
+      const shared = new URL('https://home-console-beta.vercel.app/api/groceries');
+      const beta = getBetaDestination(process.env, req.nextUrl.hostname);
+      const key = process.env.HOME_CONSOLE_SHARED_GROCERY_DEVICE_KEY;
+      if (!key || !beta || new URL(beta).origin !== shared.origin) {
+        return failure('Open Shared grocery list in Dinner Hub to enter or check your request.', 503);
+      }
+      const reading = name === 'get_grocery_requests';
+      if (reading && Object.keys(args).length) return failure('This action does not accept extra instructions.', 400);
+      if (!reading && !callId) return failure('That voice request could not be identified. Please try again.', 400);
+      const body = reading ? undefined : JSON.stringify({ action: 'add', operation_id: `voice:${callId}`,
+        items: parseGroceryVoiceItems(name, args) });
+      const response = await fetch(shared, { method: reading ? 'GET' : 'POST', body, redirect: 'error',
+        cache: 'no-store', signal: AbortSignal.timeout(10000),
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } });
+      if (!response.ok) return failure('The shared grocery list could not confirm this request. Check the list before retrying.', 503);
+      const result = await response.json();
+      if (result.ok !== true || !Array.isArray(result.items) || (!reading && !Array.isArray(result.added_ids))) {
+        return failure('The shared grocery list returned an incomplete result. Check the list before retrying.', 503);
+      }
+      return NextResponse.json({ result: reading ? result : { ok: true, added_ids: result.added_ids, note: 'Saved to the shared grocery list.' } });
+    }
     if (name === 'add_grocery_items' || name === 'add_grocery_item') {
       if (!callId) return failure('That voice request could not be identified. Please try again.', 400);
       const result = await addGroceryRequests(parseGroceryVoiceItems(name, args), `voice:${callId}`, 'voice');
-      return NextResponse.json({ result: { ...result, note: "Saved to Saturday's list. Checkout remains manual." } });
+      return NextResponse.json({ result: { ...result, note: 'Saved to the test grocery list.' } });
     }
     if (name === 'get_grocery_requests') {
       if (Object.keys(args).length) return failure('This action does not accept extra instructions.', 400);

@@ -370,7 +370,7 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
   }
 }
 
-export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitchenUrl = null }: { initial: KitchenState; initialWeather: Weather | null; betaUrl?: string | null; betaKitchenUrl?: string | null }) {
+export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitchenUrl = null, allowPantryEntry = false }: { initial: KitchenState; initialWeather: Weather | null; betaUrl?: string | null; betaKitchenUrl?: string | null; allowPantryEntry?: boolean }) {
   const beta = Boolean(betaKitchenUrl);
   const [state, setState] = useState<KitchenState>(initial);
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
@@ -943,6 +943,20 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
   const allowanceEarned = (bonusEarnedCents / 100).toFixed(2);
   const allowanceTotal = (bonusTotalCents / 100).toFixed(2);
   const pendingOrders = state.orders.filter((o) => o.status === 'pending');
+  const groceryListUrl = beta ? '/beta/groceries' : betaUrl && new URL('/beta/groceries', betaUrl).href;
+  const groceryListLink = groceryListUrl && (
+    <a
+      className="hw-btn emerald"
+      href={groceryListUrl}
+      target="_top"
+      rel="noreferrer"
+      referrerPolicy="no-referrer"
+      style={{ minHeight: 48, flexShrink: 0 }}
+    >
+      Shared grocery list
+      <span aria-hidden="true">→</span>
+    </a>
+  );
   const nextUnassigned = state.events.find(
     (e) => isClaimableLogistics(e) && e.assigned_parent === 'unassigned',
   );
@@ -1884,9 +1898,9 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                           <button
                             className="hw-btn"
                             style={{ width: '100%', padding: '6px 10px', fontSize: '0.72rem' }}
-                            onClick={() => beta ? window.location.assign('/beta/groceries') : setMode('bento')}
+                            onClick={() => groceryListUrl ? window.location.assign(groceryListUrl) : setMode('bento')}
                           >
-                            + Add Item
+                            {groceryListUrl ? 'Shared grocery list' : 'Kitchen pantry'}
                           </button>
                         </div>
                       )}
@@ -3997,6 +4011,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 overflowY: 'auto',
               }}
             >
+              {groceryListLink}
               {/* Bento Card 1: UPCOMING */}
               <button
                 type="button"
@@ -4982,44 +4997,41 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                   </div>
                 </div>
 
-                {/* Pantry & Grocery Cart Staging Footer */}
-                <div style={{ paddingTop: 12, marginTop: 12, borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--muted)' }}>
-                        local_shipping
-                      </span>
-                      Pantry Cart Staging ({state.groceries.length})
-                    </span>
-                  </div>
-
-                  <form
-                    style={{ display: 'flex', gap: 8 }}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!newGrocery.trim()) return;
-                      act({ type: 'add_grocery', name: newGrocery });
-                      setNewGrocery('');
-                    }}
-                  >
-                    <input
-                      className="ceramic-well"
-                      style={{ flex: 1, padding: '11px 16px', fontSize: '0.94rem' }}
-                      placeholder={
-                        state.groceries.length
-                          ? `In cart: ${state.groceries.map((g) => g.name).join(', ')} — add more…`
-                          : 'Add item to Saturday grocery cart…'
-                      }
-                      value={newGrocery}
-                      onChange={(e) => setNewGrocery(e.target.value)}
-                    />
-                    <button className="hw-btn" type="submit" style={{ padding: '11px 18px', fontSize: '0.86rem' }}>
-                      + ADD
-                    </button>
-                  </form>
+                <div style={{ display: 'grid', gap: 4, paddingTop: 12, marginTop: 12, borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
+                  {groceryListLink}
+                  {!beta && (
+                    <details open={!groceryListUrl}>
+                      <summary className="font-mono" style={{ padding: '12px 0', cursor: 'pointer' }}>
+                        Kitchen-only pantry list ({state.groceries.length})
+                      </summary>
+                      {state.groceries.length > 0 && (
+                        <p style={{ maxHeight: 62, overflowY: 'auto', marginBottom: 8 }}>
+                          {state.groceries.map((g) => g.name).join(', ')}
+                        </p>
+                      )}
+                      {allowPantryEntry && <form
+                        style={{ display: 'flex', gap: 8 }}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!newGrocery.trim()) return;
+                          act({ type: 'add_grocery', name: newGrocery });
+                          setNewGrocery('');
+                        }}
+                      >
+                        <input
+                          aria-label="Kitchen pantry item"
+                          className="ceramic-well"
+                          style={{ flex: 1, minWidth: 0, padding: '11px 16px', fontSize: '0.94rem' }}
+                          placeholder="Add a pantry item…"
+                          value={newGrocery}
+                          onChange={(e) => setNewGrocery(e.target.value)}
+                        />
+                        <button className="hw-btn" type="submit" style={{ padding: '11px 18px', fontSize: '0.86rem' }}>
+                          + ADD
+                        </button>
+                      </form>}
+                    </details>
+                  )}
                 </div>
               </div>
             ) : (

@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { chromium } from 'playwright-core';
 
 export async function openKitchen(t, options) {
+  process.env.NODE_ENV = 'production';
   for (const [, name] of readFileSync('.env.example', 'utf8').matchAll(/^([A-Z][A-Z0-9_]*)=/gm)) {
     process.env[name] = '';
   }

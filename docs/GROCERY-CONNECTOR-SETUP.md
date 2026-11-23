@@ -238,7 +238,7 @@ safe expiry metadata, no failed-prepare writes, expiry takeover and fresh eviden
 local and public HTTPS MCP smoke with a temporary fixture and database readback;
 TypeScript; credential-cleared Next.js production build; public unauthenticated
 HTTPS 401. No Instacart operation was invoked by either smoke test.
-No UI layout was changed. Voice confirmation wording now refers to Saturday's list,
+No UI layout was changed. At that checkpoint, voice confirmation referred to the Saturday list,
 but the currently unmounted voice component has not been wired to the physical device.
 
 The dependency audit still reports the existing Next.js/PostCSS advisory chain

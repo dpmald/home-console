@@ -9,6 +9,8 @@ const identity = { id: z.uuid(), revision: z.number().int().min(1).max(999999999
 export const groceryAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('add'), operation_id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/), items: z.array(groceryInput).min(1).max(20) }).strict(),
   z.object({ action: z.literal('edit'), ...identity, ...groceryInput.shape }).strict(),
+  z.object({ action: z.literal('authorize'), ...identity }).strict(),
+  z.object({ action: z.literal('retry_missing'), ...identity, attempt_id: z.uuid() }).strict(),
   z.object({ action: z.literal('status'), ...identity, status: z.enum(['needed','got','cancelled']) }).strict(),
 ]);
 
@@ -18,6 +20,7 @@ export class GroceryRequestError extends Error {
 const errors: Record<string, string> = {
   invalid_input: 'Check the item names, quantities and notes.',
   revision_conflict: 'This request changed. Refresh before editing it.',
+  claim_active: 'The worker can still finish the previous cart change. Check the cart after the time shown.',
   request_missing: 'This request no longer exists. Refresh the list.',
   idempotency_conflict: 'This save was already used with different items. Refresh before trying again.',
 };
@@ -29,10 +32,11 @@ export async function changeGroceryRequests(input: unknown, addedBy: 'voice' | '
   const parsed = groceryAction.safeParse(input);
   if (!parsed.success) throw new GroceryRequestError('invalid_input', errors.invalid_input);
   const action = parsed.data.action === 'add' ? { ...parsed.data, added_by: addedBy } : parsed.data;
-  const result = await groceryAgentRpc('grocery_device_mutate', { p_action: action });
+  const result = await groceryAgentRpc('grocery_trusted_device_mutate', { p_action: action });
   if (result.ok !== true) {
     const code = typeof result.code === 'string' ? result.code : 'storage_error';
-    throw new GroceryRequestError(code, errors[code] ?? 'The grocery request could not be saved.', code === 'revision_conflict' || code === 'idempotency_conflict' ? 409 : 400);
+    const conflict = ['revision_conflict', 'idempotency_conflict', 'claim_active'].includes(code);
+    throw new GroceryRequestError(code, errors[code] ?? 'The grocery request could not be saved.', conflict ? 409 : 400);
   }
   return result;
 }
