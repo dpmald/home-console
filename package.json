@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "@sherpaw/kws": "0.3.0",
     "@supabase/postgrest-js": "2.119.0",
     "@supabase/supabase-js": "^2.49.0",
     "next": "^15.3.0",

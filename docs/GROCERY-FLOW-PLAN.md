@@ -37,7 +37,7 @@ voice model. The physical Cozyla microphone is still a separate acceptance test.
 | 2. Preserve migration history | Unique canonical grocery versions; documented mapping from the old synthetic ledger; fresh and legacy paths checked | Done locally |
 | 3. Persist device requests | Atomic batches, explicit quantities, bounded notes, operation IDs, revision-checked edits/cancel/received | Done |
 | 4. Display results | Visible pending/in-cart/attention states, actual recorded product and retailer, no invented price or purchase state | Done |
-| 5. Connect voice | Mount Kitchen voice within grocery panel, multi-item save, quantity preservation, success only after persistence, cleanup on stop | Implemented; actual microphone/provider check pending |
+| 5. Connect voice | Open Kitchen voice from the family board, save multiple items with quantities to the shared list, confirm after persistence, release the mic on stop | Implemented on the feature branch. Physical Cozyla microphone and provider conversation require device verification. |
 | 6. Handle failures | Fail-closed device authentication, same-origin writes, streamed request limits, save errors, same-tab recovery of uncertain submissions | Done; focused checks passed |
 | 7. Test local request/receipt flow | Actual Next voice API -> synthetic persistence -> MCP prepare/complete/replay -> display API; browser save/reload/edit/cancel | Passed locally; excludes actual speech, hosted Supabase/Vercel and Instacart |
 | 8. Share for review | Feature branch plus draft PR, reviewer commands and screenshot | Committed locally; publication blocked by GitHub write access |

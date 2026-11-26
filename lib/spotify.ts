@@ -117,17 +117,10 @@ export async function controlSpotify(action: {
   const dev = await resolveKitchenDeviceId();
   const qs = dev.id ? `?device_id=${encodeURIComponent(dev.id)}` : '';
 
-  if (action.op === 'pause') {
-    await spFetch(`/me/player/pause${qs}`, { method: 'PUT' });
-    return { ok: true, device: dev.name ?? undefined };
-  }
-  if (action.op === 'next') {
-    await spFetch(`/me/player/next${qs}`, { method: 'POST' });
-    return { ok: true, device: dev.name ?? undefined };
-  }
-  if (action.op === 'previous') {
-    await spFetch(`/me/player/previous${qs}`, { method: 'POST' });
-    return { ok: true, device: dev.name ?? undefined };
+  if (action.op !== 'play') {
+    const response = await spFetch(`/me/player/${action.op}${qs}`, { method: action.op === 'pause' ? 'PUT' : 'POST' });
+    return response.ok ? { ok: true, device: dev.name ?? undefined }
+      : { ok: false, error: 'Spotify could not confirm the playback change.' };
   }
 
   // Play (either resume, play a specific URI, or search for a query first)
@@ -160,6 +153,7 @@ export async function controlSpotify(action: {
         label = `${pick.name}${pick.artists?.[0]?.name ? ` — ${pick.artists[0].name}` : ''}`;
       }
     }
+    if (!body) return { ok: false, error: 'Spotify could not find that selection.' };
   }
 
   const pr = await spFetch(`/me/player/play${qs}`, {
@@ -169,5 +163,6 @@ export async function controlSpotify(action: {
   if (!pr.ok && pr.status === 404) {
     return { ok: false, needsWake: true, error: 'Spotify device not active yet' };
   }
+  if (!pr.ok) return { ok: false, error: 'Spotify could not confirm playback.' };
   return { ok: true, playing: label, device: dev.name ?? undefined };
 }

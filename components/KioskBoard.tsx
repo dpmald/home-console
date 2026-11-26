@@ -13,7 +13,6 @@ import {
 import { daysBetween, fmtDay, fmtEventTime, fmtShortDate, fmtTime, isAllDay, todayISO } from '@/lib/time';
 import {
   isFullyKiosk,
-  launchGeminiOnCozyla,
   launchGreenlightOnCozyla,
   speakOnCozyla,
   useCozylaKiosk,
@@ -23,18 +22,11 @@ import {
 import type { BacklogLocation, KioskAction, KitchenState } from '@/lib/types';
 import { NYC_LAT, NYC_LON, parseOpenMeteoResponse, type Weather } from '@/lib/weather';
 import type { SpotifyNowPlaying } from '@/lib/spotify';
-import { ThemeToggle } from './ThemeToggle';
-
-interface Timer {
-  id: string;
-  label: string;
-  initialSecs: number;
-  endsAt: number;
-  pausedRemaining?: number;
-}
-
-type ViewMode = 'ambient' | 'dinner' | 'bento' | 'timeline';
-type MemberFilter = 'all' | 'school' | 'daniela' | 'warren' | 'wesley' | 'lachlan';
+import { VoiceOrb } from './VoiceOrb';
+import { createKitchenTimer, describeTimer, findKitchenTimer, remainingSeconds, updateKitchenTimer, type KitchenTimer } from '@/lib/voice/console-timers';
+import { hasVoiceRecipe, readViewRequest, recipeControl, type BoardSource, type MemberFilter, type ViewMode } from '@/lib/voice/console-view';
+import { createDinnerGuideLoader, type DinnerGuide, type GuideView } from '@/lib/dinner-guide';
+import { ThemeButton, useTheme } from './ThemeToggle';
 
 interface RecipeStep {
   stage: string;
@@ -189,60 +181,6 @@ function getUnstructuredMealDetails(rawTitle: string | null | undefined): {
 
 const NPR_URL = process.env.NEXT_PUBLIC_NPR_STREAM_URL || 'https://npr-ice.streamguys1.com/live.mp3';
 
-function GeminiSparkIcon({ size = 18, white = false }: { size?: number; white?: boolean }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ flexShrink: 0 }}
-    >
-      {!white && (
-        <defs>
-          <linearGradient id="geminiSparkGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="var(--cobalt)" />
-            <stop offset="55%" stopColor="var(--terracotta)" />
-            <stop offset="100%" stopColor="var(--amber)" />
-          </linearGradient>
-        </defs>
-      )}
-      <path
-        d="M12 1.75C12.35 7.1 16.9 11.65 22.25 12C16.9 12.35 12.35 16.9 12 22.25C11.65 16.9 7.1 12.35 1.75 12C7.1 11.65 11.65 7.1 12 1.75Z"
-        fill={white ? '#ffffff' : 'url(#geminiSparkGrad)'}
-      />
-    </svg>
-  );
-}
-
-function GeminiEqualizerPill({ active = true }: { active?: boolean }) {
-  const bars: { color: string; height: number; delay: string }[] = [
-    { color: '#1d4ed8', height: 11, delay: '0s' },
-    { color: '#1d4ed8', height: 19, delay: '0.12s' },
-    { color: '#c2410c', height: 24, delay: '0.24s' },
-    { color: '#b93815', height: 14, delay: '0.08s' },
-    { color: '#15803d', height: 21, delay: '0.3s' },
-    { color: '#c2410c', height: 10, delay: '0.18s' },
-    { color: '#b93815', height: 17, delay: '0.36s' },
-  ];
-  return (
-    <div className={`gemini-eq-pill ${active ? 'active' : ''}`}>
-      {bars.map((b, i) => (
-        <span
-          key={i}
-          className="gemini-eq-bar"
-          style={{
-            background: b.color,
-            height: b.height,
-            animationDelay: b.delay,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function chime() {
   try {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
@@ -370,25 +308,29 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
   }
 }
 
-export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitchenUrl = null, allowPantryEntry = false }: { initial: KitchenState; initialWeather: Weather | null; betaUrl?: string | null; betaKitchenUrl?: string | null; allowPantryEntry?: boolean }) {
+export function KioskBoard({ initial, initialDemo = false, initialWeather, betaUrl = null, betaKitchenUrl = null, allowPantryEntry = false, allowStreamAudio = true }: { initial: KitchenState; initialDemo?: boolean; initialWeather: Weather | null; betaUrl?: string | null; betaKitchenUrl?: string | null; allowPantryEntry?: boolean; allowStreamAudio?: boolean }) {
   const beta = Boolean(betaKitchenUrl);
+  const [theme, toggleTheme, applyTheme] = useTheme();
+  const [loadDinnerGuide] = useState(() => createDinnerGuideLoader());
   const [state, setState] = useState<KitchenState>(initial);
+  const [boardSource, setBoardSource] = useState<BoardSource>(initialDemo ? 'demo' : 'saved');
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
   const [mode, setMode] = useState<ViewMode>('ambient');
   const [moreOpen, setMoreOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
   const [now, setNow] = useState<Date>(() => new Date());
-  const [timers, setTimers] = useState<Timer[]>([]);
+  const [timers, setTimers] = useState<KitchenTimer[]>([]);
+  const timersRef = useRef<KitchenTimer[]>([]);
+  const [selectedTimerId, setSelectedTimerId] = useState<string | null>(null);
   const [nprPlaying, setNprPlaying] = useState(false);
   const [spotify, setSpotify] = useState<SpotifyNowPlaying>({ configured: false, playing: false });
   const [newBacklog, setNewBacklog] = useState('');
   const [newBacklogLoc, setNewBacklogLoc] = useState<BacklogLocation>('fridge');
   const [newGrocery, setNewGrocery] = useState('');
-  const [geminiOpen, setGeminiOpen] = useState(false);
-  const [geminiCustomQuery, setGeminiCustomQuery] = useState('');
-  const [geminiListening, setGeminiListening] = useState(false);
-  const [geminiStampedAt, setGeminiStampedAt] = useState('');
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voicePrompt, setVoicePrompt] = useState('');
+  const [wakeArmed, setWakeArmed] = useState(false);
   const [recipeStepIdx, setRecipeStepIdx] = useState(2); // Default Step 3 of 5 — BROILING
   const [broilSeconds, setBroilSeconds] = useState(342); // Default 05:42
   const [broilRunning, setBroilRunning] = useState(false);
@@ -396,7 +338,6 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
   const [dinnerRecipeMode, setDinnerRecipeMode] = useState<'auto' | 'structured' | 'tips'>('auto');
   const [pendingChef, setPendingChef] = useState<'daniela' | 'warren' | null>(null);
   const [captureMealInput, setCaptureMealInput] = useState('');
-  const [captureListening, setCaptureListening] = useState(false);
   const [liveDinnerTips, setLiveDinnerTips] = useState<{
     mealTitle: string;
     imageUrl: string;
@@ -427,80 +368,25 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
     }, 2600);
   }, []);
 
-  const openGeminiOverlay = useCallback(() => {
-    if (beta) return showToast('Gemini is disconnected in Beta.');
-    setGeminiStampedAt(
-      new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-      }),
-    );
-    setGeminiOpen(true);
-  }, [beta, showToast]);
+  function openAssistant(prompt = '') {
+    setMoreOpen(false);
+    setVoicePrompt(prompt);
+    setVoiceOpen(true);
+  }
 
-  const applyVoiceCommandIfTimer = useCallback((text: string) => {
-    const lower = text.toLowerCase();
-    if (/\b(cancel|clear|stop|delete)\b.*\btimer/.test(lower)) {
-      setTimers([]);
-      return true;
-    }
-    const m = lower.match(/(\d+)\s*(?:-\s*)?(minute|minutes|min|mins|second|seconds|sec|secs)\b(?:\s+([a-z0-9 ]+?))?\s*(?:timer)?/);
-    if (lower.includes('timer') && m) {
-      const n = parseInt(m[1], 10);
-      const unit = m[2].startsWith('sec') ? 1 : 60;
-      const secs = Math.max(1, n * unit);
-      const rawLabel = m[3]?.replace(/\b(for|timer|a|the)\b/g, '').trim();
-      const label = rawLabel
-        ? `${rawLabel.charAt(0).toUpperCase()}${rawLabel.slice(1)} Timer`
-        : `${n} ${unit === 60 ? 'Min' : 'Sec'} Timer`;
-      const id = `${Date.now()}`;
-      firedTimers.current.delete(id);
-      setTimers([{ id, label, initialSecs: secs, endsAt: Date.now() + secs * 1000 }]);
-      return true;
-    }
-    return false;
+  const changeAssistantOpen = useCallback((open: boolean) => {
+    setMoreOpen(false);
+    if (!open) setVoicePrompt('');
+    setVoiceOpen(open);
   }, []);
-
-  const startGeminiDictation = useCallback(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      launchGeminiOnCozyla();
-      return;
-    }
-    try {
-      const rec = new SR();
-      rec.lang = 'en-US';
-      rec.interimResults = false;
-      setGeminiListening(true);
-      rec.onresult = (ev: any) => {
-        const transcript = ev.results?.[0]?.[0]?.transcript;
-        if (transcript) {
-          setGeminiCustomQuery(transcript);
-          applyVoiceCommandIfTimer(transcript);
-          setGeminiStampedAt(
-            new Date().toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: true,
-            }),
-          );
-        }
-      };
-      rec.onend = () => setGeminiListening(false);
-      rec.onerror = () => setGeminiListening(false);
-      rec.start();
-    } catch {
-      setGeminiListening(false);
-    }
-  }, [applyVoiceCommandIfTimer]);
 
   const refreshKitchen = useCallback(async () => {
     try {
       const r = await fetch('/api/kiosk', { cache: 'no-store' });
-      if (r.ok) setState(await r.json());
+      if (r.ok) {
+        setState(await r.json());
+        setBoardSource(r.headers.get('X-Kitchen-Data') === 'demo' ? 'demo' : 'saved');
+      }
     } catch {}
   }, []);
 
@@ -524,10 +410,12 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
       });
       if (r.ok) {
         setState(await r.json());
+        setBoardSource('saved');
         return;
       }
     } catch {}
     if (beta) return showToast('Could not confirm the save. Refresh the Beta kitchen before retrying.');
+    setBoardSource('unconfirmed');
     setState((cur) => applyOptimisticAction(cur, action));
   }, [beta, showToast]);
 
@@ -540,10 +428,12 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
       });
       if (r.ok) {
         setState(await r.json());
+        setBoardSource('saved');
         return;
       }
     } catch {}
     if (beta) return showToast('Could not confirm the Beta cart decision. Refresh before retrying.');
+    setBoardSource('unconfirmed');
     setState((cur) => ({
       ...cur,
       orders: cur.orders.map((o) => (o.id === id ? { ...o, status: approve ? 'approved' : 'rejected' } : o)),
@@ -596,23 +486,20 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
     const id = setInterval(() => {
       const t = new Date();
       setNow(t);
-      setTimers((cur) => {
-        for (const tm of cur) {
-          if (tm.pausedRemaining === undefined && tm.endsAt <= t.getTime() && !firedTimers.current.has(tm.id)) {
-            firedTimers.current.add(tm.id);
-            if (!beta) wakeCozylaScreen();
-            chime();
-            if (!beta && isFullyKiosk()) speakOnCozyla(`${tm.label} is done`);
-          }
+      for (const timer of timersRef.current) {
+        if (timer.pausedRemaining === undefined && timer.endsAt <= t.getTime() && !firedTimers.current.has(timer.id)) {
+          firedTimers.current.add(timer.id);
+          if (!beta) wakeCozylaScreen();
+          chime();
+          if (!beta && isFullyKiosk()) speakOnCozyla(`${timer.label} is done`);
         }
-        return cur;
-      });
+      }
       setBroilSeconds((s) => {
         if (!broilRunning) return s;
         if (s > 1) return s - 1;
         setBroilRunning(false);
         chime();
-        showToast('🔔 Salmon Broil Complete! Check caramelized blisters.');
+        showToast('The recipe step timer is done.');
         return 0;
       });
     }, 1000);
@@ -668,39 +555,59 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
     };
   }, [beta, initialWeather, refresh, refreshKitchen, refreshWeather]);
 
-  const playNpr = useCallback(() => {
-    if (!nprRef.current) nprRef.current = new Audio(NPR_URL);
-    nprRef.current.src = NPR_URL;
-    nprRef.current.play().then(() => setNprPlaying(true)).catch(() => setNprPlaying(false));
-  }, []);
+  const playNpr = useCallback(async () => {
+    if (beta || !allowStreamAudio) throw new Error('Live radio is disconnected on this board.');
+    const audio = nprRef.current ?? new Audio();
+    if (!nprRef.current) {
+      audio.onpause = audio.onended = audio.onerror = () => setNprPlaying(false);
+      nprRef.current = audio;
+    }
+    if (!audio.getAttribute('src')) audio.src = NPR_URL;
+    try {
+      await audio.play();
+      setNprPlaying(true);
+    } catch {
+      setNprPlaying(false);
+      throw new Error('The console could not play NPR.');
+    }
+  }, [allowStreamAudio, beta]);
 
   const stopNpr = useCallback(() => {
     if (nprRef.current) {
       nprRef.current.pause();
-      nprRef.current.src = '';
+      nprRef.current.removeAttribute('src');
+      nprRef.current.load();
     }
     setNprPlaying(false);
   }, []);
 
-  const startTimer = useCallback((seconds: number, label = 'Kitchen Timer') => {
-    const id = `${Date.now()}`;
-    firedTimers.current.delete(id);
-    setTimers([
-      {
-        id,
-        label,
-        initialSecs: seconds,
-        endsAt: Date.now() + seconds * 1000,
-      },
-    ]);
-  }, []);
+  function replaceTimers(next: KitchenTimer[]) {
+    timersRef.current = next;
+    setTimers(next);
+  }
 
-  const activeTimer = timers[0];
-  const timerRemainingSecs = activeTimer
-    ? activeTimer.pausedRemaining !== undefined
-      ? activeTimer.pausedRemaining
-      : Math.max(0, Math.ceil((activeTimer.endsAt - now.getTime()) / 1000))
-    : 0;
+  function startTimer(args: Record<string, unknown>) {
+    const timer = createKitchenTimer(args);
+    const names = new Set(timersRef.current.map(other => other.label.toLowerCase()));
+    if (args.label == null) {
+      for (let n = 2; names.has(timer.label.toLowerCase()); n++) timer.label = `Kitchen Timer ${n}`;
+    } else if (names.has(timer.label.toLowerCase())) {
+      throw new Error('A timer already has that name. Choose another name or reset the existing timer.');
+    }
+    replaceTimers([timer, ...timersRef.current]);
+    setSelectedTimerId(timer.id);
+    return describeTimer(timer);
+  }
+
+  function changeTimer(timer: KitchenTimer, action: unknown) {
+    const next = updateKitchenTimer(timer, action);
+    if (!next || remainingSeconds(next) > 0) firedTimers.current.delete(timer.id);
+    replaceTimers(timersRef.current.flatMap(other => other.id !== timer.id ? [other] : next ? [next] : []));
+    return next ? describeTimer(next) : { label: timer.label, status: 'cancelled' };
+  }
+
+  const activeTimer = timers.find(timer => timer.id === selectedTimerId) ?? timers[0];
+  const timerRemainingSecs = activeTimer ? remainingSeconds(activeTimer, now.getTime()) : 0;
   const timerRunning = Boolean(activeTimer && activeTimer.pausedRemaining === undefined && timerRemainingSecs > 0);
   const timerMM = String(Math.floor(timerRemainingSecs / 60)).padStart(2, '0');
   const timerSS = String(timerRemainingSecs % 60).padStart(2, '0');
@@ -709,43 +616,9 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
   const timerDashOffset = circumference * (1 - timerRatio);
 
   const toggleActiveTimer = () => {
-    if (!activeTimer) {
-      startTimer(600, 'Kitchen Timer');
-      return;
-    }
-    setTimers((cur) =>
-      cur.map((tm, i) => {
-        if (i !== 0) return tm;
-        if (tm.pausedRemaining !== undefined) {
-          return { ...tm, endsAt: Date.now() + tm.pausedRemaining * 1000, pausedRemaining: undefined };
-        }
-        const rem = Math.max(0, Math.ceil((tm.endsAt - Date.now()) / 1000));
-        return { ...tm, pausedRemaining: rem };
-      }),
-    );
-  };
-
-  const bumpTimerMinute = () => {
-    if (!activeTimer) {
-      startTimer(60, '1 Min Timer');
-      return;
-    }
-    setTimers((cur) =>
-      cur.map((tm, i) => {
-        if (i !== 0) return tm;
-        if (tm.pausedRemaining !== undefined) {
-          return { ...tm, pausedRemaining: tm.pausedRemaining + 60, initialSecs: tm.initialSecs + 60 };
-        }
-        return { ...tm, endsAt: tm.endsAt + 60_000, initialSecs: tm.initialSecs + 60 };
-      }),
-    );
-  };
-
-  const resetActiveTimer = () => {
     if (!activeTimer) return;
-    setTimers((cur) =>
-      cur.map((tm, i) => (i === 0 ? { ...tm, pausedRemaining: tm.initialSecs, endsAt: Date.now() + tm.initialSecs * 1000 } : tm)),
-    );
+    if (timerRemainingSecs === 0) return changeTimer(activeTimer, 'reset');
+    changeTimer(activeTimer, timerRunning ? 'pause' : 'resume');
   };
 
   const d = state.dinner;
@@ -803,21 +676,15 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
     }, 4000);
   };
 
-  const advanceRecipeStep = () => {
-    const nextIdx = (recipeStepIdx + 1) % activeRecipeSteps.length;
-    setRecipeStepIdx(nextIdx);
-    const nextStep = activeRecipeSteps[nextIdx];
-    setBroilSeconds(nextStep.defaultTimerSecs);
-    showToast(`Advancing to Step ${nextIdx + 1}: ${nextStep.stage}`);
-  };
+  function goToRecipeStep(index: number) {
+    setRecipeStepIdx(index);
+    setBroilRunning(false);
+    setBroilSeconds(activeRecipeSteps[index].defaultTimerSecs);
+    showToast(`Step ${index + 1}: ${activeRecipeSteps[index].stage}`);
+  }
 
-  const prevRecipeStep = () => {
-    const prevIdx = (recipeStepIdx - 1 + activeRecipeSteps.length) % activeRecipeSteps.length;
-    setRecipeStepIdx(prevIdx);
-    const prevStep = activeRecipeSteps[prevIdx];
-    setBroilSeconds(prevStep.defaultTimerSecs);
-    showToast(`Viewing Step ${prevIdx + 1}: ${prevStep.stage}`);
-  };
+  const advanceRecipeStep = () => goToRecipeStep((recipeStepIdx + 1) % activeRecipeSteps.length);
+  const prevRecipeStep = () => goToRecipeStep((recipeStepIdx - 1 + activeRecipeSteps.length) % activeRecipeSteps.length);
 
   const selectFastRecipe = (recipeName: string, backlogId?: string) => {
     setPendingChef(null);
@@ -829,32 +696,6 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
       act({ type: 'claim_dinner', chef: 'daniela', recipeName });
     }
     showToast(`Selected: ${recipeName}! Setting up recipe...`);
-  };
-
-  const startCaptureMealDictation = () => {
-    if (beta) return showToast('Type the meal name in Beta.');
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      showToast('Voice dictation not available in this browser — type or tap a chip below');
-      return;
-    }
-    try {
-      const rec = new SR();
-      rec.lang = 'en-US';
-      rec.interimResults = false;
-      setCaptureListening(true);
-      rec.onresult = (ev: any) => {
-        const transcript = ev.results?.[0]?.[0]?.transcript;
-        if (transcript) {
-          setCaptureMealInput(transcript);
-        }
-      };
-      rec.onend = () => setCaptureListening(false);
-      rec.onerror = () => setCaptureListening(false);
-      rec.start();
-    } catch {
-      setCaptureListening(false);
-    }
   };
 
   const confirmCapturedDinner = (chef: 'daniela' | 'warren', needRecipe: boolean, customMeal?: string) => {
@@ -895,34 +736,36 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
     pendingChef ?? (isParent(d.chef) ? d.chef : 'daniela');
   const fallbackUnstructured = getUnstructuredMealDetails(d.recipe_name);
   const activeMealTitle = d.recipe_name?.trim() || 'Charcuterie Board';
+  const guideTarget = useRef({ title: activeMealTitle, view: dinnerView, source: boardSource, mode });
+  guideTarget.current = { title: activeMealTitle, view: dinnerView, source: boardSource, mode };
+
+  const applyDinnerGuide = useCallback((guide: DinnerGuide) => {
+    if ('tips' in guide) {
+      setLiveDinnerTips(guide);
+    } else {
+      setLiveStructuredRecipe(guide);
+      setRecipeStepIdx(0);
+      setBroilRunning(false);
+      setBroilSeconds(guide.steps[0].defaultTimerSecs);
+    }
+  }, []);
 
   useEffect(() => {
     if (beta || d.status === 'unclaimed' || isCapturingMeal) return;
     let cancelled = false;
-    fetch(`/api/dinner-tips?meal=${encodeURIComponent(activeMealTitle)}&mode=tips`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data && Array.isArray(data.tips) && data.tips.length > 0) {
-          setLiveDinnerTips(data);
-        }
-      })
-      .catch(() => {});
-
-    if (isStructuredRecipeView) {
-      fetch(`/api/dinner-tips?meal=${encodeURIComponent(activeMealTitle)}&mode=recipe`, { cache: 'no-store' })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!cancelled && data && Array.isArray(data.steps) && data.steps.length > 0) {
-            setLiveStructuredRecipe(data);
-            setBroilSeconds(data.steps[0]?.defaultTimerSecs ?? 342);
-          }
-        })
-        .catch(() => {});
+    const update = (data: DinnerGuide) => { if (!cancelled) applyDinnerGuide(data); };
+    const meal = activeMealTitle.toLowerCase();
+    if (liveDinnerTips?.mealTitle.toLowerCase() !== meal) {
+      void loadDinnerGuide('tips', activeMealTitle).then(update).catch(() => {});
+    }
+    if (isStructuredRecipeView && liveStructuredRecipe?.mealTitle.toLowerCase() !== meal) {
+      void loadDinnerGuide('steps', activeMealTitle).then(update).catch(() => {});
     }
     return () => {
       cancelled = true;
     };
-  }, [beta, d.status, activeMealTitle, isStructuredRecipeView, isCapturingMeal]);
+  }, [beta, d.status, activeMealTitle, isStructuredRecipeView, isCapturingMeal,
+    liveDinnerTips?.mealTitle, liveStructuredRecipe?.mealTitle, loadDinnerGuide, applyDinnerGuide]);
 
   const unstructuredDetails =
     liveDinnerTips && liveDinnerTips.mealTitle.toLowerCase() === activeMealTitle.toLowerCase()
@@ -994,8 +837,118 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
   }, [currentView]);
 
   function openDockView(view: ViewMode) {
-    setMoreOpen(false);
+    changeAssistantOpen(false);
     setMode(view);
+  }
+
+  function onVoiceServerToolDone(name: string) {
+    if (name === 'set_dinner' || name === 'unclaim_dinner' || name === 'plan_fridge_meal') {
+      setPendingChef(null);
+      setCaptureMealInput('');
+      setDinnerRecipeMode('auto');
+      setRecipeStepIdx(0);
+      setBroilRunning(false);
+    }
+    if (!name.startsWith('get_')) void refresh();
+  }
+
+  function recipeStepDetails(index: number) {
+    const step = activeRecipeSteps[index];
+    return { step: index + 1, total_steps: activeRecipeSteps.length, stage: step.stage,
+      instruction: step.instruction, suggested_seconds: step.defaultTimerSecs };
+  }
+
+  function selectGuide(view: GuideView) {
+    setMode('dinner');
+    setDinnerRecipeMode(view === 'steps' ? 'structured' : 'tips');
+    guideTarget.current = { title: activeMealTitle, view: view === 'steps' ? 'recipe' : 'tips', source: boardSource, mode: 'dinner' };
+  }
+
+  async function handleVoiceTool(name: string, args: Record<string, unknown>) {
+    const index = recipeStepIdx % activeRecipeSteps.length;
+    const hasRecipe = hasVoiceRecipe(boardSource, dinnerView, d.recipe_name, activeRecipeSteps === DEFAULT_RECIPE_STEPS);
+    try {
+      switch (name) {
+        case 'get_console_context':
+          return {
+            ok: true, view: mode, member_filter: memberFilter, board_data: boardSource,
+            theme: document.documentElement.dataset.theme ?? theme,
+            dinner_screen: mode === 'dinner' ? dinnerView : null,
+            selected_cook: mode === 'dinner' && isCapturingMeal ? pendingChef ?? (boardSource === 'saved' ? activeCaptureChef : null) : null,
+            timers: timersRef.current.map(timer => describeTimer(timer)),
+            npr_playing: nprRef.current ? !nprRef.current.paused : false,
+            spotify: { configured: spotify.configured, playing: spotify.playing, track: spotify.track, artist: spotify.artist },
+            recipe: hasRecipe ? {
+              title: d.recipe_name, ...recipeStepDetails(index), timer_seconds: broilSeconds, timer_running: broilRunning,
+              ingredients: activeRecipeSteps !== DEFAULT_RECIPE_STEPS ? liveStructuredRecipe?.ingredients : undefined,
+            } : null,
+            cooking_tips: mode === 'dinner' && boardSource === 'saved' && dinnerView === 'tips' && unstructuredDetails === liveDinnerTips
+              ? { title: liveDinnerTips.mealTitle, tips: liveDinnerTips.tips.map(tip => tip.detail) } : null,
+          };
+        case 'show_console_view': {
+          const selection = readViewRequest(args, memberFilter);
+          setMemberFilter(selection.member_filter);
+          setMoreOpen(false);
+          setMode(selection.view);
+          return { ok: true, ...selection };
+        }
+        case 'set_console_theme':
+          if (args.theme !== 'light' && args.theme !== 'dark') throw new Error('Choose light or dark.');
+          applyTheme(args.theme);
+          return { ok: true, theme: args.theme };
+        case 'show_recipe_view': {
+          const view = args.view;
+          if (view !== 'steps' && view !== 'tips') throw new Error('Choose cooking steps or tips.');
+          if (boardSource !== 'saved' || !d.recipe_name?.trim() || dinnerView === 'choose' || dinnerView === 'capture') {
+            throw new Error('Choose and save a meal before opening its cooking guide.');
+          }
+          selectGuide(view);
+          let ready = view === 'steps'
+            ? hasVoiceRecipe(boardSource, 'recipe', d.recipe_name, activeRecipeSteps === DEFAULT_RECIPE_STEPS)
+            : unstructuredDetails === liveDinnerTips;
+          if (!ready) {
+            const guide = await loadDinnerGuide(view, activeMealTitle).catch(() => null);
+            const target = guideTarget.current;
+            if (target.source !== 'saved' || target.mode !== 'dinner' || target.title !== activeMealTitle || target.view !== (view === 'steps' ? 'recipe' : 'tips')) {
+              throw new Error('The dinner selection changed while its guide was loading.');
+            }
+            if (guide) { applyDinnerGuide(guide); ready = true; }
+          }
+          return { ok: true, view, title: d.recipe_name, content_ready: ready,
+            ...(!ready && { message: 'The view opened, but matching content is unavailable.' }) };
+        }
+        case 'set_timer':
+          return { ok: true, ...startTimer(args) };
+        case 'control_timer':
+          return { ok: true, ...changeTimer(findKitchenTimer(timersRef.current, args.label), args.action) };
+        case 'cancel_timers':
+          replaceTimers([]);
+          firedTimers.current.clear();
+          return { ok: true, remaining_timers: 0 };
+        case 'play_npr':
+          await playNpr();
+          return { ok: true, npr_playing: true };
+        case 'stop_npr':
+          stopNpr();
+          return { ok: true, npr_playing: false };
+        case 'control_recipe_step': {
+          if (!hasRecipe) throw new Error('No matching step-by-step recipe is ready on the console.');
+          const next = recipeControl(args.action, activeRecipeSteps, index, broilSeconds, broilRunning);
+          if (next.index !== index) {
+            goToRecipeStep(next.index);
+          } else if (args.action !== 'current') {
+            setBroilSeconds(next.seconds);
+            setBroilRunning(next.running);
+          }
+          setMode('dinner');
+          return { ok: true, title: d.recipe_name, ...recipeStepDetails(next.index),
+            timer_running: next.running, timer_seconds: next.seconds };
+        }
+        default: throw new Error('This console control is unavailable.');
+      }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'The console could not confirm this action.' };
+    }
   }
 
   return (
@@ -1738,21 +1691,24 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         <div style={{ fontSize: '1.22rem', fontWeight: 800 }}>
                           {activeTimer.label}
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                          Stove Station • Voice Timer
-                        </div>
+                        {timers.length > 1 && (
+                          <select aria-label="Displayed kitchen timer" className="input" value={activeTimer.id}
+                            onChange={event => setSelectedTimerId(event.target.value)}>
+                            {timers.map(timer => <option key={timer.id} value={timer.id}>{timer.label}</option>)}
+                          </select>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <button className="hw-btn terracotta" onClick={toggleActiveTimer}>
                           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
                             {timerRunning ? 'pause' : 'play_arrow'}
                           </span>
-                          <span>{timerRunning ? 'PAUSE' : 'RESUME'}</span>
+                          <span>{timerRemainingSecs === 0 ? 'RESET TIMER' : timerRunning ? 'PAUSE' : 'RESUME'}</span>
                         </button>
-                        <button className="hw-btn" onClick={bumpTimerMinute}>
+                        <button className="hw-btn" onClick={() => changeTimer(activeTimer, 'add_minute')}>
                           +1 MIN
                         </button>
-                        <button className="hw-btn" onClick={resetActiveTimer}>
+                        <button className="hw-btn" onClick={() => changeTimer(activeTimer, 'reset')}>
                           RESET
                         </button>
                       </div>
@@ -2137,7 +2093,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--clay)' }}>
                           restaurant_menu
                         </span>
-                        WHAT ARE YOU MAKING? (TYPE, SPEAK, OR TAP A QUICK PICK)
+                        WHAT ARE YOU MAKING?
                       </span>
                     </div>
 
@@ -2158,18 +2114,18 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                           color: 'var(--text)',
                         }}
                       />
-                      <button
+                      {!beta && <button
                         type="button"
-                        onClick={startCaptureMealDictation}
+                        onClick={() => openAssistant(`Help me set ${NAMES[activeCaptureChef]}'s dinner plan.`)}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 8,
                           padding: '0 20px',
                           borderRadius: 12,
-                          background: captureListening ? 'var(--terracotta)' : 'var(--cobalt-surface)',
-                          color: captureListening ? '#ffffff' : 'var(--cobalt)',
-                          border: `1px solid ${captureListening ? 'var(--terracotta)' : 'var(--cobalt-border)'}`,
+                          background: 'var(--cobalt-surface)',
+                          color: 'var(--cobalt)',
+                          border: '1px solid var(--cobalt-border)',
                           fontSize: '0.98rem',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -2177,10 +2133,10 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         }}
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                          {captureListening ? 'graphic_eq' : 'mic'}
+                          mic
                         </span>
-                        <span>{captureListening ? 'Listening…' : 'Speak Dish'}</span>
-                      </button>
+                        <span>Ask Kitchen</span>
+                      </button>}
                     </div>
 
                     {/* Quick-Tap Dish Chips */}
@@ -2458,7 +2414,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         <button
                           type="button"
                           onClick={() => {
-                            setDinnerRecipeMode('tips');
+                            selectGuide('tips');
                             showToast('Switched to Gemini Assembly Tips & Photo view');
                           }}
                           className="font-mono"
@@ -3097,7 +3053,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         <button
                           type="button"
                           onClick={() => {
-                            setDinnerRecipeMode('structured');
+                            selectGuide('steps');
                             showToast('Switched to Step-by-Step Cooking Guide');
                           }}
                           className="font-mono"
@@ -3509,7 +3465,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                     </div>
                   </div>
 
-                  {/* Main Content Split: Left 7 Cols (Fast Recipes) + Right 5 Cols (Gemini Voice & Delivery Re-Order) */}
+                  {/* Main Content Split: Left 7 Cols (Fast Recipes) + Right 5 Cols (Kitchen voice & Delivery Re-Order) */}
                   <div
                     style={{
                       display: 'grid',
@@ -3800,7 +3756,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                       </div>
                     </div>
 
-                    {/* Right 5 Cols: Ask Gemini Voice + Delivery Re-Order */}
+                    {/* Right 5 Cols: Kitchen voice + Delivery Re-Order */}
                     <div
                       style={{
                         display: 'flex',
@@ -3810,8 +3766,8 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                         minHeight: 0,
                       }}
                     >
-                      {/* Ask Gemini Voice Card */}
-                      <div
+                      {/* Kitchen voice */}
+                      {!beta && <div
                         style={{
                           padding: 16,
                           borderRadius: 12,
@@ -3837,7 +3793,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                               letterSpacing: '0.06em',
                             }}
                           >
-                            Ask Gemini Voice
+                            Kitchen voice
                           </span>
                         </div>
 
@@ -3853,16 +3809,12 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                             border: '1px solid var(--cobalt-border)',
                           }}
                         >
-                          &ldquo;Suggest a 20-min dinner using wild salmon and jasmine rice&rdquo;
+                          &ldquo;Suggest a 20-minute dinner using what we have.&rdquo;
                         </p>
 
                         <button
                           type="button"
-                          onClick={() => {
-                            setGeminiCustomQuery('Suggest a 20-min dinner using wild salmon and jasmine rice');
-                            openGeminiOverlay();
-                            showToast('Gemini listening... Ask your dinner question!');
-                          }}
+                          onClick={() => openAssistant('Suggest a 20-minute dinner using what we have.')}
                           style={{
                             width: '100%',
                             display: 'flex',
@@ -3882,9 +3834,9 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
                             graphic_eq
                           </span>
-                          <span>Tap to Ask Gemini</span>
+                          <span>Ask Kitchen</span>
                         </button>
-                      </div>
+                      </div>}
 
                       {/* Delivery Re-Order Card */}
                       <div
@@ -5240,18 +5192,20 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
                 <span>Beta</span>
               </a>
             )}
-            <button
+            {!beta && <button
+              type="button"
               className="dock-tab dock-extra"
-              onClick={() => { setMoreOpen(false); openGeminiOverlay(); }}
-              title="Engage Gemini Voice"
+              aria-expanded={voiceOpen}
+              onClick={() => openAssistant()}
+              title={wakeArmed ? 'Listening locally for Hey Kitchen' : 'Open kitchen voice'}
             >
-              <GeminiSparkIcon size={18} />
-              <span>Gemini</span>
-            </button>
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ color: wakeArmed ? 'var(--emerald)' : 'var(--cobalt)' }}>mic</span>
+              <span>{wakeArmed ? 'Hey Kitchen on' : 'Kitchen voice'}</span>
+            </button>}
 
             <button
               className="dock-tab dock-extra"
-              onClick={nprPlaying ? stopNpr : playNpr}
+              onClick={nprPlaying ? stopNpr : () => { void playNpr().catch(error => showToast(error.message)); }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--terracotta)' }}>
                 radio
@@ -5273,7 +5227,7 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
           </nav>
 
           <div className="dock-utilities">
-            <ThemeToggle defaultTheme="light" />
+            <ThemeButton theme={theme} onToggle={toggleTheme} />
             <a
               href="/guide"
               className="hw-btn"
@@ -5317,191 +5271,8 @@ export function KioskBoard({ initial, initialWeather, betaUrl = null, betaKitche
           </div>
         </footer>
 
-        {/* ════════════════════════════════════════════════════════════════════
-            STITCH "GEMINI VOICE" OVERLAY WHEN ENGAGED
-            ════════════════════════════════════════════════════════════════════ */}
-        {geminiOpen && (
-          <div className="gemini-voice-overlay-backdrop" onClick={() => setGeminiOpen(false)}>
-            <div className="gemini-voice-card" onClick={(e) => e.stopPropagation()}>
-              {/* Top Row: Rounded-Square Gradient Spark Badge + "Gemini Voice" + 7-Bar Equalizer Pill */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div className="gemini-badge-square">
-                    <GeminiSparkIcon size={24} white />
-                  </div>
-                  <span style={{ fontSize: '1.42rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                    Gemini Voice
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <GeminiEqualizerPill active={geminiListening} />
-                  <button
-                    className="hw-btn pill"
-                    onClick={() => setGeminiOpen(false)}
-                    style={{ padding: '7px 12px' }}
-                    title="Close overlay"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      close
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Card 1: Cooktop Utterance Well */}
-              <div className="gemini-utterance-well">
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: '#1549d6',
-                    color: '#ffffff',
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    flexShrink: 0,
-                    marginTop: 2,
-                  }}
-                >
-                  D
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    className="font-mono"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      fontSize: '0.76rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.06em',
-                    }}
-                  >
-                    <span style={{ color: 'var(--cobalt)' }}>AT COOKTOP</span>
-                    {geminiStampedAt && (
-                      <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{geminiStampedAt}</span>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: '1.16rem', lineHeight: 1.5, marginTop: 5, fontWeight: 500 }}>
-                    {geminiCustomQuery ? (
-                      <>&ldquo;{geminiCustomQuery}&rdquo;</>
-                    ) : (
-                      <span style={{ color: 'var(--muted)' }}>
-                        Tap <strong>Ask by Voice</strong> or type below to speak with Gemini at the cooktop…
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: GEMINI RESPONSE Well (Live Kitchen Context Summary) */}
-              <div className="gemini-utterance-well" style={{ padding: '20px 22px' }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: '#c23d1b',
-                    color: '#ffffff',
-                    display: 'grid',
-                    placeItems: 'center',
-                    flexShrink: 0,
-                    marginTop: 2,
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 19 }}>
-                    reviews
-                  </span>
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    className="font-mono"
-                    style={{
-                      fontSize: '0.76rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.06em',
-                      color: 'var(--clay)',
-                    }}
-                  >
-                    GEMINI RESPONSE
-                  </div>
-
-                  <div style={{ fontSize: '1.14rem', lineHeight: 1.62, marginTop: 6 }}>
-                    {geminiCustomQuery ? (
-                      <>
-                        Ready to send <span className="gemini-hl-terracotta">{geminiCustomQuery}</span> with live
-                        kitchen context ({' '}
-                        <span className="gemini-hl-cobalt">
-                          {d.recipe_name || `${state.backlog.length} backlog items`}
-                        </span>
-                        ). Tap <strong>Open Gemini App</strong> to continue in Gemini Live.
-                      </>
-                    ) : (
-                      <>
-                        Connected to live kitchen state:{' '}
-                        <span className="gemini-hl-terracotta">
-                          {d.recipe_name
-                            ? `Tonight: ${d.recipe_name}`
-                            : `${state.backlog.length} meals in fridge backlog`}
-                        </span>{' '}
-                        and{' '}
-                        <span className="gemini-hl-cobalt">
-                          {activeTimer
-                            ? `${timerMM}:${timerSS} remaining on ${activeTimer.label}`
-                            : `${state.events.length} schedule items today`}
-                        </span>
-                        .
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Prompt Input + Voice & Native Gemini Launch Controls */}
-              <form
-                style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (geminiCustomQuery && applyVoiceCommandIfTimer(geminiCustomQuery)) {
-                    setGeminiOpen(false);
-                    return;
-                  }
-                  launchGeminiOnCozyla(geminiCustomQuery || undefined);
-                }}
-              >
-                <input
-                  className="ceramic-well"
-                  style={{ flex: 1, minWidth: 220, padding: '9px 14px', fontSize: '0.88rem' }}
-                  placeholder="Type or dictate a question for Gemini…"
-                  value={geminiCustomQuery}
-                  onChange={(e) => setGeminiCustomQuery(e.target.value)}
-                />
-                <button type="button" className="hw-btn" onClick={startGeminiDictation}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--cobalt)' }}>
-                    mic
-                  </span>
-                  <span>{geminiListening ? 'LISTENING…' : 'ASK BY VOICE'}</span>
-                </button>
-                <button type="submit" className="hw-btn terracotta">
-                  <GeminiSparkIcon size={15} white />
-                  <span>OPEN GEMINI APP</span>
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
+        {!beta && <VoiceOrb open={voiceOpen} onOpenChange={changeAssistantOpen} initialPrompt={voicePrompt}
+          onClientTool={handleVoiceTool} onServerToolDone={onVoiceServerToolDone} onWakeStatusChange={setWakeArmed} />}
 
         {/* Notification Banner Toast */}
         {toastMsg && (

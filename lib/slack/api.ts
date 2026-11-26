@@ -1,17 +1,18 @@
 import { NAMES } from '../family';
 import type { Parent } from '../types';
 
-export async function slackApi(method: string, body: Record<string, unknown>): Promise<any> {
+export async function slackApi(method: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<any> {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) throw new Error('SLACK_BOT_TOKEN missing');
   const r = await fetch(`https://slack.com/api/${method}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify(body),
+    signal,
     cache: 'no-store',
   });
   const j = await r.json();
-  if (!j.ok) throw new Error(`Slack ${method} failed: ${j.error}`);
+  if (!r.ok || j.ok !== true) throw new Error(`Slack ${method} failed: ${j.error ?? r.status}`);
   return j;
 }
 
@@ -85,4 +86,5 @@ export const CHANNELS = {
   food: () => process.env.SLACK_CHANNEL_FOOD || '#food',
   chores: () => process.env.SLACK_CHANNEL_CHORES || process.env.SLACK_CHANNEL_LOGISTICS || '#logistics',
   calendar: () => process.env.SLACK_CHANNEL_CALENDAR || '#calendar',
+  backlog: () => process.env.SLACK_CHANNEL_BACKLOG?.trim() || '#home-console',
 };

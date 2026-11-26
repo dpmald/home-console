@@ -131,14 +131,20 @@ export default function InteractiveGuidePage() {
             </div>
 
             <div className="card">
-              <div className="card-title">Voice Commands (5–8 ft from the Cozyla)</div>
+              <div className="card-title">Kitchen voice</div>
               <p className="row-meta" style={{ lineHeight: 1.45 }}>
-                Tap <strong>🎙️ Ask Kitchen</strong> on the top bar and speak naturally:
+                Open <strong>Kitchen voice</strong> in the bottom bar, or under <strong>More</strong> on a phone.
+                You can talk by tapping the microphone or turn on <strong>Hey Kitchen</strong> for this device.
+                With the family board open, say “Hey Kitchen”, wait for it to listen, then ask your question.
+                You can ask follow-ups in the same conversation. Say “that’s all” to finish.
               </p>
               {[
                 ['“What’s the weather today and tomorrow?”', 'Reads current temp + today/tomorrow forecast'],
                 ['“Play NPR” / “Stop NPR”', 'Starts or stops live NPR audio on the console'],
                 ['“Set a 12 minute pasta timer”', 'Starts a countdown that chimes and speaks when done'],
+                ['“How much time is left?”', 'Checks the timers running on this console'],
+                ['“Show me the school schedule”', 'Opens the family timeline with its school filter'],
+                ['“What’s the next recipe step?”', 'Moves the dinner guide forward and reads the instruction'],
                 ['“Warren is cooking the salmon tonight”', 'Claims dinner + links the salmon backlog item'],
                 ['“I can’t cook tonight”', 'Marks you as “Not tonight” in Slack and on the wall'],
                 ['“We cooked the lemon pasta”', 'Clears it from the fridge backlog'],
@@ -153,7 +159,7 @@ export default function InteractiveGuidePage() {
                 </div>
               ))}
               <p className="row-meta" style={{ marginTop: 12 }}>
-                For shared Instacart requests, open <strong>Dinner Hub → Shared grocery list</strong> and enter the item and quantity. Check the list for the cart receipt.
+                Ask to add items to the shared grocery list, then check <strong>Dinner Hub → Shared grocery list</strong> for the cart receipt. Warren handles checkout and delivery.
               </p>
             </div>
           </div>

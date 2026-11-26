@@ -92,4 +92,48 @@ test('disposable Beta kitchen', { timeout: 240000 }, async t => {
     for (let i = 0; i < 2; i++) assert.equal((await decideProposal(next.id, true, 'fixture')).status, 'approved');
     assert.deepEqual((await listBacklog()).map(row => row.recipe_or_item_name), [input.recipes[0].name]);
   });
+
+  await t.test('voice confirms saved chores and respects payout reconciliation', async () => {
+    const { executeVoiceTool } = await import('../../lib/voice/execute');
+    const { db, unwrap } = await import('../../lib/supabase/server');
+    const { todayISO } = await import('../../lib/time');
+    const chore = unwrap<{ id: string }>(await db().from('wesley_chores').insert({
+      chore_date: todayISO(), chore_title: 'Synthetic voice chore', reward_cents: 25,
+    }).select('id').single(), 'insert test chore');
+    const setDone = (done: boolean) => executeVoiceTool('set_chore_done', { chore: chore.id, done });
+    assert.equal(((await setDone(true)).result as { ok: boolean }).ok, true);
+    unwrap(await db().from('wesley_chores').update({ verified_in_greenlight: true }).eq('id', chore.id), 'verify test chore');
+    assert.equal(((await setDone(false)).result as { ok: boolean }).ok, false);
+    const saved = unwrap<{ completed: boolean }>(await db().from('wesley_chores').select('completed')
+      .eq('id', chore.id).single(), 'read test chore');
+    assert.equal(saved.completed, true);
+  });
+
+  await t.test('a voice follow-up selects a saved meal and a fresh board read confirms the assignment', async () => {
+    const { executeVoiceTool } = await import('../../lib/voice/execute');
+    for (const name of ['Synthetic green curry', 'Synthetic red curry']) {
+      const receipt = await executeVoiceTool('add_fridge_item', { name, location: 'freezer' });
+      assert.deepEqual(receipt.result, { ok: true, added: name });
+    }
+    const board = async () => {
+      const response = await fetch(origin + '/api/kiosk', { headers: { Authorization: 'Bearer ' + deviceKey } });
+      assert.equal(response.status, 200);
+      return response.json();
+    };
+    const previous = (await board()).dinner;
+    const ambiguous = await executeVoiceTool('plan_fridge_meal', { item: 'curry', chef: 'daniela' });
+    const clarification = ambiguous.result as { ok: boolean; needs_clarification: boolean; choices: { ref: string; label: string }[] };
+    assert.equal(clarification.ok, false);
+    assert.equal(clarification.needs_clarification, true);
+    assert.deepEqual((await board()).dinner, previous);
+    const selected = clarification.choices.find((c) => c.label.startsWith('Synthetic red curry'));
+    assert.ok(selected);
+    const receipt = await executeVoiceTool('plan_fridge_meal', { item: selected.ref, chef: 'daniela' });
+    assert.equal((receipt.result as { ok: boolean }).ok, true);
+    const saved = (await board()).dinner;
+    assert.equal(saved.recipe_name, 'Synthetic red curry');
+    assert.equal(saved.linked_backlog_id, selected.ref);
+    assert.equal(saved.chef, 'daniela');
+    assert.equal(saved.claimed_via, 'voice');
+  });
 });

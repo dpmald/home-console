@@ -49,5 +49,15 @@ export function parseGroceryVoiceItems(name: string, args: Record<string, unknow
 }
 
 export function voiceResultSucceeded(value: unknown): boolean {
-  return record(value) && value.ok !== false && !value.error;
+  return record(value) && value.ok === true && !value.error;
+}
+
+/** Keep each tool result small enough for the Realtime data channel. */
+export function voicePage<T>(rows: T[], offset: unknown) {
+  const start = offset === undefined ? 0 : offset;
+  if (typeof start !== 'number' || !Number.isSafeInteger(start) || start < 0) {
+    throw new VoiceInputError('Please request a valid list offset.');
+  }
+  const page = rows.slice(start, start + 15);
+  return { page, total: rows.length, next_offset: start + page.length < rows.length ? start + page.length : null };
 }
