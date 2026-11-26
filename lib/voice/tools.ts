@@ -10,7 +10,7 @@ const parent = { type: 'string', enum: ['daniela', 'warren'] };
 const offset = { type: 'integer', minimum: 0, description: 'Continue a previous result at its next_offset.' };
 
 /** Tools executed in the browser (audio, timers) rather than on the server. */
-export const CLIENT_TOOL_NAMES = new Set(['get_console_context', 'show_console_view', 'control_recipe_step', 'control_timer', 'set_timer', 'cancel_timers', 'play_npr', 'stop_npr', 'end_session']);
+export const CLIENT_TOOL_NAMES = new Set(['get_console_context', 'show_console_view', 'show_recipe_view', 'set_console_theme', 'control_recipe_step', 'control_timer', 'set_timer', 'cancel_timers', 'play_npr', 'stop_npr', 'end_session']);
 
 export const GROCERY_VOICE_TOOL_NAMES = new Set(['add_grocery_items', 'add_grocery_item', 'get_grocery_requests', 'set_grocery_request_status']);
 
@@ -26,10 +26,16 @@ export const VOICE_TOOLS = [
     view: { type: 'string', enum: ['ambient', 'dinner', 'bento', 'timeline'] },
     member: { type: 'string', enum: ['all', 'school', 'daniela', 'warren', 'wesley', 'lachlan'] },
   }, ['view']),
+  fn('show_recipe_view', 'Switch Dinner Hub between the step-by-step recipe and cooking tips for the current meal.', {
+    view: { type: 'string', enum: ['steps', 'tips'] },
+  }, ['view']),
+  fn('set_console_theme', 'Switch this console to its light or dark theme.', {
+    theme: { type: 'string', enum: ['light', 'dark'] },
+  }, ['theme']),
   fn('control_recipe_step', 'Read or move through the current cooking guide, or start/pause its step timer.', {
     action: { type: 'string', enum: ['current', 'next', 'previous', 'start_timer', 'pause_timer'] },
   }, ['action']),
-  fn('get_today_overview', "Live dinner plan, fridge/pantry/freezer inventory, Wesley's chores, calendar events with dates and ownership, conflicts, and recent meal proposals. For the shared grocery list use get_grocery_requests."),
+  fn('get_today_overview', "Live dinner plan, fridge/pantry/freezer inventory, kitchen-only pantry requests, chores, calendar, conflicts and meal proposals. Items up for approval appear on the current pending proposal. Use get_grocery_requests for the shared grocery list."),
   fn('get_schedule', 'Read all synced family and personal calendar events overlapping the requested local dates, including all-day events. Scope is the calendars synced to the console.', {
     start_date: { type: 'string', description: 'First date YYYY-MM-DD in the family timezone, defaults to today.' },
     days: { type: 'integer', minimum: 1, maximum: 7, description: 'Number of calendar days, defaults to 1.' },

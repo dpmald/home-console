@@ -41,15 +41,18 @@ export function voiceEvent(event: LogisticsEvent) {
 }
 
 export function kitchenOverview(state: KitchenState) {
+  const pending = state.orders.find((proposal) => proposal.status === 'pending');
   return {
     ok: true, date: state.date, timezone: TZ,
     dinner: { chef: state.dinner.chef, dish: state.dinner.recipe_name, status: state.dinner.status, unavailable: state.dinner.unavailable },
     inventory: state.backlog.map((b) => ({ ref: b.id, name: b.recipe_or_item_name, location: b.location, since: b.delivery_date, perishables: b.key_perishables })),
+    kitchen_only_pantry_requests: state.groceries.map(({ name, quantity, status }) => ({ name, quantity, status })),
     chores: state.chores.map((c) => ({ ref: c.id, name: c.chore_title, done: c.completed, reward_cents: c.reward_cents })),
     calendar: state.events.map(voiceEvent), conflicts: state.conflicts.map((c) => c.message),
     recent_cart_proposals: state.orders.map((p) => ({
       proposed_delivery_date: p.delivery_date, approval_status: p.status,
-      recipes: p.kept_recipes.map((r) => ({ name: r.name, ingredients: r.ingredients, perishables: r.perishables })),
+      recipes: p.kept_recipes.map((r) => ({ name: r.name, ingredients: r.ingredients?.map(({ name, quantity }) => ({ name, quantity })), perishables: r.perishables })),
+      ...(p === pending ? { items_up_for_approval: p.items.map(({ name, quantity, source }) => ({ name, quantity, source })) } : {}),
     })),
   };
 }

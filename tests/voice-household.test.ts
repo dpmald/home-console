@@ -51,8 +51,15 @@ test('inventory and a proposed meal stay distinct from shopping requests and del
     slack_ts: null, dropped_recipes: [], items: [], skipped_items: [], backlog_snapshot: [] });
   const overview = kitchenOverview(state);
   assert.deepEqual(overview.inventory.map((row) => [row.name, row.location]), [['Pea soup', 'freezer']]);
+  assert.deepEqual(overview.kitchen_only_pantry_requests, [{ name: 'More peas', quantity: null, status: 'needed' }]);
   assert.equal(overview.recent_cart_proposals[0].approval_status, 'approved');
   assert.equal(overview.recent_cart_proposals[0].recipes[0].name, 'Carrot soup');
+  state.orders.unshift({ ...state.orders[0], status: 'pending', slack_ts: 'private-timestamp',
+    items: [{ name: 'Carrots', quantity: '2 lb', source: 'Carrot soup' }] });
+  const proposals = kitchenOverview(state).recent_cart_proposals;
+  assert.deepEqual(proposals[0].items_up_for_approval, [{ name: 'Carrots', quantity: '2 lb', source: 'Carrot soup' }]);
+  assert.equal(proposals[1].items_up_for_approval, undefined);
+  assert.doesNotMatch(JSON.stringify(proposals), /private-timestamp|slack_ts|grocery_item_ids|backlog_snapshot/);
   const rows = Array.from({ length: 18 }, (_, index) => index);
   const first = voicePage(rows, undefined);
   assert.equal(first.total, 18);
@@ -117,7 +124,7 @@ test('session advertises board and household tools, and synthetic sessions exclu
   });
   const connect = () => createSession(request('/api/voice/session', 'synthetic offer', 'application/sdp'));
   assert.equal((await connect()).status, 200);
-  for (const name of ['get_console_context', 'get_today_overview', 'show_console_view', 'control_recipe_step', 'control_timer', 'get_schedule', 'plan_fridge_meal', 'get_grocery_requests']) {
+  for (const name of ['get_console_context', 'get_today_overview', 'show_console_view', 'show_recipe_view', 'set_console_theme', 'control_recipe_step', 'control_timer', 'get_schedule', 'plan_fridge_meal', 'get_grocery_requests']) {
     assert.ok(names.includes(name), name);
   }
   process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT = '1';
