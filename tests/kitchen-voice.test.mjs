@@ -89,6 +89,13 @@ test('Hey Kitchen starts one conversation, handles follow-ups and returns to loc
   assert.equal(context.timers.length, 1);
   assert.equal(context.timers[0].label, 'Pasta');
   assert.equal(await page.evaluate(() => window.voiceFixture.messages.filter(m => m.item?.call_id === 'timer1').length), 1);
+  await tool('theme1', 'set_console_theme', { theme: 'dark' });
+  assert.equal((await result('theme1')).ok, true);
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await tool('context2', 'get_console_context', {});
+  assert.equal((await result('context2')).theme, 'dark');
+  await page.getByRole('button', { name: 'Switch to Light mode' }).click();
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
   await provider({ type: 'response.output_audio_transcript.done', transcript: 'Your pasta timer is running.' });
   await dialog.getByText('Your pasta timer is running.').waitFor();
   await provider({ type: 'output_audio_buffer.started' });

@@ -839,7 +839,7 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
   }
 
   function onVoiceServerToolDone(name: string) {
-    if (name === 'set_dinner' || name === 'unclaim_dinner' || name === 'cook_from_backlog') {
+    if (name === 'set_dinner' || name === 'unclaim_dinner' || name === 'plan_fridge_meal') {
       setPendingChef(null);
       setCaptureMealInput('');
       setDinnerRecipeMode('auto');

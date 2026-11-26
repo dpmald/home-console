@@ -100,8 +100,9 @@ export async function executeVoiceTool(name: string, args: Record<string, unknow
       if (!text(args.chore) || (args.done !== undefined && typeof args.done !== 'boolean')) return invalid();
       const { match, choices } = matchVoiceTarget(await listChores(date), args.chore, (c) => c.chore_title);
       if (!match) return clarify(choices);
-      await toggleChore(match.id, args.done !== false);
-      return result({ ok: true, chore: match.chore_title, done: args.done !== false });
+      const saved = await toggleChore(match.id, args.done !== false);
+      if (!saved || saved.completed !== (args.done !== false)) return result({ ok: false, error: 'The chore change was not confirmed.' });
+      return result({ ok: true, chore: match.chore_title, done: saved.completed });
     }
     case 'assign_logistics': {
       const range = scheduleWindow(args.date, 1, date);

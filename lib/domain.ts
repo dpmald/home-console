@@ -117,7 +117,9 @@ async function updateBacklogRow(id: string, status: BacklogItem['status']) {
     await db()
       .from('fridge_backlog')
       .update({ status, resolved_at: status === 'in_fridge' ? null : now() })
-      .eq('id', id),
+      .eq('id', id)
+      .select('id')
+      .single(),
     'update backlog',
   );
 }
@@ -127,20 +129,20 @@ export async function setBacklogStatus(id: string, status: 'cooked' | 'discarded
   await updateBacklogRow(id, status);
   const today = todayISO();
   if (status === 'cooked') {
-    await db()
+    unwrap(await db()
       .from('dinner_schedule')
       .update({ status: 'cooked', updated_at: now() })
       .eq('linked_backlog_id', id)
       .eq('status', 'planned')
-      .lte('date', today);
+      .lte('date', today), 'finish linked dinner');
   } else {
     // Tossed: unlink it from any upcoming dinner so that night needs a new plan.
-    await db()
+    unwrap(await db()
       .from('dinner_schedule')
       .update({ linked_backlog_id: null, recipe_name: null, status: 'unclaimed', chef: 'unclaimed', updated_at: now() })
       .eq('linked_backlog_id', id)
       .eq('status', 'planned')
-      .gte('date', today);
+      .gte('date', today), 'unlink discarded dinner');
   }
 }
 
@@ -214,12 +216,14 @@ export async function listChores(date: string): Promise<Chore[]> {
 }
 
 export async function toggleChore(id: string, completed: boolean) {
-  unwrap(
+  return unwrap<Pick<Chore, 'id' | 'completed'> | null>(
     await db()
       .from('wesley_chores')
       .update({ completed, completed_at: completed ? now() : null })
       .eq('id', id)
-      .eq('verified_in_greenlight', false), // don't change history after payout reconciliation
+      .eq('verified_in_greenlight', false) // don't change history after payout reconciliation
+      .select('id, completed')
+      .maybeSingle(),
     'toggle chore',
   );
 }
@@ -309,7 +313,9 @@ export async function assignLogistics(id: string, parent: Assignee) {
         ...(newDescription !== undefined ? { description: newDescription } : {}),
         updated_at: now(),
       })
-      .eq('id', id),
+      .eq('id', id)
+      .select('id')
+      .single(),
     'assign logistics',
   );
 
