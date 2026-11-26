@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await getKitchenState(date));
   } catch {
     if (isBetaDeployment()) return NextResponse.json({ error: 'Beta kitchen data is unavailable.' }, { status: 503 });
-    return NextResponse.json(demoKitchenState(date));
+    return NextResponse.json(demoKitchenState(date), { headers: { 'X-Kitchen-Data': 'demo' } });
   }
 }
 

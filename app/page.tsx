@@ -16,10 +16,12 @@ export default async function HomePage() {
   if (isBetaDeployment()) redirect('/beta');
   const date = todayISO();
   let state: KitchenState;
+  let initialDemo = false;
   try {
     state = await getKitchenState(date);
   } catch {
     state = demoKitchenState(date);
+    initialDemo = true;
   }
 
   let weather: Weather | null = null;
@@ -29,6 +31,7 @@ export default async function HomePage() {
 
   const host = (await headers()).get('host');
   const betaUrl = getBetaDestination(process.env, host);
-  return <KioskBoard initial={state} initialWeather={weather} betaUrl={betaUrl}
+  return <KioskBoard initial={state} initialDemo={initialDemo} initialWeather={weather} betaUrl={betaUrl}
+    allowStreamAudio={process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT !== '1'}
     allowPantryEntry={!betaUrl && (process.env.NODE_ENV !== 'production' || process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT === '1')} />;
 }
