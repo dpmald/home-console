@@ -97,14 +97,16 @@ test('disposable Beta kitchen', { timeout: 240000 }, async t => {
     const { executeVoiceTool } = await import('../../lib/voice/execute');
     const { db, unwrap } = await import('../../lib/supabase/server');
     const { todayISO } = await import('../../lib/time');
-    const chore = unwrap(await db().from('wesley_chores').insert({
+    const chore = unwrap<{ id: string }>(await db().from('wesley_chores').insert({
       chore_date: todayISO(), chore_title: 'Synthetic voice chore', reward_cents: 25,
-    }).select('id').single());
+    }).select('id').single(), 'insert test chore');
     const setDone = (done: boolean) => executeVoiceTool('set_chore_done', { chore: chore.id, done });
     assert.equal(((await setDone(true)).result as { ok: boolean }).ok, true);
-    unwrap(await db().from('wesley_chores').update({ verified_in_greenlight: true }).eq('id', chore.id));
+    unwrap(await db().from('wesley_chores').update({ verified_in_greenlight: true }).eq('id', chore.id), 'verify test chore');
     assert.equal(((await setDone(false)).result as { ok: boolean }).ok, false);
-    assert.equal(unwrap(await db().from('wesley_chores').select('completed').eq('id', chore.id).single()).completed, true);
+    const saved = unwrap<{ completed: boolean }>(await db().from('wesley_chores').select('completed')
+      .eq('id', chore.id).single(), 'read test chore');
+    assert.equal(saved.completed, true);
   });
 
   await t.test('a voice follow-up selects a saved meal and a fresh board read confirms the assignment', async () => {
