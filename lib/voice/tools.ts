@@ -21,6 +21,12 @@ const groceryProperties = {
 };
 
 export const VOICE_TOOLS = [
+  fn('post_developer_feedback', "Post a Home Console bug or feature request to the Slack backlog, labeled for Warren’s Codex or Daniela’s Gemini. Confirm the intended message with the speaker first. Success means the backlog post reached Slack.", {
+    recipient: { type: 'string', enum: ['codex', 'gemini'] },
+    kind: { type: 'string', enum: ['bug', 'feature'] },
+    title: { type: 'string', minLength: 1, maxLength: 120, description: 'A short summary of the issue or requested behavior.' },
+    details: { type: 'string', minLength: 1, maxLength: 2000, description: 'The instructions the person wants passed on, including any observed behavior, steps or desired result they gave.' },
+  }, ['recipient', 'kind', 'title', 'details']),
   fn('get_console_context', 'Read the current screen, running or paused timers, music, meal capture, and the recipe or cooking step on this console. Use before answering questions about what is on screen.'),
   fn('show_console_view', 'Show Today (ambient), Dinner Hub, Family (bento), or the timeline. Optionally filter by a household member or school.', {
     view: { type: 'string', enum: ['ambient', 'dinner', 'bento', 'timeline'] },

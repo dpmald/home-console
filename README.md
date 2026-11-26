@@ -48,6 +48,10 @@ Open **Kitchen voice** on the family board (under **More** on a phone). Tap **Ta
 
 Try “What’s on our calendar tomorrow?”, “Who can cook tonight?”, or “Set a ten-minute pasta timer.” Then ask “How much time is left?” The assistant can use the screen you’re looking at, current household records and the console’s connected controls. Grocery requests use the shared list and its existing cart workflow. Warren handles checkout.
 
+To leave a development note, wake Kitchen, wait for the tone, then say **“Log a bug for Gemini. The Dinner button disappears when I rotate the screen.”** You can also say **“Feature request for Codex. Let me give each timer its own chime.”** Kitchen reads the note back and asks before posting. The Home Console bot adds one searchable message to the Slack backlog in **#home-console**, labeled **Bug** or **Feature request** and **Gemini (Daniela)** or **Codex (Warren)**. A successful reply confirms that Slack accepted the post for later triage.
+
+The Cozyla uses its existing kitchen login. The family server posts with `SLACK_BOT_TOKEN`. To use a different backlog channel, set `SLACK_CHANNEL_BACKLOG` to its Slack channel ID and give the Home Console bot access there.
+
 The wake detector runs locally while this board is visible. The first enable downloads its acoustic model and browser runtime from the console. Hiding the page releases the microphone. Only the hands-free preference is saved by the voice UI. Starting a conversation sends the conversation and the household information needed for requested tools to OpenAI. The authenticated family deployment needs a server-side `OPENAI_API_KEY` with Realtime access. `OPENAI_REALTIME_MODEL` and `OPENAI_REALTIME_VOICE` select the model and voice. Voice grocery forwarding also needs the shared grocery configuration documented in [.env.example](.env.example). The isolated Beta site keeps its existing integration restrictions.
 
 ### 3. Warren's Saturday Recipe Agent

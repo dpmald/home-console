@@ -153,8 +153,10 @@ export function createConversation(audio: HTMLAudioElement, callbacks: Callbacks
       }
       if (!record(result)) throw new Error();
     } catch {
-      result = { ok: false, error: UNCONFIRMED };
-      if (!signal.aborted) callbacks.onCaption(UNCONFIRMED);
+      const error = name === 'post_developer_feedback'
+        ? 'Slack did not confirm the backlog post. Check the channel before retrying.' : UNCONFIRMED;
+      result = { ok: false, error };
+      if (!signal.aborted) callbacks.onCaption(error);
     }
     send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: id, output: JSON.stringify(result) } });
     return true;

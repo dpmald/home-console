@@ -6,6 +6,8 @@ import { changeGroceryRequests, groceryAction, GroceryRequestError, listGroceryR
 import { requireKioskRequest } from '@/lib/kiosk-auth';
 import { readBoundedBody, RequestBodyError } from '@/lib/request-body';
 import { getBetaDestination } from '@/lib/beta-navigation.mjs';
+import { isBetaDeployment } from '@/lib/beta-deployment';
+import { postDeveloperFeedback } from '@/lib/slack/feedback';
 
 export const dynamic = 'force-dynamic';
 const MAX_BODY = 32 * 1024;
@@ -30,6 +32,13 @@ export async function POST(req: NextRequest) {
     }
     if (Object.keys(args).some((key) => !Object.hasOwn(tool.parameters.properties, key))) {
       return failure('This action does not accept extra instructions.', 400);
+    }
+    if (name === 'post_developer_feedback') {
+      if (isBetaDeployment()) return failure('Use the family kitchen to leave assistant feedback.', 404);
+      if (!callId) return failure('The console could not identify this feedback request.', 400);
+      const receipt = await postDeveloperFeedback(callId, args);
+      if (!receipt) return failure('Slack did not confirm the backlog post. Check the channel before retrying.', 502);
+      return NextResponse.json({ result: receipt }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (GROCERY_VOICE_TOOL_NAMES.has(name)) {
       const reading = name === 'get_grocery_requests';

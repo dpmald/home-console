@@ -124,13 +124,13 @@ test('session advertises board and household tools, and synthetic sessions exclu
   });
   const connect = () => createSession(request('/api/voice/session', 'synthetic offer', 'application/sdp'));
   assert.equal((await connect()).status, 200);
-  for (const name of ['get_console_context', 'get_today_overview', 'show_console_view', 'show_recipe_view', 'set_console_theme', 'control_recipe_step', 'control_timer', 'get_schedule', 'plan_fridge_meal', 'get_grocery_requests']) {
+  for (const name of ['get_console_context', 'get_today_overview', 'show_console_view', 'show_recipe_view', 'set_console_theme', 'control_recipe_step', 'control_timer', 'get_schedule', 'plan_fridge_meal', 'get_grocery_requests', 'post_developer_feedback']) {
     assert.ok(names.includes(name), name);
   }
   process.env.HOME_CONSOLE_GROCERY_DEVELOPMENT = '1';
   assert.equal((await connect()).status, 200);
   assert.ok(names.includes('get_console_context') && names.includes('add_grocery_items'));
-  for (const name of ['get_schedule', 'set_dinner', 'post_to_slack', 'control_spotify', 'play_npr']) assert.ok(!names.includes(name), name);
+  for (const name of ['get_schedule', 'set_dinner', 'post_to_slack', 'control_spotify', 'play_npr', 'post_developer_feedback']) assert.ok(!names.includes(name), name);
   assert.equal((await voiceTool('get_schedule')).status, 400);
 });
 
