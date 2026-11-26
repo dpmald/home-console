@@ -37,6 +37,7 @@ export function VoiceOrb(props: Props) {
   const latest = useRef(props);
   latest.current = props;
   const audio = useRef<HTMLAudioElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
   const tone = useRef<AudioContext | null>(null);
   const call = useRef<ReturnType<typeof createConversation> | null>(null);
   const detector = useRef<AbortController | null>(null);
@@ -178,9 +179,17 @@ export function VoiceOrb(props: Props) {
 
   useEffect(() => {
     if (!props.open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = title.current?.closest('section');
+    title.current?.focus({ preventScroll: true });
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') closePanel(); };
     window.addEventListener('keydown', escape);
-    return () => window.removeEventListener('keydown', escape);
+    return () => {
+      window.removeEventListener('keydown', escape);
+      if (document.activeElement === document.body || panel?.contains(document.activeElement)) {
+        opener?.focus({ preventScroll: true });
+      }
+    };
   }, [props.open, closePanel]);
 
   function preferWake(value: boolean) {
@@ -216,7 +225,7 @@ export function VoiceOrb(props: Props) {
       <header className={styles.header}>
         <div className={styles.heading}>
           <span className={styles.indicator} data-live={live} aria-hidden="true" />
-          <h2 id="kitchen-assistant-title" aria-live="polite">{heading}</h2>
+          <h2 id="kitchen-assistant-title" ref={title} tabIndex={-1} aria-live="polite">{heading}</h2>
         </div>
         <button type="button" className={styles.close} onClick={closePanel} aria-label="Close Kitchen voice">×</button>
       </header>
