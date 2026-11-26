@@ -1,117 +1,134 @@
-// Server-side execution of voice tool calls.
 import {
-  addBacklogItem, assignLogistics, claimDinner, cookFromBacklog, fuzzyFind,
-  getKitchenState, listBacklog, listChores, eventsForDate, markDinnerCooked, setBacklogStatus,
-  setNotTonight, toggleChore,
+  addBacklogItem, assignLogistics, claimDinner, cookFromBacklog, computeConflicts, eventsInRange,
+  getKitchenState, listBacklog, listChores, markDinnerCooked, setBacklogStatus,
+  setNotTonight, toggleChore, unclaimDinner,
 } from '../domain';
-import { isParent, NAMES } from '../family';
-import { fmtTime, fmtDay, todayISO } from '../time';
+import { isClaimableLogistics, isParent, NAMES } from '../family';
+import { syncIcsCalendarsIfConfigured } from '../gcal';
+import { fmtTime, todayISO, TZ } from '../time';
 import { getWeather } from '../weather';
 import { controlSpotify } from '../spotify';
 import { postMessage, CHANNELS } from '../slack/api';
 import { refreshDinnerMessages } from '../slack/sync';
 import { dinnerLine } from '../slack/blocks';
+import { kitchenOverview, matchVoiceTarget, scheduleWindow, voiceEvent } from './context';
+import { voicePage } from './request';
+import type { BacklogItem } from '../types';
 
 const plain = (s: string) => s.replace(/[*_]/g, '');
+const text = (value: unknown, max = 250): value is string =>
+  typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+const inventoryMatch = (items: BacklogItem[], name: string) => matchVoiceTarget(items, name,
+  (b) => b.recipe_or_item_name, (b) => `${b.recipe_or_item_name} (${b.location}, ${b.delivery_date})`);
 
-export async function executeVoiceTool(name: string, args: Record<string, any>): Promise<{ result: unknown; touchedDinner: boolean }> {
+export async function executeVoiceTool(name: string, args: Record<string, unknown>) {
   const date = todayISO();
-  const ok = (result: unknown, touchedDinner = false) => ({ result, touchedDinner });
+  const result = (body: unknown, touchedDinner = false) => ({ result: body, touchedDinner });
+  const invalid = () => result({ ok: false, error: 'Invalid arguments.' });
+  const clarify = (choices: { ref: string; label: string }[]) => result({
+    ok: false, needs_clarification: true, choices,
+    message: choices.length ? 'Which one did you mean?' : 'No matching record. Check its name before trying again.',
+  });
 
   switch (name) {
-    case 'get_today_overview': {
-      const s = await getKitchenState(date);
-      return ok({
-        date: fmtDay(date),
-        dinner: plain(dinnerLine(s.dinner)),
-        not_tonight: s.dinner.unavailable.map((p) => NAMES[p]),
-        fridge_backlog: s.backlog.map((b) => `${b.recipe_or_item_name} (since ${b.delivery_date})`),
-        wesley_chores: s.chores.map((c) => `${c.chore_title}: ${c.completed ? 'done' : 'not done'}`),
-        logistics: s.events
-          .filter((e) => e.logistics_type !== 'general')
-          .map((e) => `${fmtTime(e.start_time)} ${e.title} — ${e.assigned_parent === 'unassigned' ? 'NO OWNER' : NAMES[e.assigned_parent]}`),
-        conflicts: s.conflicts.map((c) => c.message),
-        kitchen_pantry: s.groceries.map((g) => g.name),
-      });
+    case 'get_today_overview':
+      return result(kitchenOverview(await getKitchenState(date)));
+
+    case 'get_schedule': {
+      const range = scheduleWindow(args.start_date, args.days, date);
+      if (!range || (args.include_notes !== undefined && typeof args.include_notes !== 'boolean')) return invalid();
+      await syncIcsCalendarsIfConfigured();
+      const events = await eventsInRange(range.first, range.last);
+      const { page, total, next_offset } = voicePage(events, args.offset);
+      return result({ ok: true, ...range, timezone: TZ,
+        total, next_offset, events: page.map((event) => ({ ...voiceEvent(event), notes: args.include_notes ? event.description?.slice(0, 1500) : undefined })),
+        conflicts: computeConflicts(events).map((c) => c.message) });
     }
 
     case 'set_dinner': {
       const chef = args.chef;
-      if (chef !== 'takeout' && !isParent(chef)) return ok({ error: 'chef must be daniela, warren or takeout' });
-      if (chef !== 'takeout' && args.recipe_name) {
-        const match = fuzzyFind(await listBacklog(), (b) => b.recipe_or_item_name, String(args.recipe_name));
+      if (chef !== 'takeout' && !isParent(chef)) return invalid();
+      const recipe = args.recipe_name;
+      if (recipe !== undefined && !text(recipe)) return invalid();
+      if (chef !== 'takeout' && recipe) {
+        const { match, choices } = inventoryMatch(await listBacklog(), recipe);
+        if (!match && choices.length) return clarify(choices);
         if (match) {
           const d = await cookFromBacklog(date, match.id, chef, 'voice');
-          return ok({ ok: true, dinner: plain(dinnerLine(d)), linked_backlog: match.recipe_or_item_name }, true);
+          return result({ ok: true, dinner: plain(dinnerLine(d)), linked_backlog: match.recipe_or_item_name }, true);
         }
       }
-      const d = await claimDinner(date, chef, 'voice', chef === 'takeout' ? undefined : args.recipe_name ?? null);
-      return ok({ ok: true, dinner: plain(dinnerLine(d)) }, true);
+      const d = await claimDinner(date, chef, 'voice', chef === 'takeout' ? undefined : recipe);
+      return result({ ok: true, dinner: plain(dinnerLine(d)) }, true);
     }
-
+    case 'unclaim_dinner': {
+      const d = await unclaimDinner(date, 'voice');
+      return result({ ok: true, dinner: plain(dinnerLine(d)) }, true);
+    }
+    case 'plan_fridge_meal': {
+      if (!text(args.item) || (args.chef !== undefined && !isParent(args.chef))) return invalid();
+      const { match, choices } = inventoryMatch(await listBacklog(), args.item);
+      if (!match) return clarify(choices);
+      const d = await cookFromBacklog(date, match.id, args.chef ?? null, 'voice');
+      return result({ ok: true, dinner: plain(dinnerLine(d)) }, true);
+    }
     case 'not_tonight': {
-      if (!isParent(args.parent)) return ok({ error: 'unknown parent' });
+      if (!isParent(args.parent) || (args.unavailable !== undefined && typeof args.unavailable !== 'boolean')) return invalid();
       const d = await setNotTonight(date, args.parent, args.unavailable !== false, 'voice');
-      return ok({ ok: true, not_tonight: d.unavailable.map((p) => NAMES[p]) }, true);
+      return result({ ok: true, not_tonight: d.unavailable.map((p) => NAMES[p]) }, true);
     }
-
     case 'mark_dinner_cooked': {
       const d = await markDinnerCooked(date, 'voice');
-      return ok({ ok: true, dinner: plain(dinnerLine(d)) }, true);
+      return result({ ok: true, dinner: plain(dinnerLine(d)) }, true);
     }
-
     case 'update_fridge_item': {
-      const backlog = await listBacklog();
-      const match = fuzzyFind(backlog, (b) => b.recipe_or_item_name, String(args.name ?? ''));
-      if (!match) return ok({ error: 'not found', backlog: backlog.map((b) => b.recipe_or_item_name) });
-      await setBacklogStatus(match.id, args.status === 'discarded' ? 'discarded' : 'cooked');
-      return ok({ ok: true, item: match.recipe_or_item_name, status: args.status }, true);
+      if (!text(args.name) || (args.status !== 'cooked' && args.status !== 'discarded')) return invalid();
+      const { match, choices } = inventoryMatch(await listBacklog(), args.name);
+      if (!match) return clarify(choices);
+      await setBacklogStatus(match.id, args.status);
+      return result({ ok: true, item: match.recipe_or_item_name, status: args.status }, true);
     }
-
     case 'add_fridge_item': {
-      const item = await addBacklogItem({
-        name: String(args.name),
-        perishables: Array.isArray(args.perishables) ? args.perishables.map(String) : [],
-        location: ['fridge', 'pantry', 'freezer'].includes(args.location) ? args.location : 'fridge',
-        added_by: 'voice',
-      });
-      return ok({ ok: true, added: item.recipe_or_item_name }, true);
+      const location = args.location ?? 'fridge';
+      const perishables = args.perishables ?? [];
+      if (!text(args.name) || (location !== 'fridge' && location !== 'pantry' && location !== 'freezer') ||
+        !Array.isArray(perishables) || perishables.length > 30 || !perishables.every((p) => text(p))) return invalid();
+      const item = await addBacklogItem({ name: args.name.trim(), perishables, location, added_by: 'voice' });
+      return result({ ok: true, added: item.recipe_or_item_name }, true);
     }
-
     case 'set_chore_done': {
-      const chores = await listChores(date);
-      const match = fuzzyFind(chores, (c) => c.chore_title, String(args.chore ?? ''));
-      if (!match) return ok({ error: 'not found', chores: chores.map((c) => c.chore_title) });
+      if (!text(args.chore) || (args.done !== undefined && typeof args.done !== 'boolean')) return invalid();
+      const { match, choices } = matchVoiceTarget(await listChores(date), args.chore, (c) => c.chore_title);
+      if (!match) return clarify(choices);
       await toggleChore(match.id, args.done !== false);
-      return ok({ ok: true, chore: match.chore_title, done: args.done !== false });
+      return result({ ok: true, chore: match.chore_title, done: args.done !== false });
     }
-
     case 'assign_logistics': {
-      if (!isParent(args.parent)) return ok({ error: 'unknown parent' });
-      const events = await eventsForDate(date);
-      const match = fuzzyFind(events, (e) => e.title, String(args.event ?? ''));
-      if (!match) return ok({ error: 'not found', events: events.map((e) => e.title) });
+      const range = scheduleWindow(args.date, 1, date);
+      if (!range || !text(args.event) || (!isParent(args.parent) && args.parent !== 'unassigned')) return invalid();
+      await syncIcsCalendarsIfConfigured();
+      const events = (await eventsInRange(range.first, range.last)).filter(isClaimableLogistics);
+      const { match, choices } = matchVoiceTarget(events, args.event, (e) => e.title, (e) => `${e.title} at ${fmtTime(e.start_time)}`);
+      if (!match) return clarify(choices);
       await assignLogistics(match.id, args.parent);
-      return ok({ ok: true, event: match.title, assigned: NAMES[args.parent as 'daniela' | 'warren'] }, true);
+      return result({ ok: true, event: match.title, date: range.first, assigned: args.parent }, true);
     }
-
     case 'get_weather':
-      return ok(await getWeather());
-
+      return result({ ok: true, units: 'Fahrenheit', ...await getWeather() });
     case 'control_spotify': {
-      const op = ['play', 'pause', 'next', 'previous'].includes(args.op) ? args.op : 'play';
-      const res = await controlSpotify({ op, query: args.query ? String(args.query) : undefined });
-      return ok(res);
+      const op = args.op;
+      if (op !== 'play' && op !== 'pause' && op !== 'next' && op !== 'previous') return invalid();
+      if (args.query !== undefined && !text(args.query)) return invalid();
+      return result(await controlSpotify({ op, query: args.query }));
     }
-
     case 'post_to_slack': {
-      const channel = args.channel === 'food' ? CHANNELS.food() : CHANNELS.logistics();
-      await postMessage(channel, `🎙️ From the kitchen: ${String(args.message ?? '')}`);
-      return ok({ ok: true });
+      if ((args.channel !== 'food' && args.channel !== 'logistics') || !text(args.message, 1000)) return invalid();
+      const channel = CHANNELS[args.channel]();
+      const sent = await postMessage(channel, `🎙️ From the kitchen: ${args.message.trim()}`);
+      return result({ ok: Boolean(sent.ts && sent.channel) });
     }
-
     default:
-      return ok({ error: `Unknown tool ${name}` });
+      return invalid();
   }
 }
 

@@ -274,8 +274,13 @@ export async function markGreenlightVerified(start: string, end: string) {
 
 // ──────────────────────────── Logistics ────────────────────────────
 export async function eventsForDate(date: string): Promise<LogisticsEvent[]> {
-  const [s] = dayBoundsUTC(date);
-  const [, e] = dayBoundsUTC(addDays(date, 1));
+  // The board includes today and tomorrow.
+  return eventsInRange(date, addDays(date, 1));
+}
+
+export async function eventsInRange(firstDate: string, lastDate: string): Promise<LogisticsEvent[]> {
+  const [s] = dayBoundsUTC(firstDate);
+  const [, e] = dayBoundsUTC(lastDate);
   return unwrap(
     await db()
       .from('family_logistics')
