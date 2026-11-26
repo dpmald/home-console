@@ -25,7 +25,8 @@ import type { SpotifyNowPlaying } from '@/lib/spotify';
 import { VoiceOrb } from './VoiceOrb';
 import { createKitchenTimer, describeTimer, findKitchenTimer, remainingSeconds, updateKitchenTimer, type KitchenTimer } from '@/lib/voice/console-timers';
 import { hasVoiceRecipe, readViewRequest, recipeControl, type BoardSource, type MemberFilter, type ViewMode } from '@/lib/voice/console-view';
-import { ThemeToggle } from './ThemeToggle';
+import { createDinnerGuideLoader, type DinnerGuide, type GuideView } from '@/lib/dinner-guide';
+import { ThemeButton, useTheme } from './ThemeToggle';
 
 interface RecipeStep {
   stage: string;
@@ -309,6 +310,8 @@ function applyOptimisticAction(cur: KitchenState, a: KioskAction): KitchenState 
 
 export function KioskBoard({ initial, initialDemo = false, initialWeather, betaUrl = null, betaKitchenUrl = null, allowPantryEntry = false, allowStreamAudio = true }: { initial: KitchenState; initialDemo?: boolean; initialWeather: Weather | null; betaUrl?: string | null; betaKitchenUrl?: string | null; allowPantryEntry?: boolean; allowStreamAudio?: boolean }) {
   const beta = Boolean(betaKitchenUrl);
+  const [theme, toggleTheme, applyTheme] = useTheme();
+  const [loadDinnerGuide] = useState(() => createDinnerGuideLoader());
   const [state, setState] = useState<KitchenState>(initial);
   const [boardSource, setBoardSource] = useState<BoardSource>(initialDemo ? 'demo' : 'saved');
   const [weather, setWeather] = useState<Weather | null>(initialWeather);
@@ -733,36 +736,36 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
     pendingChef ?? (isParent(d.chef) ? d.chef : 'daniela');
   const fallbackUnstructured = getUnstructuredMealDetails(d.recipe_name);
   const activeMealTitle = d.recipe_name?.trim() || 'Charcuterie Board';
+  const guideTarget = useRef({ title: activeMealTitle, view: dinnerView, source: boardSource, mode });
+  guideTarget.current = { title: activeMealTitle, view: dinnerView, source: boardSource, mode };
+
+  const applyDinnerGuide = useCallback((guide: DinnerGuide) => {
+    if ('tips' in guide) {
+      setLiveDinnerTips(guide);
+    } else {
+      setLiveStructuredRecipe(guide);
+      setRecipeStepIdx(0);
+      setBroilRunning(false);
+      setBroilSeconds(guide.steps[0].defaultTimerSecs);
+    }
+  }, []);
 
   useEffect(() => {
     if (beta || d.status === 'unclaimed' || isCapturingMeal) return;
     let cancelled = false;
-    fetch(`/api/dinner-tips?meal=${encodeURIComponent(activeMealTitle)}&mode=tips`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data && Array.isArray(data.tips) && data.tips.length > 0) {
-          setLiveDinnerTips(data);
-        }
-      })
-      .catch(() => {});
-
-    if (isStructuredRecipeView) {
-      fetch(`/api/dinner-tips?meal=${encodeURIComponent(activeMealTitle)}&mode=recipe`, { cache: 'no-store' })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!cancelled && data && Array.isArray(data.steps) && data.steps.length > 0) {
-            setLiveStructuredRecipe(data);
-            setRecipeStepIdx(0);
-            setBroilRunning(false);
-            setBroilSeconds(data.steps[0]?.defaultTimerSecs ?? 342);
-          }
-        })
-        .catch(() => {});
+    const update = (data: DinnerGuide) => { if (!cancelled) applyDinnerGuide(data); };
+    const meal = activeMealTitle.toLowerCase();
+    if (liveDinnerTips?.mealTitle.toLowerCase() !== meal) {
+      void loadDinnerGuide('tips', activeMealTitle).then(update).catch(() => {});
+    }
+    if (isStructuredRecipeView && liveStructuredRecipe?.mealTitle.toLowerCase() !== meal) {
+      void loadDinnerGuide('steps', activeMealTitle).then(update).catch(() => {});
     }
     return () => {
       cancelled = true;
     };
-  }, [beta, d.status, activeMealTitle, isStructuredRecipeView, isCapturingMeal]);
+  }, [beta, d.status, activeMealTitle, isStructuredRecipeView, isCapturingMeal,
+    liveDinnerTips?.mealTitle, liveStructuredRecipe?.mealTitle, loadDinnerGuide, applyDinnerGuide]);
 
   const unstructuredDetails =
     liveDinnerTips && liveDinnerTips.mealTitle.toLowerCase() === activeMealTitle.toLowerCase()
@@ -855,6 +858,12 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
       instruction: step.instruction, suggested_seconds: step.defaultTimerSecs };
   }
 
+  function selectGuide(view: GuideView) {
+    setMode('dinner');
+    setDinnerRecipeMode(view === 'steps' ? 'structured' : 'tips');
+    guideTarget.current = { title: activeMealTitle, view: view === 'steps' ? 'recipe' : 'tips', source: boardSource, mode: 'dinner' };
+  }
+
   async function handleVoiceTool(name: string, args: Record<string, unknown>) {
     const index = recipeStepIdx % activeRecipeSteps.length;
     const hasRecipe = hasVoiceRecipe(boardSource, dinnerView, d.recipe_name, activeRecipeSteps === DEFAULT_RECIPE_STEPS);
@@ -863,6 +872,7 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
         case 'get_console_context':
           return {
             ok: true, view: mode, member_filter: memberFilter, board_data: boardSource,
+            theme: document.documentElement.dataset.theme ?? theme,
             dinner_screen: mode === 'dinner' ? dinnerView : null,
             selected_cook: mode === 'dinner' && isCapturingMeal ? pendingChef ?? (boardSource === 'saved' ? activeCaptureChef : null) : null,
             timers: timersRef.current.map(timer => describeTimer(timer)),
@@ -881,6 +891,31 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
           setMoreOpen(false);
           setMode(selection.view);
           return { ok: true, ...selection };
+        }
+        case 'set_console_theme':
+          if (args.theme !== 'light' && args.theme !== 'dark') throw new Error('Choose light or dark.');
+          applyTheme(args.theme);
+          return { ok: true, theme: args.theme };
+        case 'show_recipe_view': {
+          const view = args.view;
+          if (view !== 'steps' && view !== 'tips') throw new Error('Choose cooking steps or tips.');
+          if (boardSource !== 'saved' || !d.recipe_name?.trim() || dinnerView === 'choose' || dinnerView === 'capture') {
+            throw new Error('Choose and save a meal before opening its cooking guide.');
+          }
+          selectGuide(view);
+          let ready = view === 'steps'
+            ? hasVoiceRecipe(boardSource, 'recipe', d.recipe_name, activeRecipeSteps === DEFAULT_RECIPE_STEPS)
+            : unstructuredDetails === liveDinnerTips;
+          if (!ready) {
+            const guide = await loadDinnerGuide(view, activeMealTitle).catch(() => null);
+            const target = guideTarget.current;
+            if (target.source !== 'saved' || target.mode !== 'dinner' || target.title !== activeMealTitle || target.view !== (view === 'steps' ? 'recipe' : 'tips')) {
+              throw new Error('The dinner selection changed while its guide was loading.');
+            }
+            if (guide) { applyDinnerGuide(guide); ready = true; }
+          }
+          return { ok: true, view, title: d.recipe_name, content_ready: ready,
+            ...(!ready && { message: 'The view opened, but matching content is unavailable.' }) };
         }
         case 'set_timer':
           return { ok: true, ...startTimer(args) };
@@ -2379,7 +2414,7 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
                         <button
                           type="button"
                           onClick={() => {
-                            setDinnerRecipeMode('tips');
+                            selectGuide('tips');
                             showToast('Switched to Gemini Assembly Tips & Photo view');
                           }}
                           className="font-mono"
@@ -3018,7 +3053,7 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
                         <button
                           type="button"
                           onClick={() => {
-                            setDinnerRecipeMode('structured');
+                            selectGuide('steps');
                             showToast('Switched to Step-by-Step Cooking Guide');
                           }}
                           className="font-mono"
@@ -5192,7 +5227,7 @@ export function KioskBoard({ initial, initialDemo = false, initialWeather, betaU
           </nav>
 
           <div className="dock-utilities">
-            <ThemeToggle defaultTheme="light" />
+            <ThemeButton theme={theme} onToggle={toggleTheme} />
             <a
               href="/guide"
               className="hw-btn"
