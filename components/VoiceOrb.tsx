@@ -1,206 +1,254 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { CLIENT_TOOL_NAMES } from '@/lib/voice/tools';
-import { voiceResultSucceeded } from '@/lib/voice/request';
 
-export interface VoiceClientHandlers {
-  onStartTimer: (seconds: number, label: string) => void;
-  onCancelTimers: () => void;
-  onPlayNpr: () => void;
-  onStopNpr: () => void;
-  onServerToolDone: (name?: string) => void;
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createConversation, type ConversationStatus, type VoiceClientTool } from '@/lib/voice/conversation';
+import { startWakeListener } from '@/lib/voice/wake';
+import styles from './VoiceOrb.module.css';
+
+const WAKE_PREFERENCE = 'home-console.wake.enabled';
+type WakeStatus = 'off' | 'starting' | 'armed' | 'error';
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onClientTool: VoiceClientTool;
+  onServerToolDone: (name: string) => void;
+  onWakeStatusChange?: (armed: boolean) => void;
+  initialPrompt?: string;
+  suspended?: boolean;
 }
 
-type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error';
-const AUTO_DISCONNECT_MS = 90_000;
-const TOOL_FAILURE = 'That change was not confirmed. Please check the list before trying again.';
+function readyTone(context: AudioContext | null) {
+  if (context?.state !== 'running') return;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  const at = context.currentTime;
+  oscillator.frequency.setValueAtTime(560, at);
+  oscillator.frequency.setValueAtTime(790, at + 0.09);
+  gain.gain.setValueAtTime(0.045, at);
+  gain.gain.exponentialRampToValueAtTime(0.001, at + 0.2);
+  oscillator.connect(gain).connect(context.destination);
+  oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+  oscillator.start(at);
+  oscillator.stop(at + 0.2);
+}
 
-export function VoiceOrb(props: VoiceClientHandlers) {
-  const [status, setStatus] = useState<Status>('idle');
+export function VoiceOrb(props: Props) {
+  const latest = useRef(props);
+  latest.current = props;
+  const audio = useRef<HTMLAudioElement>(null);
+  const tone = useRef<AudioContext | null>(null);
+  const call = useRef<ReturnType<typeof createConversation> | null>(null);
+  const detector = useRef<AbortController | null>(null);
+  const wantsWake = useRef(false);
+  const wakeBlocked = useRef(false);
+  const mounted = useRef(false);
+  const [enabled, setEnabled] = useState(false);
+  const [wake, setWake] = useState<WakeStatus>('off');
+  const [wakeError, setWakeError] = useState('');
+  const [status, setStatus] = useState<ConversationStatus | 'idle'>('idle');
   const [caption, setCaption] = useState('');
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const generation = useRef(0);
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const endTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mounted = useRef(true);
-  const handlers = useRef(props);
-  handlers.current = props;
+  const [issue, setIssue] = useState('');
+  const [draft, setDraft] = useState('');
 
-  const stop = useCallback(() => {
-    ++generation.current;
-    if (idleTimer.current) clearTimeout(idleTimer.current);
-    if (endTimer.current) clearTimeout(endTimer.current);
-    idleTimer.current = null;
-    endTimer.current = null;
-    abortRef.current?.abort();
-    abortRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    pcRef.current?.close();
-    pcRef.current = null;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.srcObject = null;
-    }
+  function unlockSound() {
+    try {
+      tone.current ??= new AudioContext();
+      if (tone.current.state !== 'running') void tone.current.resume().catch(() => {});
+    } catch { /* The listening label also signals readiness. */ }
+  }
+
+  const pauseWake = useCallback(() => {
+    detector.current?.abort();
+    detector.current = null;
+    if (mounted.current) setWake('off');
+  }, []);
+
+  const endCall = useCallback(() => {
+    call.current?.close();
+    call.current = null;
     if (mounted.current) setStatus('idle');
   }, []);
 
-  const bumpIdle = useCallback(() => {
-    if (idleTimer.current) clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(stop, AUTO_DISCONNECT_MS);
-  }, [stop]);
+  const startCall = useCallback((useMic: boolean, firstText?: string, woken = false) => {
+    if (call.current || !audio.current || document.hidden || latest.current.suspended) return;
+    pauseWake();
+    setIssue('');
+    setCaption('');
+    setStatus('connecting');
+    latest.current.onOpenChange(true);
+    const session = createConversation(audio.current, {
+      onClientTool: (name, args) => latest.current.onClientTool(name, args),
+      onServerToolDone: name => latest.current.onServerToolDone(name),
+      onCaption: setCaption,
+      onStatus: setStatus,
+      onReady: () => {
+        if (firstText) setDraft(current => current.trim() === firstText ? '' : current);
+        if (!useMic) return;
+        // A restored hands-free preference can wake before anyone has opened the panel.
+        unlockSound();
+        const context = tone.current;
+        if (context?.state === 'running') readyTone(context);
+        else void context?.resume().then(() => { if (call.current === session) readyTone(context); }).catch(() => {});
+      },
+      onEnded: error => {
+        call.current = null;
+        setStatus('idle');
+        setIssue(error || '');
+        if (!error) latest.current.onOpenChange(false);
+        // A configuration or connection failure must not repeatedly open paid sessions.
+        if (error && woken) {
+          wakeBlocked.current = true;
+          setWake('error');
+          setWakeError('Hands-free is paused. Check the connection, then retry.');
+        }
+      },
+    });
+    call.current = session;
+    void session.start(useMic, firstText);
+  }, [pauseWake]);
+
+  const arm = useCallback(() => {
+    if (!mounted.current || !wantsWake.current || wakeBlocked.current || document.hidden
+        || latest.current.suspended || call.current || detector.current) return;
+    const controller = new AbortController();
+    detector.current = controller;
+    setWake('starting');
+    const failed = (error: Error) => {
+      if (controller.signal.aborted || detector.current !== controller) return;
+      controller.abort();
+      detector.current = null;
+      wakeBlocked.current = true;
+      setWakeError(error.message.slice(0, 240) || 'Check microphone access and retry.');
+      setWake('error');
+    };
+    void startWakeListener(() => {
+      if (!controller.signal.aborted && detector.current === controller) startCall(true, undefined, true);
+    }, failed, controller.signal).then(stop => {
+      if (controller.signal.aborted) stop();
+      else setWake('armed');
+    }).catch(failed);
+  }, [startCall]);
 
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; stop(); };
-  }, [stop]);
+    try { wantsWake.current = localStorage.getItem(WAKE_PREFERENCE) === '1'; } catch { /* Private mode. */ }
+    setEnabled(wantsWake.current);
+    arm();
+    const suspend = () => {
+      pauseWake();
+      endCall();
+      setCaption('');
+    };
+    const visibility = () => { if (document.hidden) suspend(); else arm(); };
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pagehide', suspend);
+    window.addEventListener('pageshow', arm);
+    return () => {
+      mounted.current = false;
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pagehide', suspend);
+      window.removeEventListener('pageshow', arm);
+      pauseWake();
+      endCall();
+      void tone.current?.close().catch(() => {});
+      tone.current = null;
+    };
+  }, [arm, endCall, pauseWake]);
 
-  const start = async () => {
-    // A second click before React re-renders must not start another microphone.
-    if (abortRef.current) return;
-    const session = ++generation.current;
-    const active = () => mounted.current && generation.current === session;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const outputs = new Map<string, Promise<unknown>>();
-    setCaption('');
-    setStatus('connecting');
-    try {
-      const pc = new RTCPeerConnection();
-      pcRef.current = pc;
-      const audio = audioRef.current ?? new Audio();
-      audio.autoplay = true;
-      audioRef.current = audio;
-      pc.ontrack = (event) => { if (active()) audio.srcObject = event.streams[0]; };
-      pc.onconnectionstatechange = () => {
-        if (active() && pc.connectionState === 'failed') {
-          stop();
-          setStatus('error');
-          setCaption('Voice disconnected. Please check the list before trying again.');
-        }
-      };
+  useEffect(() => {
+    if (props.suspended) {
+      pauseWake();
+      endCall();
+    } else if (status === 'idle') arm();
+  }, [status, props.suspended, enabled, arm, endCall, pauseWake]);
 
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      if (!active()) {
-        mic.getTracks().forEach((track) => track.stop());
-        return;
-      }
-      streamRef.current = mic;
-      mic.getTracks().forEach((track) => pc.addTrack(track, mic));
-      const dc = pc.createDataChannel('oai-events');
-      const send = (event: Record<string, unknown>) => {
-        if (active() && dc.readyState === 'open') dc.send(JSON.stringify(event));
-      };
-      dc.onopen = () => {
-        if (!active()) return;
-        setStatus('listening');
-        bumpIdle();
-      };
+  // The board can close the panel when a different kiosk interaction takes focus.
+  useEffect(() => {
+    if (!props.open) { endCall(); setCaption(''); setIssue(''); setDraft(''); }
+    else setDraft(props.initialPrompt || '');
+  }, [props.open, props.initialPrompt, endCall]);
 
-      const execute = async (name: string, callId: string, argumentText: unknown): Promise<unknown> => {
-        try {
-          if (typeof argumentText !== 'string' || argumentText.length > 32768) throw new Error('invalid arguments');
-          const args = JSON.parse(argumentText || '{}') as Record<string, unknown>;
-          if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('invalid arguments');
-          if (!active()) return { ok: false, error: 'Voice session ended.' };
-          if (CLIENT_TOOL_NAMES.has(name)) {
-            if (name === 'set_timer') {
-              const total = Number(args.minutes ?? 0) * 60 + Number(args.seconds ?? 0);
-              if (!Number.isFinite(total) || total <= 0 || total > 86400) throw new Error('invalid timer');
-              const seconds = Math.round(total);
-              handlers.current.onStartTimer(seconds, String(args.label || 'Timer').slice(0, 100));
-              return { ok: true, seconds };
-            }
-            if (name === 'cancel_timers') handlers.current.onCancelTimers();
-            if (name === 'play_npr') handlers.current.onPlayNpr();
-            if (name === 'stop_npr') handlers.current.onStopNpr();
-            if (name === 'end_session') endTimer.current = setTimeout(() => { if (active()) stop(); }, 1200);
-            return { ok: true };
-          }
-          const response = await fetch('/api/voice/tool', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, args, call_id: callId }),
-            signal: controller.signal,
-          });
-          const body: unknown = await response.json();
-          const result = body && typeof body === 'object' && 'result' in body ? body.result : null;
-          if (!response.ok || !voiceResultSucceeded(result)) throw new Error('tool failed');
-          if (active()) handlers.current.onServerToolDone(name);
-          return result;
-        } catch {
-          if (active()) setCaption(TOOL_FAILURE);
-          return { ok: false, error: TOOL_FAILURE };
-        }
-      };
+  useEffect(() => { latest.current.onWakeStatusChange?.(wake === 'armed'); }, [wake]);
 
-      dc.onmessage = async (event) => {
-        if (!active()) return;
-        bumpIdle();
-        let message: Record<string, unknown>;
-        try {
-          if (typeof event.data !== 'string' || event.data.length > 65536) return;
-          message = JSON.parse(event.data);
-          if (!message || typeof message !== 'object' || Array.isArray(message)) return;
-        } catch { return; }
-        if (message.type === 'output_audio_buffer.started') setStatus('speaking');
-        if (message.type === 'output_audio_buffer.stopped') setStatus('listening');
-        if (message.type === 'response.output_audio_transcript.done' && typeof message.transcript === 'string') {
-          setCaption(message.transcript.slice(0, 1200));
-        }
-        if (message.type !== 'response.function_call_arguments.done') return;
-        const name = message.name;
-        const callId = message.call_id;
-        if (typeof name !== 'string' || typeof callId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(callId)) return;
-        // Duplicate provider events reuse the same in-flight work and result.
-        // Server-side operation IDs also protect grocery writes if the response is lost.
-        const existing = outputs.get(callId);
-        if (existing) return;
-        const pending = execute(name, callId, message.arguments);
-        outputs.set(callId, pending);
-        const output = await pending;
-        send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify(output) } });
-        send({ type: 'response.create' });
-      };
+  const closePanel = useCallback(() => {
+    endCall();
+    latest.current.onOpenChange(false);
+  }, [endCall]);
 
-      const offer = await pc.createOffer();
-      if (!active()) return;
-      await pc.setLocalDescription(offer);
-      if (!active()) return;
-      const response = await fetch('/api/voice/session', {
-        method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: offer.sdp,
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error('voice unavailable');
-      const answer = await response.text();
-      if (!active()) return;
-      await pc.setRemoteDescription({ type: 'answer', sdp: answer });
-    } catch {
-      if (!active()) return;
-      stop();
-      setStatus('error');
-      setCaption('Voice is unavailable. Check microphone permission, or type your request.');
-    }
-  };
+  useEffect(() => {
+    if (!props.open) return;
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') closePanel(); };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [props.open, closePanel]);
 
-  const live = status === 'listening' || status === 'speaking' || status === 'connecting';
-  const label = status === 'connecting' ? 'Connecting…' : status === 'listening' ? 'Listening — speak now'
-    : status === 'speaking' ? 'Speaking… (tap to stop)' : status === 'error' ? 'Retry kitchen voice' : 'Kitchen voice';
+  function preferWake(value: boolean) {
+    wantsWake.current = value;
+    setEnabled(value);
+    wakeBlocked.current = false;
+    setWakeError('');
+    try { localStorage.setItem(WAKE_PREFERENCE, value ? '1' : '0'); } catch { /* This tab still works. */ }
+    if (value) { unlockSound(); arm(); }
+    else { pauseWake(); endCall(); }
+  }
 
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-      <button type="button" className={`voice-btn ${live ? 'live' : ''}`} aria-pressed={live}
-        onClick={live ? stop : start} style={{ minHeight: 48 }}>
-        <span className="dot" />🎙️ {label}
-      </button>
-      {caption && <span role="status" aria-live="polite" style={{ color: 'var(--muted)', fontSize: '0.92rem', maxWidth: 480 }}>
-        {caption}
-      </span>}
-    </div>
-  );
+  function sendDraft() {
+    const text = draft.trim();
+    if (!text || status === 'connecting') return;
+    unlockSound();
+    if (call.current) {
+      if (!call.current.sendText(text)) return;
+      setDraft('');
+    } else startCall(false, text);
+  }
+
+  const live = status !== 'idle';
+  const heading = { idle: 'Kitchen voice', connecting: 'Connecting…', listening: 'Listening',
+    speaking: 'Speaking', typing: 'Ready for your question' }[status];
+  const handsFree = wake === 'armed' ? 'Listening for “Hey Kitchen”'
+    : wake === 'starting' ? 'Starting wake detection…'
+    : enabled && live ? 'Resumes after this conversation' : 'Say “Hey Kitchen”, wait for the tone, then ask.';
+
+  return <>
+    <audio ref={audio} autoPlay playsInline />
+    {props.open && <section role="dialog" aria-labelledby="kitchen-assistant-title" className={styles.panel}>
+      <header className={styles.header}>
+        <div className={styles.heading}>
+          <span className={styles.indicator} data-live={live} aria-hidden="true" />
+          <h2 id="kitchen-assistant-title" aria-live="polite">{heading}</h2>
+        </div>
+        <button type="button" className={styles.close} onClick={closePanel} aria-label="Close Kitchen voice">×</button>
+      </header>
+      <div className={styles.reply} role="status">
+        {issue || caption || (status === 'listening' ? 'Go ahead. You can ask a follow-up or interrupt.'
+          : status === 'connecting' ? 'Wait for the listening cue.'
+          : 'Ask about the family schedule, change dinner, or start a timer.')}
+      </div>
+      <div className={styles.controls}>
+        {(!live || status === 'typing') && <button type="button" className={styles.talk} onClick={() => {
+          unlockSound();
+          setIssue('');
+          if (!call.current) startCall(true);
+          else void call.current.enableMicrophone().catch(() => setIssue('Allow microphone access to talk, or keep typing.'));
+        }}>Talk</button>}
+        {live && <button type="button" className={styles.end} onClick={closePanel}>End conversation</button>}
+      </div>
+      <form className={styles.form} onSubmit={event => { event.preventDefault(); sendDraft(); }}>
+        <input aria-label="Question for Kitchen voice" placeholder="Type a question…" maxLength={1500}
+          value={draft} onChange={event => setDraft(event.target.value)} />
+        <button type="submit" disabled={!draft.trim() || status === 'connecting'}>Send</button>
+      </form>
+      <div className={styles.setting}>
+        <div>
+          <strong>Hands-free wake</strong>
+          <small>{enabled && wakeError && !live ? wakeError : handsFree}</small>
+        </div>
+        <button type="button" role="switch" aria-checked={enabled} aria-label="Hands-free wake"
+          className={styles.toggle} onClick={() => preferWake(!enabled)}>{enabled ? 'On' : 'Off'}</button>
+      </div>
+      {enabled && wakeError && !live && <button type="button" onClick={() => preferWake(true)}>Retry wake detection</button>}
+      <p className={styles.privacy}>Wake detection runs on this device. Conversations use OpenAI.</p>
+    </section>}
+  </>;
 }

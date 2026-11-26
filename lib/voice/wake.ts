@@ -88,7 +88,14 @@ export async function startWakeListener(
     capture = new AudioWorkletNode(context, 'kitchen-wake-capture', {
       channelCount: 1, channelCountMode: 'explicit', numberOfOutputs: 1, outputChannelCount: [1],
     });
+    // A throttled WebView must not accumulate minutes of delayed kitchen audio.
+    let pendingFrames = 0;
     const listen = async (samples: Float32Array) => {
+      if (pendingFrames >= 20) {
+        fail('This device fell behind on wake detection. Tap to try again.');
+        return;
+      }
+      pendingFrames++;
       try {
         const hits = await detector.processAudio(samples, context.sampleRate);
         if (!lifetime.signal.aborted && hits.some((hit) => hit.label === wakePhrase.label)) {
@@ -97,6 +104,8 @@ export async function startWakeListener(
         }
       } catch {
         fail('Wake-word recognition stopped. Tap to try again.');
+      } finally {
+        pendingFrames--;
       }
     };
     capture.port.onmessage = (event: MessageEvent<Float32Array>) => {
